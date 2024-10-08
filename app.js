@@ -1,27 +1,38 @@
 const express = require("express");
 const { mongoose } = require("mongoose");
-const cors = require('cors')
+const cors = require('cors');
 const path = require("path");
-const fileUpload = require("express-fileupload"); // Import express-fileupload
+const fs = require("fs");
+const fileUpload = require("express-fileupload"); 
 require("dotenv").config();
-const admin = require('firebase-admin')
-const serviceAccount = require('./config/serviceAccount')
+const admin = require('firebase-admin');
 
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(fileUpload()); 
+app.use(fileUpload());
+
+// Get service account path from environment variable
+const serviceAccountPath = process.env.SERVICE_ACCOUNT_PATH;
+
+// Read the service account JSON file
+const serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, serviceAccountPath)));
+
+// Initialize Firebase Admin
 admin.initializeApp({
-credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(serviceAccount),
 });
+
 // Serve static files (for the uploads folder)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Debugging: Log the path being served as static
 console.log("Serving static files from:", path.join(__dirname, 'uploads'));
 
+// Routes
 const signUpRouter = require("./routes/signUpRouter");
 const postRouter = require('./routes/postRouter');
 const notFound = require("./middlewares/notFound");

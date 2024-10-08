@@ -33,7 +33,6 @@ const signUp = async (req, res, next) => {
       
       const { uid, email: googleEmail, name, picture } = decodedToken;
 
-      // Checked if the user already exists
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
         return res.status(409).json({ success: false, message: "User already exists" });

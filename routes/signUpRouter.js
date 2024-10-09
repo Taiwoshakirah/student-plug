@@ -2,8 +2,6 @@ const express = require("express");
 const { signUp, studentInformation, signin, forgotPassword, resetPassword, getUser, uploadProfilePicture, googleSignIn } = require("../controllers/authController"); 
 const methodNotAllowed = require("../utils/methodNotAllowed");
 const authenticateToken = require("../middlewares/verifyToken");
-const upload = require("../middlewares/profilePicture");
-const uploadProfileImage = require("../middlewares/profilePicture");
 const router = express.Router();
 
 router.route("/signin-google").post(googleSignIn).all(methodNotAllowed);

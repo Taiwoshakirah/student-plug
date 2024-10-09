@@ -14,9 +14,10 @@ const admin = require('firebase-admin');
 const signUp = async (req, res, next) => {
   const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
-  // I converted agreedToTerms to boolean if it's a string
+  // Convert agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
+  // Check for required fields based on the sign-up method (Google vs Normal)
   if (!idToken && (!fullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTermsBool)) {
     return res.status(422).json({ success: false, message: "Input all fields" });
   }
@@ -25,64 +26,73 @@ const signUp = async (req, res, next) => {
     return res.status(400).json({ success: false, message: "You must agree to the terms and conditions" });
   }
 
+  // If Google sign-up
   if (idToken) {
     try {
-      // Google signup logic
+      // Verify the Google ID token
       const decodedToken = await admin.auth().verifyIdToken(idToken, true);
       console.log(decodedToken);
-      
+
       const { uid, email: googleEmail, name, picture } = decodedToken;
 
+      // Check if the user already exists
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
         return res.status(409).json({ success: false, message: "User already exists" });
       }
 
+      // Create new user using Google credentials
       const newUser = await User.create({
-        fullName: name || fullName, 
+        fullName: name || fullName,  // If name is not provided by Google, fallback to user-provided fullName
         email: googleEmail,
-        phoneNumber,
         googleId: uid,
-        profilePicture: picture || null,
+        profilePicture: picture || null,  // Optional Google profile picture
         agreedToTerms: agreedToTermsBool,
       });
 
+      // Generate JWT token for the user
       const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
       return res.json({ success: true, message: "User created successfully", data: newUser, token });
-      
-    } catch (error) {
-      if (error.code === 'auth/id-token-revoked') {
-        // Handle token revocation error
-        return res.status(401).json({ success: false, message: "Google ID token has been revoked" });
-      }else {return res.status(401).json({ success: false, message: "Invalid Google ID token" });}
-    }
 
-  } else {
-    // Normal signup logic
+    } catch (error) {
+      console.error("Google sign-up error:", error);
+      if (error.code === "auth/id-token-revoked") {
+        return res.status(401).json({ success: false, message: "Google ID token has been revoked" });
+      }
+      return res.status(401).json({ success: false, message: "Invalid Google ID token" });
+    }
+  } 
+
+  // If Normal sign-up
+  else {
     if (password !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
 
-    // Check if the user already exists
+    // Check if the user already exists by email
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ success: false, message: "User already exists" });
     }
 
     try {
+      // Create new user with normal sign-up details
       const newUser = await User.create({
         fullName,
         email,
         phoneNumber,
-        password, 
+        password,  // Ensure that the password is hashed before saving (using bcrypt or similar)
         agreedToTerms: agreedToTermsBool,
       });
 
+      // Generate JWT token for the user
       const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
       return res.json({ success: true, message: "User created successfully", data: newUser, token });
 
     } catch (error) {
+      console.error("Normal sign-up error:", error);
       if (error.code === 11000) {
+        // Handle duplicate key error (e.g., email or phone number already exists)
         const field = Object.keys(error.keyPattern)[0];
         return res.status(400).json({ success: false, message: `Duplicate ${field} provided` });
       }
@@ -90,6 +100,7 @@ const signUp = async (req, res, next) => {
     }
   }
 };
+
 
 
 

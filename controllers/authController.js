@@ -40,7 +40,7 @@ const signUp = async (req, res, next) => {
         return res.status(409).json({ success: false, message: "User already exists" });
       }
 
-      // Create new user with Google sign-up details
+      // Create new user with Google sign-up detail
       const newUser = await User.create({
         fullName: name || fullName,  // Use Google name if available, else use provided fullName
         email: googleEmail,

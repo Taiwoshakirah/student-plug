@@ -17,6 +17,7 @@ const signUp = async (req, res, next) => {
   // Convert agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
+  // For non-Google sign-up, validate required fields
   if (!idToken && (!fullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTermsBool)) {
     return res.status(422).json({ success: false, message: "Input all fields" });
   }
@@ -25,6 +26,7 @@ const signUp = async (req, res, next) => {
     return res.status(400).json({ success: false, message: "You must agree to the terms and conditions" });
   }
 
+  // Google sign-up logic
   if (idToken) {
     try {
       const decodedToken = await admin.auth().verifyIdToken(idToken, true);
@@ -32,19 +34,22 @@ const signUp = async (req, res, next) => {
 
       const { uid, email: googleEmail, name, picture } = decodedToken;
 
+      // Check if the user already exists
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
         return res.status(409).json({ success: false, message: "User already exists" });
       }
 
+      // Create new user with Google sign-up details
       const newUser = await User.create({
-        fullName: name || fullName,  
+        fullName: name || fullName,  // Use Google name if available, else use provided fullName
         email: googleEmail,
         googleId: uid,
-        profilePicture: picture || null,  
+        profilePicture: picture || null,  // Use Google profile picture if available
         agreedToTerms: agreedToTermsBool,
       });
 
+      // Generate JWT token for the user
       const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
       return res.json({ success: true, message: "User created successfully", data: newUser, token });
 
@@ -55,9 +60,9 @@ const signUp = async (req, res, next) => {
       }
       return res.status(401).json({ success: false, message: "Invalid Google ID token" });
     }
-  } 
+  }
 
-  // If Normal sign-up
+  // Normal sign-up logic
   else {
     if (password !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match" });

@@ -14,7 +14,7 @@ const admin = require('firebase-admin');
 const signUp = async (req, res, next) => {
   const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
-  // Convert agreedToTerms to boolean if it's a string
+  // Converttion of agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
   // For non-Google sign-up, validate required fields
@@ -42,10 +42,10 @@ const signUp = async (req, res, next) => {
 
       // Create new user with Google sign-up detail
       const newUser = await User.create({
-        fullName: name || fullName,  // Use Google name if available, else use provided fullName
+        fullName: name || fullName,  
         email: googleEmail,
         googleId: uid,
-        profilePicture: picture || null,  // Use Google profile picture if available
+        profilePicture: picture || null,  
         agreedToTerms: agreedToTermsBool,
       });
 
@@ -80,7 +80,7 @@ const signUp = async (req, res, next) => {
         fullName,
         email,
         phoneNumber,
-        password,  // Ensure that the password is hashed before saving (using bcrypt or similar)
+        password,  
         agreedToTerms: agreedToTermsBool,
       });
 
@@ -416,28 +416,59 @@ const forgotPassword = async (req, res, next) => {
   }
 };
 
-const resetPassword = async (req, res, next) => {
-  const { code, password } = req.body;
 
-  if (!code || !password) {
-    return res.status(400).json({ message: "Code and new password are required" });
+
+const verifyResetCode = async (req, res, next) => {
+  const { code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({ message: "Verification code is required" });
   }
 
   try {
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
-
-    // Find user with matching reset code and check expiry
     const user = await User.findOne({
       resetPasswordCode: hashedCode,
-      resetPasswordExpires: { $gt: Date.now() }, 
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid or expired reset code" });
     }
 
-    // Reset the password and clear the reset fields
-    user.password = password;
+    // Return the user ID or a temporary token after code verification
+    res.status(200).json({ message: "Code verified successfully", userId: user._id });
+  } catch (error) {
+    console.error("Error in verifyResetCode:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+
+
+
+const resetPassword = async (req, res, next) => {
+  const { userId, password, confirmPassword } = req.body;
+
+  if (!userId || !password || !confirmPassword) {
+    return res.status(400).json({ message: "User ID, Password, and Confirm Password are required" });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ message: "Passwords do not match" });
+  }
+
+  try {
+    // Find the user by userId
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Reset the password
+    user.password = password; 
     user.resetPasswordCode = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
@@ -449,6 +480,8 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+
+
 module.exports = {
   signUp,
   uploadProfilePicture,
@@ -456,6 +489,7 @@ module.exports = {
   signin,
   googleSignIn,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   getUser,
 };

@@ -380,6 +380,7 @@ const forgotPassword = async (req, res, next) => {
   try {
     let user;
 
+    // Find the user by email or phone number
     if (email) {
       user = await User.findOne({ email });
     } else if (phoneNumber) {
@@ -388,6 +389,11 @@ const forgotPassword = async (req, res, next) => {
 
     if (!user) {
       return res.status(400).json({ message: "User with this email or phone number does not exist" });
+    }
+
+    // Block password reset for Google accounts
+    if (user.googleId) {
+      return res.status(400).json({ message: "Password reset is not allowed for Google accounts" });
     }
 
     // Generate a new 4-digit reset code (regenerate on every resend request)
@@ -454,10 +460,12 @@ const verifyResetCode = async (req, res, next) => {
 const resetPassword = async (req, res, next) => {
   const { userId, password, confirmPassword } = req.body;
 
+  // Check for required fields
   if (!userId || !password || !confirmPassword) {
     return res.status(400).json({ message: "User ID, Password, and Confirm Password are required" });
   }
 
+  // Ensure the passwords match
   if (password !== confirmPassword) {
     return res.status(400).json({ message: "Passwords do not match" });
   }
@@ -470,10 +478,15 @@ const resetPassword = async (req, res, next) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Reset the password
+    // Prevent password reset for Google accounts
+    if (user.googleId) {
+      return res.status(400).json({ message: "Password reset is not allowed for Google accounts" });
+    }
+
+    // Proceed with password reset
     user.password = password; 
-    user.resetPasswordCode = undefined;
-    user.resetPasswordExpires = undefined;
+    user.resetPasswordCode = undefined;  
+    user.resetPasswordExpires = undefined;  // Clear the expiration time
     await user.save();
 
     res.status(200).json({ message: "Password reset successful" });
@@ -482,6 +495,7 @@ const resetPassword = async (req, res, next) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 
 

@@ -371,7 +371,7 @@ const getUser = async (req, res) => {
 
 
 const forgotPassword = async (req, res, next) => {
-  const { email, phoneNumber, resend } = req.body; // Adding the `resend` flag
+  const { email, phoneNumber, resend } = req.body;
 
   if (!email && !phoneNumber) {
     return res.status(400).json({ message: "Please provide either an email or phone number" });
@@ -390,41 +390,24 @@ const forgotPassword = async (req, res, next) => {
       return res.status(400).json({ message: "User with this email or phone number does not exist" });
     }
 
-    // Check if this is a resend request and if the code is still valid
-    if (resend && user.resetPasswordCode && user.resetPasswordExpires > Date.now()) {
-      // Resend the existing code (if not expired)
-      if (email) {
-        const options = {
-          email: email,
-          subject: "Password Reset Code",
-          text: `Your password reset code is ${user.resetPasswordCode}`,
-        };
-        await sendMail(options);
-      } else if (phoneNumber) {
-        await sendSMS(phoneNumber, `Your password reset code is ${user.resetPasswordCode}`);
-      }
-
-      return res.status(200).json({ message: "Password reset code resent successfully" });
-    }
-
-    // If it's not a resend or the code has expired, generate a new code
+    // Generate a new 4-digit reset code (regenerate on every resend request)
     const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    // Hash the new reset code and set expiration
+    // Hash the reset code and set expiration
     user.resetPasswordCode = crypto.createHash('sha256').update(resetCode).digest('hex');
     user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiration
     await user.save();
 
-    // Send the new code
+    // Send the plain-text reset code via email or SMS
     if (email) {
       const options = {
         email: email,
         subject: "Password Reset Code",
-        text: `Your password reset code is ${resetCode}`,
+        text: `Your password reset code is ${resetCode}`,  // Send the plain-text code
       };
       await sendMail(options);
     } else if (phoneNumber) {
-      await sendSMS(phoneNumber, `Your password reset code is ${resetCode}`);
+      await sendSMS(phoneNumber, `Your password reset code is ${resetCode}`);  // Send the plain-text code
     }
 
     res.status(200).json({ message: "Password reset code sent successfully" });
@@ -433,6 +416,7 @@ const forgotPassword = async (req, res, next) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 
 

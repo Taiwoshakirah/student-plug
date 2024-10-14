@@ -10,7 +10,7 @@ const studentInfoSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  course: {
+  faculty: {
     type: String,
     required: true,
   },

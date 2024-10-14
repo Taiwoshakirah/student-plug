@@ -135,7 +135,7 @@ const studentInformation = async (req, res) => {
   const {
     userId,
     university,
-    course,
+    faculty,
     department,
     level,
     yearOfAdmission,
@@ -144,7 +144,7 @@ const studentInformation = async (req, res) => {
 
   if (
     !university ||
-    !course ||
+    !faculty ||
     !department ||
     !level ||
     !yearOfAdmission ||
@@ -174,7 +174,7 @@ const studentInformation = async (req, res) => {
     const newStudentInfo = new StudentInfo({
       userId,
       university,
-      course,
+      faculty,
       department,
       level,
       yearOfAdmission: formatDate(yearOfAdmission),
@@ -486,7 +486,7 @@ const resetPassword = async (req, res, next) => {
     // Proceed with password reset
     user.password = password; 
     user.resetPasswordCode = undefined;  
-    user.resetPasswordExpires = undefined;  // Clear the expiration time
+    user.resetPasswordExpires = undefined;
     await user.save();
 
     res.status(200).json({ message: "Password reset successful" });

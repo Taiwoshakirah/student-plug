@@ -149,121 +149,156 @@ const schoolInformation = async (req, res) => {
 };
 
 const uploadStudentsRegNo = async (req, res) => {
-    const { facultyName } = req.body;
-  
-    if (!facultyName) {
-      return res.status(400).send("Faculty name is required.");
+    // Ensure that facultyName[] is treated as an array
+    let facultyNames = req.body.facultyName;
+
+    if (!Array.isArray(facultyNames)) {
+        facultyNames = [facultyNames];
     }
-  
-    // Finding the faculty by its name
-    const faculty = await Faculty.findOne({ facultyName });
-    if (!faculty) {
-      return res.status(404).send("Faculty not found.");
+
+    console.log("Incoming faculty names:", facultyNames);
+
+    if (!facultyNames || !facultyNames.length) {
+        return res.status(400).send("At least one faculty must be selected.");
     }
-    const facultyId = faculty._id;
-  
-    if (!req.files || Object.keys(req.files).length === 0) {
-      return res.status(400).send("No files were uploaded.");
+
+    const faculties = await Faculty.find({}, { facultyName: 1 });
+    console.log("Faculties in DB:", faculties);
+
+    const facultyDocs = await Faculty.find({
+        facultyName: { $in: facultyNames.map(name => new RegExp(name, 'i')) }
+    });
+
+    console.log("Faculty documents retrieved:", facultyDocs);
+
+    if (facultyDocs.length === 0) {
+        return res.status(404).send("No faculties found.");
     }
-  
+
+    if (!req.files || !req.files.file) {
+        return res.status(400).send("No files were uploaded.");
+    }
+
     const file = req.files.file;
-  
+
     // Validating the uploaded file type
     const allowedMimeTypes = [
-      "text/csv",
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/csv",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
     ];
-  
+
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      return res.status(400).send("Please upload a valid CSV, PDF, Excel, or Word document.");
+        return res.status(400).send("Please upload a valid CSV, PDF, or Excel file.");
     }
-  
+
     const registrationNumbers = [];
-    const tempPath = `${process.env.UPLOAD_PATH}${file.name}`;
-    ;
-  
+    const tempPath = `${process.env.UPLOAD_PATH}/${file.name}`;
+
     // Move the uploaded file to the desired location
     await file.mv(tempPath);
-  
+
     try {
-      if (file.mimetype === "text/csv") {
-        // Handle CSV file
-        fs.createReadStream(tempPath)
-          .pipe(csv())
-          .on("data", (data) => {
-            const regNum = data.registrationNumber?.trim();
-            if (regNum && !registrationNumbers.includes(regNum)) {
-              registrationNumbers.push(regNum);
-            }
-          })
-          .on("end", () => handleFileProcessingEnd(registrationNumbers, facultyId, tempPath, res));
-      } else if (file.mimetype === "application/pdf") {
-        // Handle PDF file
-        const dataBuffer = fs.readFileSync(tempPath);
-        const pdfData = await pdfParse(dataBuffer);
-        const lines = pdfData.text.split("\n");
-        lines.forEach((line) => {
-          const regNum = line.trim();
-          if (regNum && !registrationNumbers.includes(regNum)) {
-            registrationNumbers.push(regNum);
-          }
-        });
-        handleFileProcessingEnd(registrationNumbers, facultyId, tempPath, res);
-      } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
-        // Handle Excel file
-        const rows = await readXlsxFile(tempPath);
-        rows.forEach((row) => {
-          const regNum = row[0]?.trim(); 
-          if (regNum && !registrationNumbers.includes(regNum)) {
-            registrationNumbers.push(regNum);
-          }
-        });
-        handleFileProcessingEnd(registrationNumbers, facultyId, tempPath, res);
-      } else if (file.mimetype.includes("wordprocessingml")) {
-        // Handle DOCX file
-        const result = await mammoth.extractRawText({ path: tempPath });
-        const lines = result.value.split("\n");
-        lines.forEach((line) => {
-          const regNum = line.trim();
-          if (regNum && !registrationNumbers.includes(regNum)) {
-            registrationNumbers.push(regNum);
-          }
-        });
-        handleFileProcessingEnd(registrationNumbers, facultyId, tempPath, res);
-      } else if (file.mimetype === "application/msword") {
-        // Handle DOC file (older Word format)
-        return res.status(400).send("DOC format is not supported. Please upload DOCX.");
-      }
-    } catch (error) {
-      console.error("Error processing file:", error);
-      return res.status(500).send("Error processing file.");
-    }
-  };
-  
-  //  function to handle file processing completion and saving to the database
-  const handleFileProcessingEnd = async (registrationNumbers, facultyId, tempPath, res) => {
-    try {
-      for (const regNum of registrationNumbers) {
-        const existingStudent = await Student.findOne({ registrationNumber: regNum });
-        if (!existingStudent) {
-          const student = new Student({ registrationNumber: regNum, faculty: facultyId });
-          await student.save();
+        if (file.mimetype === "text/csv") {
+            // Handle CSV file
+            fs.createReadStream(tempPath)
+                .pipe(csv())
+                .on("data", (data) => {
+                    const regNum = data.registrationNumber?.trim();
+                    if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+                        registrationNumbers.push(regNum);
+                    }
+                })
+                .on("end", () => {
+                    console.log("Extracted registration numbers:", registrationNumbers);
+                    handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
+                });
+        } else if (file.mimetype === "application/pdf") {
+            // Handle PDF file
+            const dataBuffer = fs.readFileSync(tempPath);
+            const pdfData = await pdfParse(dataBuffer);
+            const lines = pdfData.text.split("\n");
+
+            // Extract registration numbers using a regex pattern
+            const regNoPattern = /ND\/\d{3}\/\d{3}/; // Adjust this to fit the actual registration number format
+            lines.forEach((line) => {
+                const match = line.match(regNoPattern);
+                if (match) {
+                    const regNum = match[0].trim();
+                    if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+                        registrationNumbers.push(regNum);
+                    }
+                }
+            });
+            console.log("Extracted registration numbers:", registrationNumbers);
+            handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
+        } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
+            // Handle Excel file
+            const rows = await readXlsxFile(tempPath);
+            rows.forEach((row) => {
+                const regNum = row[0]?.trim(); // Assuming registration number is in column 1
+                if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+                    registrationNumbers.push(regNum);
+                }
+            });
+            // console.log("Extracted registration numbers:", registrationNumbers);
+            handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
         }
-      }
-      // Optionally delete the temporary file
-      fs.unlink(tempPath, (err) => {
-        if (err) console.error("Error deleting temp file:", err);
-      });
-      res.status(200).send("Students registration numbers uploaded successfully.");
     } catch (error) {
-      console.error("Error saving students:", error);
-      res.status(500).send("Error saving students.");
+        console.error("Error processing file:", error);
+        return res.status(500).send("Error processing file.");
     }
-  };
+};
+
+// Function to validate registration numbers
+const isValidRegNumber = (regNum) => {
+    // Adjust this logic to fit your specific registration number format
+    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/; // Example pattern for registration numbers like ND/123/001
+    return regNum && regNumberPattern.test(regNum);
+};
+
+// Function to handle file processing completion and saving to the database
+const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPath, res) => {
+    try {
+        console.log("Registration numbers being processed:", registrationNumbers);
+        
+        // For each faculty selected
+        for (const faculty of facultyDocs) {
+            const facultyId = faculty._id;
+
+            // Find existing students in bulk for the current faculty
+            const existingStudents = await Student.find({
+                registrationNumber: { $in: registrationNumbers },
+                faculty: facultyId
+            });
+
+            const existingRegNums = existingStudents.map(student => student.registrationNumber);
+
+            // Iterate through the registration numbers
+            for (const regNum of registrationNumbers) {
+                if (!existingRegNums.includes(regNum)) {
+                    const student = new Student({ registrationNumber: regNum, faculty: facultyId });
+                    await student.save();
+                } else {
+                    console.log(`Student with registration number ${regNum} already exists for faculty ${faculty.facultyName}`);
+                }
+            }
+        }
+
+        // Optionally delete the temporary file
+        fs.unlink(tempPath, (err) => {
+            if (err) console.error("Error deleting temp file:", err);
+        });
+
+        res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
+    } catch (error) {
+        console.error("Error saving students:", error);
+        res.status(500).send("Error saving students.");
+    }
+};
+
+
   
 const getFaculty = async (req, res) => {
   console.log("Received request for faculty:", req.params.name);

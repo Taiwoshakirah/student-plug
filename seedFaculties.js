@@ -15,11 +15,11 @@ const seedFaculties = async () => {
     }
 
     const faculties = [
-        { facultyName: "Engineering", schoolId: school._id },
-        { facultyName: "Arts", schoolId: school._id },
-        { facultyName: "Sciences", schoolId: school._id },
-        // Add more faculties if needed
-    ];
+      { facultyName: "Engineering".trim(), schoolId: school._id },
+      { facultyName: "Arts".trim(), schoolId: school._id },
+      { facultyName: "Sciences".trim(), schoolId: school._id },
+  ];
+  
 
     await Faculty.insertMany(faculties);
     console.log("Faculties seeded!");

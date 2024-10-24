@@ -14,156 +14,181 @@ const readXlsxFile = require("read-excel-file/node");
 const mammoth = require("mammoth"); 
 const bcrypt = require('bcrypt')
 
-const schoolSugSignup = async (req, res) => {
-  const {
-    sugFullName,
-    email,
-    phoneNumber,
-    password,
-    confirmPassword,
-    agreedToTerms,
-  } = req.body;
+const schoolSugSignup = async (req, res,next) => {
+    const {
+        sugFullName,
+        email,
+        phoneNumber,
+        password,
+        confirmPassword,
+        agreedToTerms,
+        
+    } = req.body;
 
-  // Convertion of agreedToTerms to boolean if it's a string
-  const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
+    // Convert agreedToTerms to boolean if it's a string
+    const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
-  if (
-    !sugFullName ||
-    !email ||
-    !phoneNumber ||
-    !password ||
-    !confirmPassword ||
-    !agreedToTerms
-  ) {
-    return res.status(422).json({ message: "Input all fields" });
-  }
-  if (!agreedToTermsBool) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "You must agree to the terms and conditions",
-      });
-  }
+    // Input validation
+    if (
+        !sugFullName ||
+        !email ||
+        !phoneNumber ||
+        !password ||
+        !confirmPassword ||
+        !agreedToTerms
+        
 
-  if (password !== confirmPassword) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Passwords do not match" });
-  }
-
-  const existingUser = await SugUser.findOne({ email });
-  if (existingUser) {
-    return res
-      .status(409)
-      .json({ success: false, message: "User already exists" });
-  }
-
-  try {
-    const newUser = await SugUser.create({
-      sugFullName,
-      email,
-      phoneNumber,
-      password,
-      agreedToTerms: agreedToTermsBool,
-    });
-
-    const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-      expiresIn: "3d",
-    });
-    return res.json({
-      success: true,
-      message: "User created successfully",
-      data: newUser,
-      token,
-    });
-  } catch (error) {
-    console.error("Normal sign-up error:", error);
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res
-        .status(400)
-        .json({ success: false, message: `Duplicate ${field} provided` });
+    ) {
+        return res.status(422).json({ message: "Input all fields" });
     }
-    next(error);
-  }
+
+    if (!agreedToTermsBool) {
+        return res.status(400).json({
+            success: false,
+            message: "You must agree to the terms and conditions",
+        });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ success: false, message: "Passwords do not match" });
+    }
+
+    const existingUser = await SugUser.findOne({ email });
+    if (existingUser) {
+        return res.status(409).json({ success: false, message: "User already exists" });
+    }
+
+    try {
+        // Create new user in the database
+        const newUser = await SugUser.create({
+            sugFullName,
+            email,
+            phoneNumber,
+            password,
+            agreedToTerms: agreedToTermsBool,
+        });
+
+        // Store user ID temporarily (e.g., in session or cache)
+        req.session.userId = newUser._id;  // Assuming you're using express-session
+
+        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
+            expiresIn: "3d",
+        });
+
+        return res.json({
+            success: true,
+            message: "User created successfully, proceed to university info",
+            data: newUser,
+            token,
+        });
+    } catch (error) {
+        console.error("Normal sign-up error:", error);
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyPattern)[0];
+            return res.status(400).json({ success: false, message: `Duplicate ${field} provided` });
+        }
+        next(error);
+    }
 };
 
 const schoolInformation = async (req, res) => {
-  const { userId, university, state, aboutUniversity } = req.body;
-
-  const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
-
-  console.log("Received files:", req.files);
-
-  if (!university || !state || !aboutUniversity) {
-    return res
-      .status(422)
-      .json({ message: "All fields except the profile picture are required" });
-  }
-
-  // Check if the profile picture is provided
-  if (!uniProfilePicture) {
-    return res.status(422).json({ message: "Profile picture is required" });
-  }
-
-  try {
-    const user = await SugUser.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { userId, university, state, aboutUniversity } = req.body;
+  
+    const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
+  
+    console.log("Received files:", req.files);
+  
+    if (!university || !state || !aboutUniversity) {
+      return res
+        .status(422)
+        .json({ message: "All fields except the profile picture are required" });
     }
+  
+    // Check if the profile picture is provided
+    if (!uniProfilePicture) {
+      return res.status(422).json({ message: "Profile picture is required" });
+    }
+  
+    try {
+      const user = await SugUser.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Define a path to temporarily store the file
+      const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
+  
+      // Move the uploaded file to the desired location
+      await uniProfilePicture.mv(tempPath);
+  
+      // Uploading the file to Cloudinary
+      const uploadResult = await cloudinary.uploader.upload(tempPath);
+  
+      // Create a new school information document
+      const newSchoolInfo = new schoolInfo({
+        userId,
+        university,
+        state,
+        aboutUniversity,
+        uniProfilePicture: uploadResult.secure_url,
+      });
+  
+      // Save the school information to the database
+      await newSchoolInfo.save();
+  
+      // Store the schoolInfoId temporarily in the session
+      req.session.schoolInfoId = newSchoolInfo._id;
+  
+      // Optionally, delete the temporary file after uploading to Cloudinary
+      fs.unlink(tempPath, (err) => {
+        if (err) console.error("Error deleting temp file:", err);
+      });
+  
+      res
+        .status(201)
+        .json({ message: "School information saved", newSchoolInfo });
+    } catch (error) {
+      console.error("Error saving school information:", error);
+      res
+        .status(500)
+        .json({ message: "Server error", error: error.message || error });
+    }
+  };
+  
 
-    // Define a path to temporarily store the file
-    const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
-
-    // Move the uploaded file to the desired location
-    await uniProfilePicture.mv(tempPath);
-
-    // uploading the file to Cloudinary
-    const uploadResult = await cloudinary.uploader.upload(tempPath);
-
-    const newSchoolInfo = new schoolInfo({
-      userId,
-      university,
-      state,
-      aboutUniversity,
-      uniProfilePicture: uploadResult.secure_url,
-    });
-
-    await newSchoolInfo.save();
-
-    // Optionally, delete the temporary file after uploading to Cloudinary
-    fs.unlink(tempPath, (err) => {
-      if (err) console.error("Error deleting temp file:", err);
-    });
-
-    res
-      .status(201)
-      .json({ message: "School information saved", newSchoolInfo });
-  } catch (error) {
-    console.error("Error saving school information:", error);
-    res
-      .status(500)
-      .json({ message: "Server error", error: error.message || error });
-  }
-};
-
-const uploadStudentsRegNo = async (req, res) => {
+  const uploadStudentsRegNo = async (req, res) => {
     // Ensure that facultyName[] is treated as an array
-    let facultyNames = req.body.facultyName;
+    let facultyNames = req.body["facultyName[]"];
 
     if (!Array.isArray(facultyNames)) {
-        facultyNames = [facultyNames];
+        facultyNames = facultyNames ? [facultyNames] : []; // If it's defined, convert to array, else make it empty
     }
 
     console.log("Incoming faculty names:", facultyNames);
 
-    if (!facultyNames || facultyNames.length === 0) {
+    if (!facultyNames || facultyNames.length === 0 || facultyNames[0] === undefined) {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    const faculties = await Faculty.find({}, { facultyName: 1 });
-    console.log("Faculties in DB:", faculties.map(f => f.facultyName));
+    // Fetch school information and validate it here
+    const { schoolInfoId, selectedFaculties } = req.body;
+    const schoolData = await schoolInfo.findById(schoolInfoId);
+    if (!schoolData) {
+        return res.status(400).json({ message: "School info not found" });
+    }
+
+    // Validate selected faculties against school
+    const faculties = await Faculty.find({
+        _id: { $in: selectedFaculties },
+        schoolId: schoolData._id,
+    });
+
+    if (faculties.length === 0) {
+        return res.status(400).json({ message: "No valid faculties found for this school" });
+    }
+
+    const facultiesInDB = await Faculty.find({}, { facultyName: 1 });
+    console.log("Faculties in DB:", facultiesInDB.map(f => f.facultyName));
 
     const facultyDocs = await Faculty.find({
         facultyName: { $in: facultyNames }
@@ -242,7 +267,6 @@ const uploadStudentsRegNo = async (req, res) => {
                     registrationNumbers.push(regNum);
                 }
             });
-            // console.log("Extracted registration numbers:", registrationNumbers);
             handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
         }
     } catch (error) {
@@ -262,12 +286,15 @@ const isValidRegNumber = (regNum) => {
 const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPath, res) => {
     try {
         console.log("Registration numbers being processed:", registrationNumbers);
-        
+
+        // Prepare to store students to insert
+        const studentsToInsert = [];
+
         // For each faculty selected
         for (const faculty of facultyDocs) {
             const facultyId = faculty._id;
 
-            // Find existing students in bulk for the current faculty
+            // Find existing students for the current faculty
             const existingStudents = await Student.find({
                 registrationNumber: { $in: registrationNumbers },
                 faculty: facultyId
@@ -275,13 +302,30 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
 
             const existingRegNums = existingStudents.map(student => student.registrationNumber);
 
-            // Iterate through the registration numbers
+            // Collect students to insert that are not already in the DB
             for (const regNum of registrationNumbers) {
                 if (!existingRegNums.includes(regNum)) {
-                    const student = new Student({ registrationNumber: regNum, faculty: facultyId });
-                    await student.save();
+                    studentsToInsert.push({
+                        registrationNumber: regNum,
+                        faculty: facultyId
+                    });
                 } else {
                     console.log(`Student with registration number ${regNum} already exists for faculty ${faculty.facultyName}`);
+                }
+            }
+        }
+
+        // Insert the non-duplicate students in bulk
+        if (studentsToInsert.length > 0) {
+            try {
+                await Student.insertMany(studentsToInsert, { ordered: false }); // `ordered: false` allows continuing despite errors
+                console.log(`Successfully inserted ${studentsToInsert.length} students.`);
+            } catch (error) {
+                if (error.code === 11000) {
+                    // Handle duplicate key errors gracefully
+                    console.log("Duplicate registration numbers encountered during insertion.");
+                } else {
+                    throw error; // Re-throw any other errors
                 }
             }
         }
@@ -297,6 +341,26 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
         res.status(500).send("Error saving students.");
     }
 };
+
+
+const addFaculty = async (req, res) => {
+    const { facultyName, schoolId } = req.body;
+
+    if (!facultyName || !schoolId) {
+        return res.status(400).json({ message: "Faculty name and school ID are required." });
+    }
+
+    try {
+        const newFaculty = new Faculty({ facultyName, schoolId });
+        await newFaculty.save();
+        res.status(201).json({ message: "Faculty added successfully.", newFaculty });
+    } catch (error) {
+        console.error("Error adding faculty:", error);
+        res.status(500).json({ message: "Server error.", error: error.message });
+    }
+};
+
+
 
   
 const getFaculty = async (req, res) => {
@@ -404,6 +468,7 @@ module.exports = {
   schoolSugSignup,
   schoolInformation,
   uploadStudentsRegNo,
+  addFaculty,
   getFaculty,
   getSugUser,
   schoolSugSignin

@@ -1,36 +1,47 @@
-const mongoose = require('mongoose')
-const bcrypt = require('bcrypt')
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 
 const schoolSugSchema = new mongoose.Schema({
-    sugFullName:{
+    sugFullName: {
         type: String,
-        require: true
+        required: true,  // Fixed typo from "require" to "required"
     },
-    email:{
+    email: {
         type: String,
         required: true,
-        match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Please provide an email"],
+        match: [/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/, "Please provide a valid email"],
         unique: true,
     },
-    phoneNumber:{
+    phoneNumber: {
         type: String,
     },
-    password:{
-        type: String
+    password: {
+        type: String,
+        required: true,  // Ensure password is required
     },
     agreedToTerms: { 
         type: Boolean, 
-        required: true 
-      },
-})
+        required: true, 
+    },
+    // schoolInfoId: {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'schoolInfo',
+    //     required: true,  // Reference to the associated school
+    // },
+    // selectedFaculties: [{
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: 'Faculty',  // Reference to the selected faculties
+    // }],
+});
 
+// Hash password before saving
 schoolSugSchema.pre("save", async function (next) {
     if (!this.isModified("password")) {
-      return next();
+        return next();
     }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next()
-  });
+    next();
+});
 
-module.exports = mongoose.model('SugUser',schoolSugSchema)
+module.exports = mongoose.model('SugUser', schoolSugSchema);

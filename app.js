@@ -6,6 +6,8 @@ const fs = require("fs");
 const fileUpload = require("express-fileupload"); 
 require("dotenv").config();
 const admin = require('firebase-admin');
+const session = require("express-session");
+const MongoStore = require("connect-mongo"); 
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -28,9 +30,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(fileUpload());
 
-// const serviceAccountPath = process.env.SERVICE_ACCOUNT_PATH;
-
-// const serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, serviceAccountPath)));
 
 // Initializing Firebase Admin
 admin.initializeApp({
@@ -40,6 +39,20 @@ admin.initializeApp({
 // Serve static files (for the uploads folder)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log("Serving static files from:", path.join(__dirname, 'uploads'));
+
+//MONGOdb session store
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: 'sessions', // Name of the session collection in MongoDB
+  }),
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24, // Session duration (1 day)
+  },
+}));
 
 const signUpRouter = require("./routes/signUpRouter");
 const schoolRouter = require('./routes/schoolRouter')

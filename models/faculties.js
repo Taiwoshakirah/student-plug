@@ -10,6 +10,10 @@ const FacultySchema = new mongoose.Schema({
     ref: 'schoolInfo', 
     required: true 
 },
+createdAt: {
+    type: Date,
+    default: Date.now
+}
 });
 
 module.exports = mongoose.model("Faculty", FacultySchema);

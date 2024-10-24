@@ -8,7 +8,7 @@ const seedFaculties = async () => {
     await mongoose.connect(process.env.MONGO_URI);
   
     // Get the schoolId from your School model
-    const school = await School.findOne({ university: "yabatech" }); // Adjust the query to match your school
+    const school = await School.findOne({ university: "obafemi awolowo university" }); // Adjust the query to match your school
     if (!school) {
         console.error("School not found! Please ensure the school exists in the database.");
         return;

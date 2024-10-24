@@ -298,7 +298,6 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
     }
 };
 
-
   
 const getFaculty = async (req, res) => {
   console.log("Received request for faculty:", req.params.name);

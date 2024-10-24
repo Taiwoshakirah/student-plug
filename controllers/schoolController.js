@@ -158,15 +158,15 @@ const uploadStudentsRegNo = async (req, res) => {
 
     console.log("Incoming faculty names:", facultyNames);
 
-    if (!facultyNames || !facultyNames.length) {
+    if (!facultyNames || facultyNames.length === 0) {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
     const faculties = await Faculty.find({}, { facultyName: 1 });
-    console.log("Faculties in DB:", faculties);
+    console.log("Faculties in DB:", faculties.map(f => f.facultyName));
 
     const facultyDocs = await Faculty.find({
-        facultyName: { $in: facultyNames.map(name => new RegExp(name, 'i')) }
+        facultyName: { $in: facultyNames }
     });
 
     console.log("Faculty documents retrieved:", facultyDocs);

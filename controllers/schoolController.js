@@ -170,36 +170,25 @@ const schoolInformation = async (req, res) => {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    // Fetch school information and validate it here
+    // Fetch school information
     const { schoolInfoId, selectedFaculties } = req.body;
     const schoolData = await schoolInfo.findById(schoolInfoId);
     if (!schoolData) {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Validate selected faculties against school
+    // Fetch all faculties (remove schoolId filtering)
     const faculties = await Faculty.find({
         _id: { $in: selectedFaculties },
-        schoolId: schoolData._id,
     });
+
+    console.log("Selected faculties retrieved:", faculties);
 
     if (faculties.length === 0) {
-        return res.status(400).json({ message: "No valid faculties found for this school" });
+        return res.status(400).json({ message: "No valid faculties found for selection" });
     }
 
-    const facultiesInDB = await Faculty.find({}, { facultyName: 1 });
-    console.log("Faculties in DB:", facultiesInDB.map(f => f.facultyName));
-
-    const facultyDocs = await Faculty.find({
-        facultyName: { $in: facultyNames }
-    });
-
-    console.log("Faculty documents retrieved:", facultyDocs);
-
-    if (facultyDocs.length === 0) {
-        return res.status(404).send("No faculties found.");
-    }
-
+    // Proceed with file upload and processing
     if (!req.files || !req.files.file) {
         return res.status(400).send("No files were uploaded.");
     }
@@ -237,7 +226,7 @@ const schoolInformation = async (req, res) => {
                 })
                 .on("end", () => {
                     console.log("Extracted registration numbers:", registrationNumbers);
-                    handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
+                    handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
                 });
         } else if (file.mimetype === "application/pdf") {
             // Handle PDF file
@@ -257,7 +246,7 @@ const schoolInformation = async (req, res) => {
                 }
             });
             console.log("Extracted registration numbers:", registrationNumbers);
-            handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
+            handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
         } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
             // Handle Excel file
             const rows = await readXlsxFile(tempPath);
@@ -267,47 +256,62 @@ const schoolInformation = async (req, res) => {
                     registrationNumbers.push(regNum);
                 }
             });
-            handleFileProcessingEnd(registrationNumbers, facultyDocs, tempPath, res);
+            handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
         }
     } catch (error) {
         console.error("Error processing file:", error);
         return res.status(500).send("Error processing file.");
     }
+
+    // Save the selected faculties with school information
+    try {
+        const updatedSchoolData = await schoolInfo.findByIdAndUpdate(
+            schoolInfoId,
+            { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } }, // Save faculty IDs
+            { new: true }
+        );
+
+        if (!updatedSchoolData) {
+            return res.status(500).send("Failed to update school with selected faculties.");
+        }
+
+        return res.status(200).json({
+            message: "Registration numbers processed and faculties updated successfully.",
+            registrationNumbers,
+            updatedSchoolData,
+        });
+    } catch (error) {
+        console.error("Error updating school data:", error);
+        return res.status(500).send("Error updating school data.");
+    }
 };
 
-// Function to validate registration numbers
+// Validate registration numbers
 const isValidRegNumber = (regNum) => {
-    // Adjust this logic to fit your specific registration number format
     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/; // Example pattern for registration numbers like ND/123/001
     return regNum && regNumberPattern.test(regNum);
 };
 
 // Function to handle file processing completion and saving to the database
+// Function to handle file processing completion and saving to the database
 const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPath, res) => {
     try {
         console.log("Registration numbers being processed:", registrationNumbers);
-
-        // Prepare to store students to insert
         const studentsToInsert = [];
 
-        // For each faculty selected
         for (const faculty of facultyDocs) {
             const facultyId = faculty._id;
-
-            // Find existing students for the current faculty
             const existingStudents = await Student.find({
                 registrationNumber: { $in: registrationNumbers },
-                faculty: facultyId
+                faculty: facultyId,
             });
-
             const existingRegNums = existingStudents.map(student => student.registrationNumber);
 
-            // Collect students to insert that are not already in the DB
             for (const regNum of registrationNumbers) {
                 if (!existingRegNums.includes(regNum)) {
                     studentsToInsert.push({
                         registrationNumber: regNum,
-                        faculty: facultyId
+                        faculty: facultyId,
                     });
                 } else {
                     console.log(`Student with registration number ${regNum} already exists for faculty ${faculty.facultyName}`);
@@ -318,61 +322,99 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
         // Insert the non-duplicate students in bulk
         if (studentsToInsert.length > 0) {
             try {
-                await Student.insertMany(studentsToInsert, { ordered: false }); // `ordered: false` allows continuing despite errors
+                await Student.insertMany(studentsToInsert, { ordered: false });
                 console.log(`Successfully inserted ${studentsToInsert.length} students.`);
             } catch (error) {
                 if (error.code === 11000) {
-                    // Handle duplicate key errors gracefully
                     console.log("Duplicate registration numbers encountered during insertion.");
                 } else {
-                    throw error; // Re-throw any other errors
+                    throw error;
                 }
             }
         }
 
-        // Optionally delete the temporary file
+        // Delete the temporary file
         fs.unlink(tempPath, (err) => {
             if (err) console.error("Error deleting temp file:", err);
         });
 
-        res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
+        // Ensure single response call
+        if (!res.headersSent) {
+            return res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
+        }
     } catch (error) {
         console.error("Error saving students:", error);
-        res.status(500).send("Error saving students.");
+        if (!res.headersSent) {
+            return res.status(500).send("Error saving students.");
+        }
     }
 };
 
 
-const addFaculty = async (req, res) => {
-    const { facultyName, schoolId } = req.body;
 
-    if (!facultyName || !schoolId) {
-        return res.status(400).json({ message: "Faculty name and school ID are required." });
+// const addFaculty = async (req, res) => {
+//     const { facultyName, schoolId } = req.body;
+
+//     if (!facultyName || !schoolId) {
+//         return res.status(400).json({ message: "Faculty name and school ID are required." });
+//     }
+
+//     try {
+//         const newFaculty = new Faculty({ facultyName, schoolId });
+//         await newFaculty.save();
+//         res.status(201).json({ message: "Faculty added successfully.", newFaculty });
+//     } catch (error) {
+//         console.error("Error adding faculty:", error);
+//         res.status(500).json({ message: "Server error.", error: error.message });
+//     }
+// };
+
+
+const addFaculty = async (req, res) => {
+    const { facultyNames } = req.body; // Expecting an array of faculty names
+
+    if (!Array.isArray(facultyNames) || facultyNames.length === 0) {
+        return res.status(400).json({ message: "An array of faculty names is required." });
     }
 
     try {
-        const newFaculty = new Faculty({ facultyName, schoolId });
-        await newFaculty.save();
-        res.status(201).json({ message: "Faculty added successfully.", newFaculty });
+        // Create an array of faculty objects to be inserted
+        const facultiesToAdd = facultyNames.map(name => ({ facultyName: name }));
+        const newFaculties = await Faculty.insertMany(facultiesToAdd);
+        
+        res.status(201).json({ message: "Faculties added successfully.", newFaculties });
     } catch (error) {
-        console.error("Error adding faculty:", error);
+        console.error("Error adding faculties:", error);
         res.status(500).json({ message: "Server error.", error: error.message });
     }
 };
 
 
 
+
+//, { _id: 1, facultyName: 1 }
   
+// const getFaculty = async (req, res) => {
+//     const { schoolId } = req.params;
+//     try {
+//         const faculties = await Faculty.find({ schoolId });
+//         res.status(200).json(faculties);
+//     } catch (error) {
+//         console.error("Error fetching faculties:", error);
+//         res.status(500).json({ message: "Error fetching faculties." });
+//     }
+// };
+
 const getFaculty = async (req, res) => {
-    const { schoolId } = req.params;
     try {
-        const faculties = await Faculty.find({ schoolId }, { _id: 1, facultyName: 1 });
+        const faculties = await Faculty.find({}, { facultyName: 1 });
         res.status(200).json(faculties);
     } catch (error) {
         console.error("Error fetching faculties:", error);
-        res.status(500).json({ message: "Error fetching faculties." });
+        res.status(500).json({ message: "Server error." });
     }
 };
+
 
 
 const getSugUser = async (req, res) => {

@@ -364,19 +364,16 @@ const addFaculty = async (req, res) => {
 
   
 const getFaculty = async (req, res) => {
-  console.log("Received request for faculty:", req.params.name);
-  try {
-    const faculty = await Faculty.findOne({ facultyName: req.params.name });
-    console.log("Found faculty:", faculty);
-    if (!faculty) {
-      return res.status(404).send("Faculty not found");
+    const { schoolId } = req.params;
+    try {
+        const faculties = await Faculty.find({ schoolId }, { _id: 1, facultyName: 1 });
+        res.status(200).json(faculties);
+    } catch (error) {
+        console.error("Error fetching faculties:", error);
+        res.status(500).json({ message: "Error fetching faculties." });
     }
-    res.status(200).json(faculty);
-  } catch (error) {
-    console.error("Error fetching faculty:", error);
-    res.status(500).send("Internal Server Error");
-  }
 };
+
 
 const getSugUser = async (req, res) => {
     const { userId } = req.user; 

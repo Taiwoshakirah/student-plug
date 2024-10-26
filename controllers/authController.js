@@ -14,10 +14,10 @@ const admin = require('firebase-admin');
 const signUp = async (req, res, next) => {
   const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
-  // Converttion of agreedToTerms to boolean if it's a string
+  // Convert agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
-  // For non-Google sign-up, validate required fields
+  // Validate required fields for non-Google sign-up
   if (!idToken && (!fullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTermsBool)) {
     return res.status(422).json({ success: false, message: "Input all fields" });
   }
@@ -30,22 +30,27 @@ const signUp = async (req, res, next) => {
   if (idToken) {
     try {
       const decodedToken = await admin.auth().verifyIdToken(idToken, true);
-      console.log(decodedToken);
-
       const { uid, email: googleEmail, name, picture } = decodedToken;
 
       // Check if the user already exists
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
-        return res.status(409).json({ success: false, message: "User already exists" });
+        if (existingUser.googleId) {
+          // User already exists and has signed up with Google
+          return res.status(409).json({ success: false, message: "User already exists, please log in." });
+        } else {
+          // User exists, but it has no googleId
+          // Optionally allow account linking or notify that an account exists with that email
+          return res.status(409).json({ success: false, message: "User exists with that email. Please log in or use Google to link your account." });
+        }
       }
 
-      // Create new user with Google sign-up detail
+      // Create new user with Google sign-up details
       const newUser = await User.create({
-        fullName: name || fullName,  
+        fullName: name,
         email: googleEmail,
         googleId: uid,
-        profilePicture: picture || null,  
+        profilePicture: picture || null,
         agreedToTerms: agreedToTermsBool,
       });
 
@@ -60,10 +65,8 @@ const signUp = async (req, res, next) => {
       }
       return res.status(401).json({ success: false, message: "Invalid Google ID token" });
     }
-  }
-
-  // Normal sign-up logic
-  else {
+  } else {
+    // Normal sign-up logic
     if (password !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
@@ -71,6 +74,7 @@ const signUp = async (req, res, next) => {
     // Check if the user already exists by email
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      // User already exist, prevent duplicate sign-up
       return res.status(409).json({ success: false, message: "User already exists" });
     }
 
@@ -80,7 +84,7 @@ const signUp = async (req, res, next) => {
         fullName,
         email,
         phoneNumber,
-        password,  
+        password,
         agreedToTerms: agreedToTermsBool,
       });
 
@@ -99,7 +103,6 @@ const signUp = async (req, res, next) => {
     }
   }
 };
-
 
 
 

@@ -13,6 +13,7 @@ const pdfParse = require("pdf-parse");
 const readXlsxFile = require("read-excel-file/node");
 const mammoth = require("mammoth"); 
 const bcrypt = require('bcrypt')
+const mongoose = require('mongoose')
 
 const schoolSugSignup = async (req, res,next) => {
     const {
@@ -170,14 +171,25 @@ const schoolInformation = async (req, res) => {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    // Fetch school information
-    const { schoolInfoId, selectedFaculties } = req.body;
+    // Fetch school information and ensure selectedFaculties is an array
+    const { schoolInfoId } = req.body;
+    let { selectedFaculties } = req.body;
+    
+    // Convert selectedFaculties to an array if it isn’t already
+    selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
+    
+    // Validate each ID in selectedFaculties to avoid CastError
+    selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (selectedFaculties.length === 0) {
+        return res.status(400).json({ message: "No valid faculties found for selection." });
+    }
+
     const schoolData = await schoolInfo.findById(schoolInfoId);
     if (!schoolData) {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Fetch all faculties (remove schoolId filtering)
+    // Fetch all faculties
     const faculties = await Faculty.find({
         _id: { $in: selectedFaculties },
     });
@@ -285,6 +297,7 @@ const schoolInformation = async (req, res) => {
         return res.status(500).send("Error updating school data.");
     }
 };
+
 
 // Validate registration numbers
 const isValidRegNumber = (regNum) => {

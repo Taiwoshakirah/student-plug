@@ -160,7 +160,6 @@ const schoolInformation = async (req, res) => {
   const uploadStudentsRegNo = async (req, res) => {
     // Ensure that facultyName[] is treated as an array
     let facultyNames = req.body["facultyName[]"];
-
     if (!Array.isArray(facultyNames)) {
         facultyNames = facultyNames ? [facultyNames] : []; // If it's defined, convert to array, else make it empty
     }
@@ -173,13 +172,15 @@ const schoolInformation = async (req, res) => {
 
     // Fetch school information and ensure selectedFaculties is an array
     const { schoolInfoId } = req.body;
-    let { selectedFaculties } = req.body;
+    let selectedFaculties = req.body["selectedFaculties[]"];
     
     // Convert selectedFaculties to an array if it isn’t already
     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
     
     // Validate each ID in selectedFaculties to avoid CastError
     selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
+    console.log("Valid Selected Faculties:", selectedFaculties);
+
     if (selectedFaculties.length === 0) {
         return res.status(400).json({ message: "No valid faculties found for selection." });
     }
@@ -189,7 +190,7 @@ const schoolInformation = async (req, res) => {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Fetch all faculties
+    // Fetch all faculties based on the selectedFaculties
     const faculties = await Faculty.find({
         _id: { $in: selectedFaculties },
     });
@@ -298,14 +299,12 @@ const schoolInformation = async (req, res) => {
     }
 };
 
-
 // Validate registration numbers
 const isValidRegNumber = (regNum) => {
     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/; // Example pattern for registration numbers like ND/123/001
     return regNum && regNumberPattern.test(regNum);
 };
 
-// Function to handle file processing completion and saving to the database
 // Function to handle file processing completion and saving to the database
 const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPath, res) => {
     try {
@@ -362,6 +361,9 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
         }
     }
 };
+
+
+
 
 
 

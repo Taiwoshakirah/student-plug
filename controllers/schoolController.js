@@ -400,7 +400,7 @@ const getSugUser = async (req, res) => {
       }
   
       // Fetch schoolInfo to get the profile picture
-      const school = await schoolInfo.findOne({ userId: user._id });
+      const school = await SchoolInfo.findOne({ userId: user._id });
       if (!school) {
         console.log("No school information found for this user.");
         return res.status(404).json({ message: "School information not found" });

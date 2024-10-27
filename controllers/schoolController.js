@@ -1,5 +1,5 @@
 const SugUser = require("../models/schoolSug");
-const schoolInfo = require("../models/schoolInfo");
+const SchoolInfo = require("../models/schoolInfo");
 const jwt = require("jsonwebtoken");
 const { parsePhoneNumberFromString } = require("libphonenumber-js");
 const crypto = require("crypto");
@@ -14,154 +14,100 @@ const readXlsxFile = require("read-excel-file/node");
 const mammoth = require("mammoth"); 
 const bcrypt = require('bcrypt')
 const mongoose = require('mongoose')
+const sendMail = require('../utils/sendMail')
 
 const schoolSugSignup = async (req, res,next) => {
-    const {
-        sugFullName,
-        email,
-        phoneNumber,
-        password,
-        confirmPassword,
-        agreedToTerms,
-        
-    } = req.body;
+    const { sugFullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
-    // Convert agreedToTerms to boolean if it's a string
-    const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
-
-    // Input validation
-    if (
-        !sugFullName ||
-        !email ||
-        !phoneNumber ||
-        !password ||
-        !confirmPassword ||
-        !agreedToTerms
-        
-
-    ) {
+    if (!sugFullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTerms) {
         return res.status(422).json({ message: "Input all fields" });
-    }
-
-    if (!agreedToTermsBool) {
-        return res.status(400).json({
-            success: false,
-            message: "You must agree to the terms and conditions",
-        });
     }
 
     if (password !== confirmPassword) {
         return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
 
-    const existingUser = await SugUser.findOne({ email });
-    if (existingUser) {
-        return res.status(409).json({ success: false, message: "User already exists" });
-    }
-
     try {
-        // Create new user in the database
         const newUser = await SugUser.create({
             sugFullName,
             email,
             phoneNumber,
             password,
-            agreedToTerms: agreedToTermsBool,
+            agreedToTerms
         });
 
-        // Store user ID temporarily (e.g., in session or cache)
-        req.session.userId = newUser._id;  // Assuming you're using express-session
+        req.session.userId = newUser._id; // Store the user ID in session to keep track across phases
 
-        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-            expiresIn: "3d",
-        });
-
-        return res.json({
+        res.json({
             success: true,
             message: "User created successfully, proceed to university info",
-            data: newUser,
-            token,
+            userId: newUser._id
         });
     } catch (error) {
-        console.error("Normal sign-up error:", error);
-        if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
-            return res.status(400).json({ success: false, message: `Duplicate ${field} provided` });
-        }
+        console.error("User signup error:", error);
         next(error);
     }
 };
+const schoolInformation = async (req, res, next) => {
+    const { userId } = req.session; // Assuming userId is stored in session
+    const { university, state, aboutUniversity } = req.body;
 
-const schoolInformation = async (req, res) => {
-    const { userId, university, state, aboutUniversity } = req.body;
-  
     const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
-  
-    console.log("Received files:", req.files);
-  
-    if (!university || !state || !aboutUniversity) {
-      return res
-        .status(422)
-        .json({ message: "All fields except the profile picture are required" });
-    }
-  
-    // Check if the profile picture is provided
-    if (!uniProfilePicture) {
-      return res.status(422).json({ message: "Profile picture is required" });
-    }
-  
-    try {
-      const user = await SugUser.findById(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-  
-      // Define a path to temporarily store the file
-      const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
-  
-      // Move the uploaded file to the desired location
-      await uniProfilePicture.mv(tempPath);
-  
-      // Uploading the file to Cloudinary
-      const uploadResult = await cloudinary.uploader.upload(tempPath);
-  
-      // Create a new school information document
-      const newSchoolInfo = new schoolInfo({
-        userId,
-        university,
-        state,
-        aboutUniversity,
-        uniProfilePicture: uploadResult.secure_url,
-      });
-  
-      // Save the school information to the database
-      await newSchoolInfo.save();
-  
-      // Store the schoolInfoId temporarily in the session
-      req.session.schoolInfoId = newSchoolInfo._id;
-  
-      // Optionally, delete the temporary file after uploading to Cloudinary
-      fs.unlink(tempPath, (err) => {
-        if (err) console.error("Error deleting temp file:", err);
-      });
-  
-      res
-        .status(201)
-        .json({ message: "School information saved", newSchoolInfo });
-    } catch (error) {
-      console.error("Error saving school information:", error);
-      res
-        .status(500)
-        .json({ message: "Server error", error: error.message || error });
-    }
-  };
-  
 
-  const uploadStudentsRegNo = async (req, res) => {
-    // Ensure that facultyName[] is treated as an array
+    console.log("Received files:", req.files);
+
+    if (!uniProfilePicture) {
+        return res.status(422).json({ message: "Profile picture is required" });
+    }
+    
+    if (!university || !state || !aboutUniversity) {
+        return res.status(422).json({ message: "All school details are required" });
+    }
+
+    // Define a path to temporarily store the file
+    const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
+
+    // Move the uploaded file to the desired location
+    await uniProfilePicture.mv(tempPath);
+
+    try {
+        // Upload the file to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(tempPath);
+
+        // Extract the URL from the upload result
+        const imageUrl = uploadResult.secure_url; // Cloudinary returns a secure URL for the image
+
+        // Create the school data with the image URL
+        const schoolData = await SchoolInfo.create({
+            userId, // Reference to the SugUser
+            university,
+            state,
+            aboutUniversity,
+            uniProfilePicture: imageUrl, // Store the URL instead of the file object
+            faculties: [],
+            students: [] // Initialize an empty array for students
+        });
+
+        // Update the SugUser to reference this new SchoolInfo document
+        await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
+
+        res.json({
+            success: true,
+            message: "School details added, proceed to faculty selection",
+            schoolData
+        });
+    } catch (error) {
+        console.error("Add school details error:", error);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
+
+const uploadStudentsRegNo = async (req, res) => {
+    // Process facultyName as an array
     let facultyNames = req.body["facultyName[]"];
     if (!Array.isArray(facultyNames)) {
-        facultyNames = facultyNames ? [facultyNames] : []; // If it's defined, convert to array, else make it empty
+        facultyNames = facultyNames ? [facultyNames] : [];
     }
 
     console.log("Incoming faculty names:", facultyNames);
@@ -173,11 +119,7 @@ const schoolInformation = async (req, res) => {
     // Fetch school information and ensure selectedFaculties is an array
     const { schoolInfoId } = req.body;
     let selectedFaculties = req.body["selectedFaculties[]"];
-    
-    // Convert selectedFaculties to an array if it isn’t already
     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
-    
-    // Validate each ID in selectedFaculties to avoid CastError
     selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
     console.log("Valid Selected Faculties:", selectedFaculties);
 
@@ -185,16 +127,13 @@ const schoolInformation = async (req, res) => {
         return res.status(400).json({ message: "No valid faculties found for selection." });
     }
 
-    const schoolData = await schoolInfo.findById(schoolInfoId);
+    const schoolData = await SchoolInfo.findById(schoolInfoId);
     if (!schoolData) {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Fetch all faculties based on the selectedFaculties
-    const faculties = await Faculty.find({
-        _id: { $in: selectedFaculties },
-    });
-
+    // Fetch all faculties based on selectedFaculties
+    const faculties = await Faculty.find({ _id: { $in: selectedFaculties } });
     console.log("Selected faculties retrieved:", faculties);
 
     if (faculties.length === 0) {
@@ -207,14 +146,7 @@ const schoolInformation = async (req, res) => {
     }
 
     const file = req.files.file;
-
-    // Validating the uploaded file type
-    const allowedMimeTypes = [
-        "text/csv",
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "application/vnd.ms-excel",
-    ];
+    const allowedMimeTypes = ["text/csv", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
         return res.status(400).send("Please upload a valid CSV, PDF, or Excel file.");
@@ -222,13 +154,10 @@ const schoolInformation = async (req, res) => {
 
     const registrationNumbers = [];
     const tempPath = `${process.env.UPLOAD_PATH}/${file.name}`;
-
-    // Move the uploaded file to the desired location
     await file.mv(tempPath);
 
     try {
         if (file.mimetype === "text/csv") {
-            // Handle CSV file
             fs.createReadStream(tempPath)
                 .pipe(csv())
                 .on("data", (data) => {
@@ -239,16 +168,14 @@ const schoolInformation = async (req, res) => {
                 })
                 .on("end", () => {
                     console.log("Extracted registration numbers:", registrationNumbers);
-                    handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
+                    handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
                 });
         } else if (file.mimetype === "application/pdf") {
-            // Handle PDF file
             const dataBuffer = fs.readFileSync(tempPath);
             const pdfData = await pdfParse(dataBuffer);
             const lines = pdfData.text.split("\n");
 
-            // Extract registration numbers using a regex pattern
-            const regNoPattern = /ND\/\d{3}\/\d{3}/; // Adjust this to fit the actual registration number format
+            const regNoPattern = /ND\/\d{3}\/\d{3}/;
             lines.forEach((line) => {
                 const match = line.match(regNoPattern);
                 if (match) {
@@ -259,54 +186,54 @@ const schoolInformation = async (req, res) => {
                 }
             });
             console.log("Extracted registration numbers:", registrationNumbers);
-            handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
+            handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
         } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
-            // Handle Excel file
             const rows = await readXlsxFile(tempPath);
             rows.forEach((row) => {
-                const regNum = row[0]?.trim(); // Assuming registration number is in column 1
+                const regNum = row[0]?.trim();
                 if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
                     registrationNumbers.push(regNum);
                 }
             });
-            handleFileProcessingEnd(registrationNumbers, faculties, tempPath, res);
+            handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
         }
     } catch (error) {
         console.error("Error processing file:", error);
         return res.status(500).send("Error processing file.");
     }
 
-    // Save the selected faculties with school information
-    try {
-        const updatedSchoolData = await schoolInfo.findByIdAndUpdate(
-            schoolInfoId,
-            { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } }, // Save faculty IDs
-            { new: true }
-        );
+    // Save selected faculties with school information
+try {
+    const updatedSchoolData = await SchoolInfo.findByIdAndUpdate(
+        schoolInfoId,
+        { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } },
+        { new: true } // This option returns the modified document
+    );
 
-        if (!updatedSchoolData) {
-            return res.status(500).send("Failed to update school with selected faculties.");
-        }
-
-        return res.status(200).json({
-            message: "Registration numbers processed and faculties updated successfully.",
-            registrationNumbers,
-            updatedSchoolData,
-        });
-    } catch (error) {
-        console.error("Error updating school data:", error);
-        return res.status(500).send("Error updating school data.");
+    if (!updatedSchoolData) {
+        return res.status(500).send("Failed to update school with selected faculties.");
     }
+
+    return res.status(200).json({
+        message: "Registration numbers processed and faculties updated successfully.",
+        registrationNumbers,
+        updatedSchoolData,
+    });
+} catch (error) {
+    console.error("Error updating school data:", error);
+    return res.status(500).send("Error updating school data.");
+}
+
 };
 
 // Validate registration numbers
 const isValidRegNumber = (regNum) => {
-    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/; // Example pattern for registration numbers like ND/123/001
+    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
     return regNum && regNumberPattern.test(regNum);
 };
 
 // Function to handle file processing completion and saving to the database
-const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPath, res) => {
+const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolInfoId, tempPath, res) => {
     try {
         console.log("Registration numbers being processed:", registrationNumbers);
         const studentsToInsert = [];
@@ -324,6 +251,7 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
                     studentsToInsert.push({
                         registrationNumber: regNum,
                         faculty: facultyId,
+                        schoolInfo: schoolInfoId,  // Link to schoolInfo
                     });
                 } else {
                     console.log(`Student with registration number ${regNum} already exists for faculty ${faculty.facultyName}`);
@@ -331,11 +259,12 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
             }
         }
 
-        // Insert the non-duplicate students in bulk
+        let insertedStudents = [];
         if (studentsToInsert.length > 0) {
             try {
-                await Student.insertMany(studentsToInsert, { ordered: false });
-                console.log(`Successfully inserted ${studentsToInsert.length} students.`);
+                // Insert students and retrieve the inserted documents
+                insertedStudents = await Student.insertMany(studentsToInsert, { ordered: false });
+                console.log(`Successfully inserted ${insertedStudents.length} students.`);
             } catch (error) {
                 if (error.code === 11000) {
                     console.log("Duplicate registration numbers encountered during insertion.");
@@ -345,12 +274,18 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
             }
         }
 
-        // Delete the temporary file
+        // Push the newly created students' IDs to the SchoolInfo document
+        if (insertedStudents.length > 0) {
+            await SchoolInfo.findByIdAndUpdate(
+                schoolInfoId,
+                { $push: { students: { $each: insertedStudents.map(student => student._id) } } }
+            );
+        }
+
         fs.unlink(tempPath, (err) => {
             if (err) console.error("Error deleting temp file:", err);
         });
 
-        // Ensure single response call
         if (!res.headersSent) {
             return res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
         }
@@ -362,27 +297,6 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, tempPat
     }
 };
 
-
-
-
-
-
-// const addFaculty = async (req, res) => {
-//     const { facultyName, schoolId } = req.body;
-
-//     if (!facultyName || !schoolId) {
-//         return res.status(400).json({ message: "Faculty name and school ID are required." });
-//     }
-
-//     try {
-//         const newFaculty = new Faculty({ facultyName, schoolId });
-//         await newFaculty.save();
-//         res.status(201).json({ message: "Faculty added successfully.", newFaculty });
-//     } catch (error) {
-//         console.error("Error adding faculty:", error);
-//         res.status(500).json({ message: "Server error.", error: error.message });
-//     }
-// };
 
 
 const addFaculty = async (req, res) => {
@@ -513,7 +427,203 @@ const getSugUser = async (req, res) => {
       res.status(500).json({ message: "Internal Server Error" });
     }
   };
+
+
+  const getSugUserDetails = async (req, res) => {
+    try {
+        const userId = req.params.userId; // Getting user ID from URL params
+
+        if (!userId) {
+            return res.status(400).json({ success: false, message: "User ID is required." });
+        }
+
+        // Fetch the user and populate schoolInfo along with faculties and students
+        const user = await SugUser.findById(userId)
+            .populate({
+                path: 'schoolInfo',
+                populate: [
+                    { path: 'faculties', select: 'name' },
+                    {
+                        path: 'students',
+                        select: 'registrationNumber faculty',
+                        populate: { path: 'faculty', select: 'name' }
+                    }
+                ]
+            });
+
+        console.log("User with populated schoolInfo:", user); // Log the user object
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        // Additional test query directly on SchoolInfo
+        const schoolInfoTest = await SchoolInfo.findById(user.schoolInfo._id).populate({
+            path: 'students',
+            select: 'registrationNumber faculty',
+            populate: { path: 'faculty', select: 'name' }
+        });
+        console.log("SchoolInfo test with students populated:", schoolInfoTest); // Log the populated SchoolInfo
+
+        // Check if schoolInfo exists
+        if (!user.schoolInfo) {
+            return res.status(404).json({ success: false, message: "School information not found for this user" });
+        }
+
+        // Extracting student data along with registration numbers
+        const students = user.schoolInfo.students.map(student => ({
+            registrationNumber: student.registrationNumber,
+            faculty: student.faculty ? student.faculty.name : null
+        }));
+
+        return res.status(200).json({
+            success: true,
+            message: "User data retrieved successfully",
+            data: {
+                user: {
+                    fullName: user.sugFullName,
+                    email: user.email,
+                    phoneNumber: user.phoneNumber,
+                    faculties: user.schoolInfo.faculties.map(faculty => ({
+                        facultyId: faculty._id,
+                        facultyName: faculty.name
+                    })),
+                    students // Include the students with their registration numbers
+                },
+                university: user.schoolInfo.university,
+                state: user.schoolInfo.state,
+                aboutUniversity: user.schoolInfo.aboutUniversity,
+                uniProfilePicture: user.schoolInfo.uniProfilePicture
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+
   
+  const schoolForgotPassword = async (req, res, next) => {
+    const { email, resend } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ message: "Please provide an email" });
+    }
+
+    try {
+        let user;
+
+        // Find the user by email 
+        if (email) {
+            user = await SugUser.findOne({ email });
+        }
+
+        if (!user) {
+            return res.status(400).json({ message: "User with this email does not exist" });
+        }
+
+        // Generate a new 4-digit reset code (regenerate on every resend request)
+        const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
+
+        // Hash the reset code and set expiration
+        user.resetPasswordCode = crypto.createHash('sha256').update(resetCode).digest('hex');
+        user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiration
+
+        // Log the hashed code and expiration time for debugging
+        console.log("Hashed reset code saved:", user.resetPasswordCode);  // Log the hashed code
+        console.log("Reset password expires at:", new Date(user.resetPasswordExpires)); // Log the expiration time
+
+        await user.save(); // Ensure that you are saving the user document
+
+        // Send the plain-text reset code via email 
+        if (email) {
+            const options = {
+                email: email,
+                subject: "Password Reset Code",
+                text: `Your password reset code is ${resetCode}`,  // Send the plain-text code
+            };
+            await sendMail(options);
+        }
+
+        res.status(200).json({ message: "Password reset code sent successfully" });
+    } catch (error) {
+        console.error("Error in forgotPassword:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+
+const schoolverifyResetCode = async (req, res, next) => {
+    const { code } = req.body;
+
+    if (!code) {
+        return res.status(400).json({ message: "Verification code is required" });
+    }
+
+    try {
+        const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+        console.log("Hashed code provided by user:", hashedCode);  // Log the hashed code for comparison
+
+        // Find the user with the hashed code and valid expiration time
+        const user = await SugUser.findOne({
+            resetPasswordCode: hashedCode,
+            resetPasswordExpires: { $gt: Date.now() },
+        });
+
+        // Log the current time and the expiration time for debugging
+        console.log("Current time:", Date.now());
+        console.log("Expiration time:", user ? user.resetPasswordExpires : null); // Log if user is found
+
+        if (!user) {
+            console.log("User not found or code expired");
+            return res.status(400).json({ message: "Invalid or expired reset code" });
+        }
+
+        // Log the found user details for debugging
+        console.log("User found for verification:", user);
+
+        // Return the user ID or a temporary token after code verification
+        res.status(200).json({ message: "Code verified successfully", userId: user._id });
+    } catch (error) {
+        console.error("Error in verifyResetCode:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+
+const schoolresetPassword = async (req, res, next) => {
+    const { userId, password, confirmPassword } = req.body;
+  
+    // Check for required fields
+    if (!userId || !password || !confirmPassword) {
+      return res.status(400).json({ message: "User ID, Password, and Confirm Password are required" });
+    }
+  
+    // Ensure the passwords match
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+  
+    try {
+      // Find the user by userId
+      const user = await SugUser.findById(userId);
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Proceed with password reset
+      user.password = password; 
+      user.resetPasswordCode = undefined;  
+      user.resetPasswordExpires = undefined;
+      await user.save();
+  
+      res.status(200).json({ message: "Password reset successful" });
+    } catch (error) {
+      console.error("Error in resetPassword:", error);
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  };
   
   
   
@@ -525,5 +635,10 @@ module.exports = {
   addFaculty,
   getFaculty,
   getSugUser,
-  schoolSugSignin
+  schoolSugSignin,
+  getSugUserDetails,
+  schoolForgotPassword,
+  schoolverifyResetCode,
+  schoolresetPassword
+
 };

@@ -5,7 +5,7 @@ const FacultySchema = new mongoose.Schema({
     type: String, 
     required: true 
 },
- 
+university: { type: mongoose.Schema.Types.ObjectId, ref: 'School' },
 createdAt: {
     type: Date,
     default: Date.now

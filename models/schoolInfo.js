@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const schoolInfoSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "sugUser",
+    ref: "SugUser", // Ensure this matches the model name
     required: true,
   },
   university: {
@@ -22,7 +22,8 @@ const schoolInfoSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
+  faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], // Add this line
+  students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }]
 });
 
-module.exports = mongoose.model("schoolInfo", schoolInfoSchema);
+module.exports = mongoose.model("SchoolInfo", schoolInfoSchema);

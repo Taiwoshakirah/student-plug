@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const Schema = mongoose.Schema;
 
 const schoolSugSchema = new mongoose.Schema({
     sugFullName: {
@@ -23,15 +24,21 @@ const schoolSugSchema = new mongoose.Schema({
         type: Boolean, 
         required: true, 
     },
-    // schoolInfoId: {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'schoolInfo',
-    //     required: true,  // Reference to the associated school
-    // },
-    // selectedFaculties: [{
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'Faculty',  // Reference to the selected faculties
-    // }],
+
+    faculties: [
+        { type: Schema.Types.ObjectId, ref: 'Faculty' }  // References Faculty IDs
+      ],
+      schoolInfo: { type: mongoose.Schema.Types.ObjectId, ref: 'SchoolInfo' },
+    resetPasswordCode: {
+        type: String,
+        required: false, // Optional if you want to reset
+    },
+    resetPasswordExpires: {
+        type: Date,
+        required: false, // Optional
+    },
+   
+  
 });
 
 // Hash password before saving
@@ -43,5 +50,7 @@ schoolSugSchema.pre("save", async function (next) {
     this.password = await bcrypt.hash(this.password, salt);
     next();
 });
+
+
 
 module.exports = mongoose.model('SugUser', schoolSugSchema);

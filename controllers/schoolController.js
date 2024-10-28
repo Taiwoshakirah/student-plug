@@ -103,6 +103,7 @@ const schoolInformation = async (req, res, next) => {
 };
 
 
+
 const uploadStudentsRegNo = async (req, res) => {
     // Process facultyName as an array
     let facultyNames = req.body["facultyName[]"];
@@ -488,7 +489,7 @@ const getSugUser = async (req, res) => {
                         facultyId: faculty._id,
                         facultyName: faculty.name
                     })),
-                    students // Include the students with their registration numbers
+                    students // Including the students with their registration numbers
                 },
                 university: user.schoolInfo.university,
                 state: user.schoolInfo.state,

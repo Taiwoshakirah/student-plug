@@ -36,7 +36,7 @@ const schoolSugSignup = async (req, res,next) => {
             agreedToTerms
         });
 
-        req.session.userId = newUser._id; // Store the user ID in session to keep track across phases
+        req.session.userId = newUser._id; 
 
         res.json({
             success: true,
@@ -48,9 +48,10 @@ const schoolSugSignup = async (req, res,next) => {
         next(error);
     }
 };
+
 const schoolInformation = async (req, res, next) => {
-    const { userId } = req.session; // Assuming userId is stored in session
-    const { university, state, aboutUniversity } = req.body;
+    // const { userId } = req.body; 
+    const { university, state, aboutUniversity,userId } = req.body;
 
     const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
 
@@ -64,31 +65,29 @@ const schoolInformation = async (req, res, next) => {
         return res.status(422).json({ message: "All school details are required" });
     }
 
-    // Define a path to temporarily store the file
+    //path to temporarily store the file
     const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
 
-    // Move the uploaded file to the desired location
+    // Moving the uploaded file to the desired location
     await uniProfilePicture.mv(tempPath);
 
     try {
-        // Upload the file to Cloudinary
         const uploadResult = await cloudinary.uploader.upload(tempPath);
 
-        // Extract the URL from the upload result
+        // Extracting the URL from the upload result
         const imageUrl = uploadResult.secure_url; // Cloudinary returns a secure URL for the image
 
-        // Create the school data with the image URL
+        // Creating the school data with the image URL
         const schoolData = await SchoolInfo.create({
-            userId, // Reference to the SugUser
+            userId,
             university,
             state,
             aboutUniversity,
-            uniProfilePicture: imageUrl, // Store the URL instead of the file object
+            uniProfilePicture: imageUrl, 
             faculties: [],
-            students: [] // Initialize an empty array for students
+            students: [] 
         });
 
-        // Update the SugUser to reference this new SchoolInfo document
         await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
 
         res.json({

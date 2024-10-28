@@ -116,7 +116,7 @@ const uploadStudentsRegNo = async (req, res) => {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    // Fetch school information and ensure selectedFaculties is an array
+    // Fetch school information and ensure selectedFaculties is array
     const { schoolInfoId } = req.body;
     let selectedFaculties = req.body["selectedFaculties[]"];
     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
@@ -413,15 +413,20 @@ const getSugUser = async (req, res) => {
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
         expiresIn: "3d",
       });
-  
       res.status(200).json({
-        token,
-        user: {
-          _id: user._id,
-          email: user.email,
-          avatar: profilePhotoUrl, 
-        },
+        success: true,
+        userId: user._id,
+        message: "You have successfully signed in"
       });
+  
+    //   res.status(200).json({
+    //     token,
+    //     user: {
+    //       _id: user._id,
+    //       email: user.email,
+    //       avatar: profilePhotoUrl, 
+    //     },
+    //   });
     } catch (error) {
       console.error("Error during sign-in:", error);
       res.status(500).json({ message: "Internal Server Error" });

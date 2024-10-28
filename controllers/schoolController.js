@@ -45,6 +45,11 @@ const schoolSugSignup = async (req, res,next) => {
         });
     } catch (error) {
         console.error("User signup error:", error);
+        if (error.code === 11000) {
+            // Handle duplicate key error (e.g., email or phone number already exists)
+            const field = Object.keys(error.keyPattern)[0];
+            return res.status(400).json({ success: false, message: "User already exist" });
+          }
         next(error);
     }
 };

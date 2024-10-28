@@ -237,24 +237,28 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
     try {
         console.log("Registration numbers being processed:", registrationNumbers);
         const studentsToInsert = [];
+        const insertedRegNumbers = new Set(); // Track inserted reg numbers
 
         for (const faculty of facultyDocs) {
             const facultyId = faculty._id;
+
+            // Retrieve existing students across all faculties with matching reg numbers
             const existingStudents = await Student.find({
                 registrationNumber: { $in: registrationNumbers },
-                faculty: facultyId,
             });
-            const existingRegNums = existingStudents.map(student => student.registrationNumber);
+            const existingRegNums = new Set(existingStudents.map(student => student.registrationNumber));
 
+            // Filter and prepare new students only if the reg number doesn't already exist
             for (const regNum of registrationNumbers) {
-                if (!existingRegNums.includes(regNum)) {
+                if (!existingRegNums.has(regNum) && !insertedRegNumbers.has(regNum)) {
                     studentsToInsert.push({
                         registrationNumber: regNum,
                         faculty: facultyId,
-                        schoolInfo: schoolInfoId,  // Link to schoolInfo
+                        schoolInfo: schoolInfoId,
                     });
+                    insertedRegNumbers.add(regNum); // Mark this reg number as processed
                 } else {
-                    console.log(`Student with registration number ${regNum} already exists for faculty ${faculty.facultyName}`);
+                    console.log(`Duplicate: ${regNum} for faculty ${faculty.facultyName}`);
                 }
             }
         }
@@ -262,9 +266,8 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
         let insertedStudents = [];
         if (studentsToInsert.length > 0) {
             try {
-                // Insert students and retrieve the inserted documents
                 insertedStudents = await Student.insertMany(studentsToInsert, { ordered: false });
-                console.log(`Successfully inserted ${insertedStudents.length} students.`);
+                console.log(`Inserted ${insertedStudents.length} students successfully.`);
             } catch (error) {
                 if (error.code === 11000) {
                     console.log("Duplicate registration numbers encountered during insertion.");
@@ -274,7 +277,7 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
             }
         }
 
-        // Push the newly created students' IDs to the SchoolInfo document
+        // Link inserted students to the SchoolInfo
         if (insertedStudents.length > 0) {
             await SchoolInfo.findByIdAndUpdate(
                 schoolInfoId,
@@ -296,6 +299,8 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
         }
     }
 };
+
+
 
 
 
@@ -436,7 +441,7 @@ const getSugUser = async (req, res) => {
 
   const getSugUserDetails = async (req, res) => {
     try {
-        const userId = req.params.userId; // Getting user ID from URL params
+        const userId = req.params.userId;
 
         if (!userId) {
             return res.status(400).json({ success: false, message: "User ID is required." });
@@ -447,38 +452,42 @@ const getSugUser = async (req, res) => {
             .populate({
                 path: 'schoolInfo',
                 populate: [
-                    { path: 'faculties', select: 'name' },
+                    { path: 'faculties', select: '_id facultyName' },  // Use facultyName instead of name
                     {
                         path: 'students',
                         select: 'registrationNumber faculty',
-                        populate: { path: 'faculty', select: 'name' }
+                        populate: { path: 'faculty', select: '_id facultyName' } // Use facultyName here as well
                     }
                 ]
             });
 
-        console.log("User with populated schoolInfo:", user); // Log the user object
-
         if (!user) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
-
-        // Additional test query directly on SchoolInfo
-        const schoolInfoTest = await SchoolInfo.findById(user.schoolInfo._id).populate({
-            path: 'students',
-            select: 'registrationNumber faculty',
-            populate: { path: 'faculty', select: 'name' }
-        });
-        console.log("SchoolInfo test with students populated:", schoolInfoTest); // Log the populated SchoolInfo
 
         // Check if schoolInfo exists
         if (!user.schoolInfo) {
             return res.status(404).json({ success: false, message: "School information not found for this user" });
         }
 
-        // Extracting student data along with registration numbers
-        const students = user.schoolInfo.students.map(student => ({
-            registrationNumber: student.registrationNumber,
-            faculty: student.faculty ? student.faculty.name : null
+        // Filter out duplicate registration numbers in students
+        const uniqueStudents = [];
+        const seenRegistrationNumbers = new Set();
+
+        user.schoolInfo.students.forEach(student => {
+            if (!seenRegistrationNumbers.has(student.registrationNumber)) {
+                seenRegistrationNumbers.add(student.registrationNumber);
+                uniqueStudents.push({
+                    registrationNumber: student.registrationNumber,
+                    // facultyId: student.faculty ? student.faculty._id : null,
+                });
+            }
+        });
+
+        // Map faculties to include both facultyId and facultyName
+        const faculties = user.schoolInfo.faculties.map(faculty => ({
+            facultyId: faculty._id,
+            facultyName: faculty.facultyName // Updated to access facultyName
         }));
 
         return res.status(200).json({
@@ -489,11 +498,8 @@ const getSugUser = async (req, res) => {
                     fullName: user.sugFullName,
                     email: user.email,
                     phoneNumber: user.phoneNumber,
-                    faculties: user.schoolInfo.faculties.map(faculty => ({
-                        facultyId: faculty._id,
-                        facultyName: faculty.name
-                    })),
-                    students // Including the students with their registration numbers
+                    faculties: faculties, // Including both facultyId and facultyName
+                    students: uniqueStudents
                 },
                 university: user.schoolInfo.university,
                 state: user.schoolInfo.state,
@@ -505,6 +511,7 @@ const getSugUser = async (req, res) => {
         return res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 
   

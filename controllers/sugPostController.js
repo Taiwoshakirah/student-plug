@@ -1,20 +1,50 @@
 const SugPost = require('../models/sugPost')
 const SugPostComment = require('../models/sugComment')
+const { promisify } = require("util");
+const cloudinary = require("cloudinary");
+const { uploadToCloudinary } = require("../config/cloudinaryConfig"); // Correctly import the function
+const fs = require("fs");;
+
 
 const createSugPost = async (req, res) => {
-    const { adminId, text, image } = req.body;
-  if (!adminId || !text) {
-    return res.status(400).json({ message: "Admin ID and text are required" });
-  }
-  
-  try {
-    const post = new SugPost({ adminId, text, image });
-    await post.save();
-    res.status(201).json({ message: "Post created", post });
-  } catch (error) {
-    res.status(500).json({ message: "Error creating post", error });
-  }
+    const { adminId, text } = req.body;
+    if (!adminId || !text) {
+        return res.status(400).json({ message: "Admin ID and text are required" });
+    }
+
+    try {
+        let imageUrl = null;
+
+        if (req.files && req.files.image) {
+            const image = req.files.image;
+            const tempFilePath = `uploads/${image.name}`; // Define a path for temporary storage
+
+            // Move the file to the temporary directory
+            await image.mv(tempFilePath); // Use await directly
+
+            // Proceed to upload to Cloudinary
+            const result = await uploadToCloudinary(tempFilePath);
+            imageUrl = result.secure_url; // Get the secure URL from Cloudinary response
+
+            // Optionally, delete the file from the server after upload
+            fs.unlink(tempFilePath, (unlinkErr) => {
+                if (unlinkErr) {
+                    console.error("Error deleting temporary file:", unlinkErr);
+                }
+            });
+        }
+
+        const post = new SugPost({ adminId, text, image: imageUrl }); // Make sure to save imageUrl
+        await post.save();
+        res.status(201).json({ message: "Post created", post });
+    } catch (error) {
+        res.status(500).json({ message: "Error creating post", error });
+    }
 };
+
+
+
+
 
 const toggleLike = async (req, res) => {
     const { postId } = req.params;

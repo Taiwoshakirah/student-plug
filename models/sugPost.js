@@ -10,9 +10,10 @@ const sugPostSchema = new mongoose.Schema({
       text: { 
         type: String, 
         required: true },
-      image: { 
-        type: String 
-    },
+      images: [
+        String
+      ], 
+         
       createdAt: { 
         type: Date, 
         default: Date.now 

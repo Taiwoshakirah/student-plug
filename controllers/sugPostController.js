@@ -13,22 +13,30 @@ const createSugPost = async (req, res) => {
     }
 
     try {
-        let imageUrls = [];
+        let imageUrls = []; // Store all image URLs
 
-        if (req.files && req.files.images) {
-            const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
-            
+        if (req.files && req.files.image) {
+            const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
+            console.log("Images received in request:", images); // Check if images are correctly received
+
             for (const image of images) {
-                const tempFilePath = `uploads/${image.name}`; // Define a path for temporary storage
+                const tempFilePath = `uploads/${image.name}`;
 
                 // Move the file to the temporary directory
                 await image.mv(tempFilePath);
+                console.log(`File moved to temporary path: ${tempFilePath}`);
 
                 // Upload to Cloudinary
                 const result = await uploadToCloudinary(tempFilePath);
-                imageUrls.push(result.secure_url); // Store the secure URL
+                console.log("Cloudinary upload result:", result); // Check Cloudinary response
 
-                // Optionally, delete the file from the server after upload
+                if (result && result.secure_url) {
+                    imageUrls.push(result.secure_url);
+                } else {
+                    console.error("Failed to upload image to Cloudinary:", result);
+                }
+
+                // Delete the temporary file
                 fs.unlink(tempFilePath, (unlinkErr) => {
                     if (unlinkErr) {
                         console.error("Error deleting temporary file:", unlinkErr);
@@ -37,13 +45,18 @@ const createSugPost = async (req, res) => {
             }
         }
 
-        const post = new SugPost({ adminId, text, images: imageUrls }); // Save imageUrls array
+        console.log("Final image URLs to be saved:", imageUrls); // Verify image URLs before saving
+
+        // Save post with all image URLs
+        const post = new SugPost({ adminId, text, images: imageUrls });
         await post.save();
         res.status(201).json({ message: "Post created", post });
     } catch (error) {
+        console.error("Error creating post:", error);
         res.status(500).json({ message: "Error creating post", error });
     }
 };
+
 
 
 
@@ -89,28 +102,30 @@ const addComment = async (req, res) => {
   }
 };
 
-const fetchPostDetails =async (req,res)=>{
+const fetchPostDetails = async (req, res) => {
     try {
         const posts = await SugPost.find()
-          .populate("adminId", "sugFullName email") // Populate admin details
-          .populate("likes", "fullName") // Populate user names who liked the post
-          .lean(); // Convert Mongoose documents to plain JavaScript objects
-    
-        for (const post of posts) {
-          // Count comments and attach to the post
-          post.comments = await SugPostComment.find({ postId: post._id })
-            .populate("userId", "fullName") // Populate user details for comments
+            .populate("adminId", "sugFullName email") // Populate admin details
+            .populate("likes", "fullName") // Populate names of users who liked the post
             .lean();
-          
-          post.commentsCount = post.comments.length; // Total number of comments
-          post.likesCount = post.likes.length; // Total number of likes
+
+        for (const post of posts) {
+            // Fetch and attach comments to each post
+            post.comments = await SugPostComment.find({ postId: post._id })
+                .populate("userId", "fullName") // Populate user details for comments
+                .lean();
+
+            post.commentsCount = post.comments.length; // Total number of comments
+            post.likesCount = post.likes.length; // Total number of likes
         }
-    
+
         res.json({ posts });
-      } catch (error) {
+    } catch (error) {
+        console.error("Error fetching posts:", error);
         res.status(500).json({ message: "Error fetching posts", error });
-      }
-}
+    }
+};
+
 
 
 module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails}

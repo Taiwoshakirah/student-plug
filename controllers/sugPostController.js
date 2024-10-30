@@ -58,11 +58,6 @@ const createSugPost = async (req, res) => {
 };
 
 
-
-
-
-
-
 const toggleLike = async (req, res) => {
     const { postId } = req.params;
     const { userId } = req.body;
@@ -104,17 +99,33 @@ const addComment = async (req, res) => {
 
 const fetchPostDetails = async (req, res) => {
     try {
-        const posts = await SugPost.find()
+        const { adminId } = req.params; // Get adminId from route parameters
+
+        // Filter posts by adminId if provided
+        const filter = adminId ? { adminId } : {};
+
+        // Fetch posts with admin details and likes populated, filtered by adminId if specified
+        const posts = await SugPost.find(filter)
             .populate("adminId", "sugFullName email") // Populate admin details
             .populate("likes", "fullName") // Populate names of users who liked the post
             .lean();
 
-        for (const post of posts) {
-            // Fetch and attach comments to each post
-            post.comments = await SugPostComment.find({ postId: post._id })
-                .populate("userId", "fullName") // Populate user details for comments
-                .lean();
+        // Get all comments for the posts in one query
+        const postIds = posts.map(post => post._id);
+        const comments = await SugPostComment.find({ postId: { $in: postIds } })
+            .populate("userId", "fullName") // Populate user details for comments
+            .lean();
 
+        // Group comments by postId
+        const commentsByPostId = comments.reduce((acc, comment) => {
+            if (!acc[comment.postId]) acc[comment.postId] = [];
+            acc[comment.postId].push(comment);
+            return acc;
+        }, {});
+
+        // Attach comments and counts to each post
+        for (const post of posts) {
+            post.comments = commentsByPostId[post._id] || []; // Attach comments for the post
             post.commentsCount = post.comments.length; // Total number of comments
             post.likesCount = post.likes.length; // Total number of likes
         }

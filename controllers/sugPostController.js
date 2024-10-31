@@ -61,24 +61,40 @@ const createSugPost = async (req, res) => {
 const toggleLike = async (req, res) => {
     const { postId } = req.params;
     const { userId } = req.body;
-  
+
     try {
-      const post = await SugPost.findById(postId);
-      if (!post) return res.status(404).json({ message: "Post not found" });
-  
-      // Add or remove like
-      if (post.likes.includes(userId)) {
-        post.likes = post.likes.filter((id) => id.toString() !== userId);
-      } else {
-        post.likes.push(userId);
-      }
-  
-      await post.save();
-      res.json({ message: "Post liked/unliked", likes: post.likes.length });
+        // Find the post by ID
+        const post = await SugPost.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        // Check if the user has already liked the post
+        const hasLiked = post.likes.includes(userId);
+
+        // Add or remove like based on the current state
+        if (hasLiked) {
+            // User has liked the post, remove the like
+            post.likes = post.likes.filter((id) => id.toString() !== userId);
+        } else {
+            // User has not liked the post, add the like
+            post.likes.push(userId);
+        }
+
+        // Save the updated post
+        await post.save();
+
+        // Return the updated like count and status
+        res.json({
+            message: hasLiked ? "Post unliked" : "Post liked",
+            likes: post.likes.length,
+        });
     } catch (error) {
-      res.status(500).json({ message: "Error liking post", error });
+        console.error("Error toggling like:", error);
+        res.status(500).json({ message: "Error liking post", error });
     }
 };
+
 
 const addComment = async (req, res) => {
     const { postId } = req.params;
@@ -108,6 +124,7 @@ const fetchPostDetails = async (req, res) => {
         const posts = await SugPost.find(filter)
             .populate("adminId", "sugFullName email") // Populate admin details
             .populate("likes", "fullName") // Populate names of users who liked the post
+            .sort({ createdAt: -1 }) // Sort posts by createdAt in descending order
             .lean();
 
         // Get all comments for the posts in one query

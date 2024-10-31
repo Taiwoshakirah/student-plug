@@ -1,5 +1,5 @@
 const express = require("express");
-const { signUp, studentInformation, signin, forgotPassword, resetPassword, getUser, uploadProfilePicture, googleSignIn, verifyResetCode } = require("../controllers/authController"); 
+const { signUp, studentInformation, signin, forgotPassword, resetPassword, getUser, uploadProfilePicture, googleSignIn, verifyResetCode, getSchoolDashboard } = require("../controllers/authController"); 
 const methodNotAllowed = require("../utils/methodNotAllowed");
 const authenticateToken = require("../middlewares/verifyToken");
 const router = express.Router();
@@ -13,4 +13,5 @@ router.route('/forgot-password').post(forgotPassword).all(methodNotAllowed)
 router.route('/verify-password').post(verifyResetCode).all(methodNotAllowed)
 router.route('/reset-password').post(resetPassword).all(methodNotAllowed)
 router.route("/upload-profile").post(authenticateToken, uploadProfilePicture).all(methodNotAllowed);
+router.route('/dashboard').get(authenticateToken,getSchoolDashboard).all(methodNotAllowed)
 module.exports = router;

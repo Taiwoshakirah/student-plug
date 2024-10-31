@@ -39,6 +39,10 @@ const userSchema =new mongoose.Schema({
   },
   resetPasswordExpires: { 
     type: Date 
+  },
+  schoolInfoId: { // Add this field
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "StudentInfo" // Reference the StudentInfo model
   }
 });
 

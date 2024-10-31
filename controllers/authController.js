@@ -13,7 +13,7 @@ const admin = require('firebase-admin');
 
 const signUp = async (req, res, next) => {
   const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
-
+  
   // Convert agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
@@ -36,11 +36,8 @@ const signUp = async (req, res, next) => {
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
         if (existingUser.googleId) {
-          // User already exists and has signed up with Google
           return res.status(409).json({ success: false, message: "User already exists, please log in." });
         } else {
-          // User exists, but it has no googleId
-          // Optionally allow account linking or notify that an account exists with that email
           return res.status(409).json({ success: false, message: "User exists with that email. Please log in or use Google to link your account." });
         }
       }
@@ -54,9 +51,8 @@ const signUp = async (req, res, next) => {
         agreedToTerms: agreedToTermsBool,
       });
 
-      // Generate JWT token for the user
-      const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
-      return res.json({ success: true, message: "User created successfully", data: newUser, token });
+      const token = jwt.sign({ userId: newUser._id, schoolId: newUser.schoolInfoId }, process.env.JWT_SECRET, { expiresIn: "3d" });
+      return res.json({ success: true, message: "User created successfully", data: newUser, token, redirectUrl: `/dashboard/school/${newUser.schoolInfoId}` });
 
     } catch (error) {
       console.error("Google sign-up error:", error);
@@ -66,20 +62,16 @@ const signUp = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "Invalid Google ID token" });
     }
   } else {
-    // Normal sign-up logic
     if (password !== confirmPassword) {
       return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
 
-    // Check if the user already exists by email
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      // User already exist, prevent duplicate sign-up
       return res.status(409).json({ success: false, message: "User already exists" });
     }
 
     try {
-      // Create new user with normal sign-up details
       const newUser = await User.create({
         fullName,
         email,
@@ -88,14 +80,12 @@ const signUp = async (req, res, next) => {
         agreedToTerms: agreedToTermsBool,
       });
 
-      // Generate JWT token for the user
-      const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
-      return res.json({ success: true, message: "User created successfully", data: newUser, token });
+      const token = jwt.sign({ userId: newUser._id, schoolId: newUser.schoolInfoId }, process.env.JWT_SECRET, { expiresIn: "3d" });
+      return res.json({ success: true, message: "User created successfully", data: newUser, token, redirectUrl: `/dashboard/school/${newUser.schoolInfoId}` });
 
     } catch (error) {
       console.error("Normal sign-up error:", error);
       if (error.code === 11000) {
-        // Handle duplicate key error (e.g., email or phone number already exists)
         const field = Object.keys(error.keyPattern)[0];
         return res.status(400).json({ success: false, message: `Duplicate ${field} provided` });
       }
@@ -131,37 +121,18 @@ const formatDate = (date) => {
 
 
 const studentInformation = async (req, res) => {
-  const {
-    userId,
-    university,
-    faculty,
-    department,
-    level,
-    yearOfAdmission,
-    yearOfGraduation,
-  } = req.body;
+  const { userId, university, faculty, department, level, yearOfAdmission, yearOfGraduation } = req.body;
 
-  if (
-    !university ||
-    !faculty ||
-    !department ||
-    !level ||
-    !yearOfAdmission ||
-    !yearOfGraduation
-  ) {
+  if (!university || !faculty || !department || !level || !yearOfAdmission || !yearOfGraduation) {
     return res.status(422).json({ message: "All fields are required" });
   }
 
   if (!isValidDate(yearOfAdmission) || !isValidDate(yearOfGraduation)) {
-    return res
-      .status(400)
-      .json({ message: "Invalid date format. Use dd/mm/yy" });
+    return res.status(400).json({ message: "Invalid date format. Use dd/mm/yy" });
   }
 
   if (!validateAdmissionAndGraduationDates(yearOfAdmission, yearOfGraduation)) {
-    return res
-      .status(400)
-      .json({ message: "Graduation date must be after admission date" });
+    return res.status(400).json({ message: "Graduation date must be after admission date" });
   }
 
   try {
@@ -180,14 +151,25 @@ const studentInformation = async (req, res) => {
       yearOfGraduation: formatDate(yearOfGraduation),
     });
 
-    await newStudentInfo.save();
-    res
-      .status(201)
-      .json({ message: "Student information saved", newStudentInfo });
+    // Save the new StudentInfo document
+    const savedStudentInfo = await newStudentInfo.save();
+
+    // Assign the ObjectId of the saved StudentInfo to the user's schoolInfoId field
+    user.schoolInfoId = savedStudentInfo._id;
+    await user.save();
+
+    res.status(201).json({ 
+      message: "Student information saved", 
+      newStudentInfo: savedStudentInfo, 
+      redirectUrl: `/dashboard/school/${savedStudentInfo.university}` 
+    });
   } catch (error) {
+    console.error("Error in studentInformation:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+
 
 const uploadProfilePicture = async (req, res) => {
   try {
@@ -241,6 +223,38 @@ const uploadProfilePicture = async (req, res) => {
 };
 
 
+// Middleware to fetch school-specific data
+const getSchoolDashboard = async (req, res) => {
+  // Extract userId from the decoded token
+  const userId = req.user.userId; // Corrected to use userId instead of id
+  try {
+    // Check if user is authenticated
+    if (!req.user || !userId) {
+      return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    // Fetch the user from the database and populate the schoolInfoId field
+    const user = await User.findById(userId).populate("schoolInfoId");
+
+    // Check if the user exists
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if the user has associated school information
+    if (!user.schoolInfoId) {
+      return res.status(400).json({ message: "School information not available" });
+    }
+
+    // Generate the dashboard URL using the university field
+    const schoolDashboardUrl = `/dashboard/${user.schoolInfoId.university}`;
+    res.json({ redirectUrl: schoolDashboardUrl });
+  } catch (error) {
+    console.error("Error in getSchoolDashboard:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 
 
@@ -258,12 +272,12 @@ const signin = async (req, res) => {
   if (email) {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (isEmail) {
-      user = await User.findOne({ email });
+      user = await User.findOne({ email }).populate("schoolInfoId"); // Populate schoolInfoId
     }
   } else if (phoneNumber) {
     const parsedPhone = parsePhoneNumberFromString(phoneNumber, "NG");
     if (parsedPhone && parsedPhone.isValid()) {
-      user = await User.findOne({ phoneNumber: parsedPhone.number });
+      user = await User.findOne({ phoneNumber: parsedPhone.number }).populate("schoolInfoId"); // Populate schoolInfoId
     }
   }
 
@@ -282,8 +296,13 @@ const signin = async (req, res) => {
     expiresIn: "3d",
   });
 
+  // Assuming user's schoolInfoId contains their university or school name
+  const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;
+
+
   res.status(200).json({
     token,
+    redirectUrl, // Add the redirect URL to the response
     user: {
       _id: user._id,
       email: user.email,
@@ -305,7 +324,9 @@ const googleSignIn = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
 
-    let user = await User.findOne({ googleId: uid });
+    // Check if the user already exists
+    let user = await User.findOne({ googleId: uid }).populate("schoolInfoId"); // Populate schoolInfoId
+
 
     if (!user) {
       user = await User.create({
@@ -315,12 +336,18 @@ const googleSignIn = async (req, res) => {
         profilePhoto: picture,
         agreedToTerms: true,
       });
+      // Re-query to populate schoolInfoId for the new user
+      user = await User.findOne({ googleId: uid }).populate("schoolInfoId");
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
+    // Assuming user's schoolInfoId contains their university or school name
+  const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;
+
 
     return res.status(200).json({
       message: "Success",
+      redirectUrl, // Add the redirect URL to the response
       user: {
         _id: user._id,
         email: user.email,
@@ -508,4 +535,5 @@ module.exports = {
   verifyResetCode,
   resetPassword,
   getUser,
+  getSchoolDashboard
 };

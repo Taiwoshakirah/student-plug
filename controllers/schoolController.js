@@ -3,7 +3,9 @@ const SchoolInfo = require("../models/schoolInfo");
 const jwt = require("jsonwebtoken");
 const { parsePhoneNumberFromString } = require("libphonenumber-js");
 const crypto = require("crypto");
-const cloudinary = require("../config/cloudinaryConfig");
+// const cloudinary = require("../config/cloudinaryConfig");
+const cloudinary = require('../config/cloudinaryConfig')
+const { uploadToCloudinary } = require("../config/cloudinaryConfig");
 const fs = require("fs");
 const path = require("path");
 const Faculty = require("../models/faculties");
@@ -55,8 +57,7 @@ const schoolSugSignup = async (req, res,next) => {
 };
 
 const schoolInformation = async (req, res, next) => {
-    // const { userId } = req.body; 
-    const { university, state, aboutUniversity,userId } = req.body;
+    const { university, state, aboutUniversity, userId } = req.body;
 
     const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
 
@@ -70,14 +71,14 @@ const schoolInformation = async (req, res, next) => {
         return res.status(422).json({ message: "All school details are required" });
     }
 
-    //path to temporarily store the file
+    // Path to temporarily store the file
     const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
 
     // Moving the uploaded file to the desired location
     await uniProfilePicture.mv(tempPath);
 
     try {
-        const uploadResult = await cloudinary.uploader.upload(tempPath);
+        const uploadResult = await uploadToCloudinary(tempPath); // Use your function to upload
 
         // Extracting the URL from the upload result
         const imageUrl = uploadResult.secure_url; // Cloudinary returns a secure URL for the image

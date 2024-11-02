@@ -8,6 +8,7 @@ const sendMail = require("../utils/sendMail");
 const fs = require('fs')
 const path = require("path");
 const cloudinary = require('../config/cloudinaryConfig')
+const {uploadToCloudinary} = require('../config/cloudinaryConfig.js')
 
 const admin = require('firebase-admin');
 
@@ -176,8 +177,7 @@ const uploadProfilePicture = async (req, res) => {
     console.log("Request Body:", req.body);
     console.log("Uploaded Files:", req.files);
 
-    const { userId } = req.body; 
-    const { skipUpload } = req.body;
+    const { userId, skipUpload } = req.body;
 
     if (skipUpload) {
       return res.status(200).json({ message: "Profile picture upload skipped" });
@@ -189,25 +189,20 @@ const uploadProfilePicture = async (req, res) => {
 
     const profilePhoto = req.files.profilePhoto;
 
-    // Define the upload pat
-    const uploadDir = path.join(__dirname, "uploads/profiles"); 
-    const uploadPath = path.join(uploadDir, profilePhoto.name); 
+    // Define the upload path
+    const uploadDir = path.join(__dirname, "uploads/profiles");
+    const uploadPath = path.join(uploadDir, profilePhoto.name);
 
-    // Check if the uploads directory exists, and create it if it doesn't
+    // Ensure the uploads directory exists
     if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true }); 
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Use the mv method to move the file to the desired location
-    await profilePhoto.mv(uploadPath); 
+    // Move the file to the desired location
+    await profilePhoto.mv(uploadPath);
 
-    console.log("Cloudinary Object:", cloudinary);
-    const result = await cloudinary.uploader.upload(uploadPath, {
-      folder: "profiles",
-      public_id: `${userId}_profile_photo_${Date.now()}`,
-      use_filename: true
-    });
-    
+    // Upload to Cloudinary using the helper function
+    const result = await uploadToCloudinary(uploadPath);
 
     const profilePhotoPath = result.secure_url;
 
@@ -216,13 +211,14 @@ const uploadProfilePicture = async (req, res) => {
 
     return res.status(200).json({
       message: "Profile picture uploaded successfully",
-      profilePhoto: profilePhotoPath 
+      profilePhoto: profilePhotoPath
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 
 // Middleware to fetch school-specific data

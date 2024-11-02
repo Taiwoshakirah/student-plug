@@ -24,6 +24,11 @@ const schoolSugSchema = new mongoose.Schema({
         type: Boolean, 
         required: true, 
     },
+    role: {  // Add a dedicated field for the role
+        type: String,
+        enum: ["user", "admin"], // Specify allowed roles
+        default: "user", // Default role
+    },
 
     faculties: [
         { type: Schema.Types.ObjectId, ref: 'Faculty' }  // References Faculty IDs

@@ -18,43 +18,58 @@ const bcrypt = require('bcrypt')
 const mongoose = require('mongoose')
 const sendMail = require('../utils/sendMail')
 
-const schoolSugSignup = async (req, res,next) => {
+
+const schoolSugSignup = async (req, res, next) => {
     const { sugFullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
+    // Check for missing fields
     if (!sugFullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTerms) {
         return res.status(422).json({ message: "Input all fields" });
     }
 
+    // Check if passwords match
     if (password !== confirmPassword) {
         return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
 
     try {
+        // Create a new user
         const newUser = await SugUser.create({
             sugFullName,
             email,
             phoneNumber,
             password,
-            agreedToTerms
+            agreedToTerms,
+            role: "admin", // Set role to admin here
         });
 
+        // Optionally, you can hash the password here before storing (if not done already)
+
+        // Set session user ID (if using sessions)
         req.session.userId = newUser._id; 
 
+        // Generate a token
+        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" }); // Adjust expiry as needed
+
+        // Return response with token
         res.json({
             success: true,
             message: "User created successfully, proceed to university info",
-            userId: newUser._id
+            userId: newUser._id,
+            role:"admin",
+            token // Include the token in the response
         });
     } catch (error) {
         console.error("User signup error:", error);
         if (error.code === 11000) {
             // Handle duplicate key error (e.g., email or phone number already exists)
             const field = Object.keys(error.keyPattern)[0];
-            return res.status(400).json({ success: false, message: "User already exist" });
-          }
-        next(error);
+            return res.status(400).json({ success: false, message: "User already exists" });
+        }
+        next(error); // Pass error to error handler
     }
 };
+
 
 const schoolInformation = async (req, res, next) => {
     const { university, state, aboutUniversity, userId } = req.body;

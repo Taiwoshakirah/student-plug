@@ -201,11 +201,13 @@ const uploadProfilePicture = async (req, res) => {
     // Use the mv method to move the file to the desired location
     await profilePhoto.mv(uploadPath); 
 
+    console.log("Cloudinary Object:", cloudinary);
     const result = await cloudinary.uploader.upload(uploadPath, {
-      folder: "profiles", 
-      public_id: `${userId}_profile_photo_${Date.now()}`, 
+      folder: "profiles",
+      public_id: `${userId}_profile_photo_${Date.now()}`,
       use_filename: true
     });
+    
 
     const profilePhotoPath = result.secure_url;
 

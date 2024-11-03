@@ -18,10 +18,12 @@ const sugPostSchema = new mongoose.Schema({
         type: Date, 
         default: Date.now 
     },
-    likes: [{ 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: "SugUser" // Ensure this references the correct user model
-    }],
+    likes: [
+        {
+            _id: { type: mongoose.Schema.Types.ObjectId, ref: "SugUser" },
+            fullName: String
+        }
+    ],
     commentsCount: { 
         type: Number, 
         default: 0 

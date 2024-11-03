@@ -6,6 +6,10 @@ const { uploadToCloudinary } = require("../config/cloudinaryConfig"); // Correct
 const fs = require("fs");;
 const mongoose = require('mongoose');
 const Roles = require('../middlewares/role');
+const User = require('../models/signUp')
+const SugUser = require('../models/schoolSug')
+const { Types: { ObjectId } } = require('mongoose'); // Make sure to import ObjectId
+
 
 
 const createSugPost = async (req, res) => {
@@ -15,22 +19,22 @@ const createSugPost = async (req, res) => {
     }
 
     try {
-        let imageUrls = []; // Store all image URLs
+        let imageUrls = []; 
 
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-            console.log("Images received in request:", images); // Check if images are correctly received
+            console.log("Images received in request:", images); 
 
             for (const image of images) {
                 const tempFilePath = `uploads/${image.name}`;
 
-                // Move the file to the temporary directory
+                
                 await image.mv(tempFilePath);
                 console.log(`File moved to temporary path: ${tempFilePath}`);
 
-                // Upload to Cloudinary
+                
                 const result = await uploadToCloudinary(tempFilePath);
-                console.log("Cloudinary upload result:", result); // Check Cloudinary response
+                console.log("Cloudinary upload result:", result); 
 
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
@@ -38,7 +42,7 @@ const createSugPost = async (req, res) => {
                     console.error("Failed to upload image to Cloudinary:", result);
                 }
 
-                // Delete the temporary file
+                //temporary file Deleted   
                 fs.unlink(tempFilePath, (unlinkErr) => {
                     if (unlinkErr) {
                         console.error("Error deleting temporary file:", unlinkErr);
@@ -46,10 +50,8 @@ const createSugPost = async (req, res) => {
                 });
             }
         }
-
-        console.log("Final image URLs to be saved:", imageUrls); // Verify image URLs before saving
-
-        // Save post with all image URLs
+        console.log("Final image URLs to be saved:", imageUrls); 
+        // post saved with all image URLs
         const post = new SugPost({ adminId, text, images: imageUrls });
         await post.save();
         res.status(201).json({ message: "Post created", post });
@@ -60,61 +62,74 @@ const createSugPost = async (req, res) => {
 };
 
 
+
+const isValidObjectId = (id) => {
+    return ObjectId.isValid(id) && (new ObjectId(id)).equals(id);
+};
+
 const toggleLike = async (req, res) => {
-    const { postId } = req.params;
-    const { userId, adminId } = req.body; // Extract userId and adminId from the request body
-    const likerId = userId || adminId; // Use userId if available, otherwise use adminId
-
     try {
-        // Fetch the post to see its current state
+        const { postId } = req.params;
+        const { userId, adminId } = req.body;
+
+        // Find the post
         const post = await SugPost.findById(postId);
-        if (!post) return res.status(404).json({ message: "Post not found" });
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
 
-        // Check if the current user has already liked the post
-        const alreadyLiked = post.likes.some(like => like.equals(likerId));
+        // Fetch user and admin details if provided
+        const user = userId ? await User.findById(userId) : null;
+        const admin = adminId ? await User.findById(adminId) : null;
 
-        // Determine whether to add or remove the like
-        const update = alreadyLiked
-            ? { $pull: { likes: likerId } } // Remove the like
-            : { $addToSet: { likes: likerId } }; // Add the like
+        // Initialize userLiked and adminLiked status
+        const userLiked = user ? post.likes.some(like => like.id.toString() === userId.toString()) : false;
+        const adminLiked = admin ? post.likes.some(like => like.id.toString() === adminId.toString()) : false;
 
-        // Perform the update
-        await SugPost.findByIdAndUpdate(postId, update);
+        // Toggle user like if userId is provided
+        if (userId && user) {
+            if (userLiked) {
+                // User is unliking the post
+                post.likes = post.likes.filter(like => like.id.toString() !== userId.toString()); // Remove user like
+            } else {
+                // User is liking the post
+                post.likes.push({ _id: userId, fullName: user.fullName || "Unknown User", id: userId }); // Use placeholder if fullName is not available
+            }
+        }
 
-        // Fetch the updated post and populate likes to get full user information
-        const updatedPost = await SugPost.findById(postId)
-            .populate("likes", "_id sugFullName") // Populate likes with user information
-            .exec();
+        // Toggle admin like if adminId is provided
+        if (adminId && admin) {
+            if (adminLiked) {
+                // Admin is unliking the post
+                post.likes = post.likes.filter(like => like.id.toString() !== adminId.toString()); // Remove admin like
+            } else {
+                // Admin is liking the post
+                post.likes.push({ _id: adminId, fullName: admin.fullName || "Unknown Admin", id: adminId }); // Use placeholder if fullName is not available
+            }
+        }
 
-        // Debugging logs to check userId and likes
-        console.log("User ID:", userId);
-        console.log("Likes Array:", updatedPost.likes.map(like => like._id.toString())); // Log each like ID
+        await post.save();
 
-        // Determine userLiked status
-        const userLiked = updatedPost.likes.some(like => like._id.equals(userId));
-        console.log("User liked status:", userLiked); // Log the userLiked status
+        // Prepare response with updated likes information
+        const updatedLikes = post.likes.map(like => ({
+            userId: like.id,
+            fullName: like.fullName || "Unknown User", // Use placeholder if fullName is not available
+            liked: true
+        }));
 
-        res.json({
-            message: alreadyLiked ? "Post unliked" : "Post liked",
-            likesCount: updatedPost.likes.length, // Count of likes
-            likesArray: updatedPost.likes.map(like => ({
-                _id: like._id,
-                fullName: like.sugFullName, // Include user information
-            })),
-            userLiked // Include the correct userLiked status
+        return res.status(200).json({
+            message: "Post like toggled",
+            likesCount: post.likes.length,
+            likesArray: post.likes,
+            userLiked: !userLiked, // Updated to reflect the new state after toggle
+            adminLiked: !adminLiked, // Updated to reflect the new state after toggle
+            allLikes: updatedLikes
         });
     } catch (error) {
         console.error("Error toggling like:", error);
-        res.status(500).json({ message: "Error liking post", error });
+        return res.status(500).json({ message: "Internal server error" });
     }
 };
-
-
-
-
-
-
-
 
 
 
@@ -122,10 +137,8 @@ const addComment = async (req, res) => {
     const { postId } = req.params;
     const text = req.body.text;
 
-    const userId = req.user.userId; // Get user ID from authenticated user
-    const role = req.user.role; // Get role from authenticated user
-
-    // Check for required fields
+    const userId = req.user.userId; 
+    const role = req.user.role; 
     if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
     }
@@ -133,10 +146,10 @@ const addComment = async (req, res) => {
         return res.status(400).json({ message: "Comment text is required" });
     }
 
-    const isAdmin = role === "admin"; // Check if the user is admin
+    const isAdmin = role === "admin"; 
 
     try {
-        const comment = new SugPostComment({ postId, userId, text, isAdmin, role }); // Include role in comment
+        const comment = new SugPostComment({ postId, userId, text, isAdmin, role });
         await comment.save();
 
         await SugPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
@@ -151,57 +164,58 @@ const addComment = async (req, res) => {
 
   
 
-
-
-
-
-
-
-
-
-const fetchPostDetails = async (req, res) => { 
+const fetchPostDetails = async (req, res) => {
     try {
-        const { adminId, userId } = req.query;
+        const { adminId } = req.params; // Change this line to use req.params
 
         console.log("Admin ID:", adminId);
-        console.log("User ID:", userId);
 
-        const posts = await SugPost.find(adminId ? { adminId } : {})
+        // Ensure adminId is provided and convert it to an ObjectId
+        if (!adminId) {
+            return res.status(400).json({ message: "Admin ID is required" });
+        }
+
+        const adminObjectId = new mongoose.Types.ObjectId(adminId);
+
+        // Find posts only for the given adminId
+        const posts = await SugPost.find({ adminId: adminObjectId })
             .populate("adminId", "sugFullName email")
             .populate({
                 path: "likes",
-                select: "_id fullName" 
+                model: "User",
+                select: "_id fullName"
             })
             .populate({
                 path: "comments",
                 select: "text userId createdAt isAdmin",
-                populate: { 
-                    path: "userId", 
-                    select: "_id fullName" 
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    select: "_id fullName"
                 }
             })
             .sort({ createdAt: -1 })
             .lean();
 
+        // If no posts found, return a message
+        if (posts.length === 0) {
+            return res.status(404).json({ message: "No posts found for this admin." });
+        }
+
+        // Process the fetched posts
         posts.forEach(post => {
             console.log(`Post ID: ${post._id}`);
             console.log("Likes Array:", post.likes);
 
-            post.adminLiked = post.likes.some(like => like._id.toString() === adminId);
+            // Check if admin has liked the post
+            post.adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
             console.log(`Admin liked this post: ${post.adminLiked}`);
 
-            if (userId) {
-                const userObjectId = new mongoose.Types.ObjectId(userId);
-                post.userLiked = post.likes.some(like => like._id.equals(userObjectId));
-            } else {
-                post.userLiked = false;
-            }
-
-            console.log(`Post ID: ${post._id} | userLiked: ${post.userLiked} | adminLiked: ${post.adminLiked}`);
-            post.adminCommented = post.comments.some(comment => comment.isAdmin);
+            // Additional properties
             post.commentsCount = post.comments.length;
             post.likesCount = post.likes.length;
 
+            // Ensure comments have a consistent `isAdmin` field
             post.comments = post.comments.map(comment => ({
                 ...comment,
                 isAdmin: comment.isAdmin || false

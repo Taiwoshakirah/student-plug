@@ -67,53 +67,34 @@ const isValidObjectId = (id) => {
     return ObjectId.isValid(id) && (new ObjectId(id)).equals(id);
 };
 
-const toggleLike = async (req, res) => {
+const toggleLike = async (req, res) => { 
     try {
         const { postId } = req.params;
         const { userId, adminId } = req.body;
 
-        // Find the post
+        // Fetch post only once
         const post = await SugPost.findById(postId);
-        if (!post) {
-            return res.status(404).json({ message: "Post not found" });
-        }
+        if (!post) return res.status(404).json({ message: "Post not found" });
 
-        // Fetch user and admin details if provided
-        const user = userId ? await User.findById(userId) : null;
-        const admin = adminId ? await User.findById(adminId) : null;
+        const likeId = userId || adminId;
+        const user = userId ? await User.findById(userId) : adminId ? await User.findById(adminId) : null;
+        if (!user) return res.status(400).json({ message: "User not found" });
 
-        // Initialize userLiked and adminLiked status
-        const userLiked = user ? post.likes.some(like => like.id.toString() === userId.toString()) : false;
-        const adminLiked = admin ? post.likes.some(like => like.id.toString() === adminId.toString()) : false;
+        const alreadyLiked = post.likes.some(like => like.id.toString() === likeId.toString());
 
-        // Toggle user like if userId is provided
-        if (userId && user) {
-            if (userLiked) {
-                // User is unliking the post
-                post.likes = post.likes.filter(like => like.id.toString() !== userId.toString()); // Remove user like
-            } else {
-                // User is liking the post
-                post.likes.push({ _id: userId, fullName: user.fullName || "Unknown User", id: userId }); // Use placeholder if fullName is not available
-            }
-        }
-
-        // Toggle admin like if adminId is provided
-        if (adminId && admin) {
-            if (adminLiked) {
-                // Admin is unliking the post
-                post.likes = post.likes.filter(like => like.id.toString() !== adminId.toString()); // Remove admin like
-            } else {
-                // Admin is liking the post
-                post.likes.push({ _id: adminId, fullName: admin.fullName || "Unknown Admin", id: adminId }); // Use placeholder if fullName is not available
-            }
+        // Toggle like status
+        if (alreadyLiked) {
+            post.likes = post.likes.filter(like => like.id.toString() !== likeId.toString());
+        } else {
+            post.likes.push({ _id: likeId, fullName: user.fullName || "Unknown", id: likeId });
         }
 
         await post.save();
 
-        // Prepare response with updated likes information
+        // Prepare response
         const updatedLikes = post.likes.map(like => ({
             userId: like.id,
-            fullName: like.fullName || "Unknown User", // Use placeholder if fullName is not available
+            fullName: like.fullName || "Unknown User",
             liked: true
         }));
 
@@ -121,8 +102,7 @@ const toggleLike = async (req, res) => {
             message: "Post like toggled",
             likesCount: post.likes.length,
             likesArray: post.likes,
-            userLiked: !userLiked, // Updated to reflect the new state after toggle
-            adminLiked: !adminLiked, // Updated to reflect the new state after toggle
+            userLiked: !alreadyLiked, 
             allLikes: updatedLikes
         });
     } catch (error) {

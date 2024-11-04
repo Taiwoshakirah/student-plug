@@ -13,9 +13,9 @@ const { Types: { ObjectId } } = require('mongoose'); // Make sure to import Obje
 
 
 const createSugPost = async (req, res) => {
-    const { adminId, text } = req.body;
-    if (!adminId || !text) {
-        return res.status(400).json({ message: "Admin ID and text are required" });
+    const { adminId, text, schoolInfoId } = req.body; // Add schoolInfoId here
+    if (!adminId || !text || !schoolInfoId) { // Include schoolInfoId in validation
+        return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
     }
 
     try {
@@ -28,11 +28,9 @@ const createSugPost = async (req, res) => {
             for (const image of images) {
                 const tempFilePath = `uploads/${image.name}`;
 
-                
                 await image.mv(tempFilePath);
                 console.log(`File moved to temporary path: ${tempFilePath}`);
 
-                
                 const result = await uploadToCloudinary(tempFilePath);
                 console.log("Cloudinary upload result:", result); 
 
@@ -42,7 +40,7 @@ const createSugPost = async (req, res) => {
                     console.error("Failed to upload image to Cloudinary:", result);
                 }
 
-                //temporary file Deleted   
+                // Temporary file Deleted   
                 fs.unlink(tempFilePath, (unlinkErr) => {
                     if (unlinkErr) {
                         console.error("Error deleting temporary file:", unlinkErr);
@@ -51,8 +49,9 @@ const createSugPost = async (req, res) => {
             }
         }
         console.log("Final image URLs to be saved:", imageUrls); 
-        // post saved with all image URLs
-        const post = new SugPost({ adminId, text, images: imageUrls });
+
+        // Post saved with all image URLs and schoolInfoId
+        const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
         await post.save();
         res.status(201).json({ message: "Post created", post });
     } catch (error) {
@@ -63,35 +62,53 @@ const createSugPost = async (req, res) => {
 
 
 
+
 const isValidObjectId = (id) => {
     return ObjectId.isValid(id) && (new ObjectId(id)).equals(id);
 };
 
-const toggleLike = async (req, res) => { 
+const toggleLike = async (req, res) => {
     try {
         const { postId } = req.params;
         const { userId, adminId } = req.body;
 
-        // Fetch post only once
         const post = await SugPost.findById(postId);
-        if (!post) return res.status(404).json({ message: "Post not found" });
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
 
-        const likeId = userId || adminId;
-        const user = userId ? await User.findById(userId) : adminId ? await User.findById(adminId) : null;
-        if (!user) return res.status(400).json({ message: "User not found" });
+        const user = userId ? await User.findById(userId) : null;
+        const admin = adminId ? await User.findById(adminId) : null;
 
-        const alreadyLiked = post.likes.some(like => like.id.toString() === likeId.toString());
+        // Initialize userLiked and adminLiked status
+        const userLiked = user ? post.likes.some(like => like.id.toString() === userId.toString()) : false;
+        const adminLiked = admin ? post.likes.some(like => like.id.toString() === adminId.toString()) : false;
 
-        // Toggle like status
-        if (alreadyLiked) {
-            post.likes = post.likes.filter(like => like.id.toString() !== likeId.toString());
-        } else {
-            post.likes.push({ _id: likeId, fullName: user.fullName || "Unknown", id: likeId });
+        // Toggle user like if userId is provided
+        if (userId && user) {
+            if (userLiked) {
+                // User is unliking the post
+                post.likes = post.likes.filter(like => like.id.toString() !== userId.toString()); // Remove user like
+            } else {
+                // User is liking the post
+                post.likes.push({ _id: userId, fullName: user.fullName || "Unknown User", id: userId }); // Use placeholder if fullName is not available
+            }
+        }
+
+        // Toggle admin like if adminId is provided
+        if (adminId && admin) {
+            if (adminLiked) {
+                // Admin is unliking the post
+                post.likes = post.likes.filter(like => like.id.toString() !== adminId.toString()); // Remove admin like
+            } else {
+                // Admin is liking the post
+                post.likes.push({ _id: adminId, fullName: admin.fullName || "Unknown Admin", id: adminId }); // Use placeholder if fullName is not available
+            }
         }
 
         await post.save();
 
-        // Prepare response
+        // Prepare response with updated likes information
         const updatedLikes = post.likes.map(like => ({
             userId: like.id,
             fullName: like.fullName || "Unknown User",
@@ -102,7 +119,8 @@ const toggleLike = async (req, res) => {
             message: "Post like toggled",
             likesCount: post.likes.length,
             likesArray: post.likes,
-            userLiked: !alreadyLiked, 
+            userLiked: !userLiked, 
+            adminLiked: !adminLiked, 
             allLikes: updatedLikes
         });
     } catch (error) {
@@ -110,6 +128,9 @@ const toggleLike = async (req, res) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 };
+
+
+
 
 
 
@@ -213,6 +234,47 @@ const fetchPostDetails = async (req, res) => {
 
 
 
+const fetchPostsForSchool = async (req, res) => {
+    const { schoolInfoId } = req.params; 
+    console.log("Received schoolInfoId:", schoolInfoId);
+
+    try {
+        // Find all posts associated with the given schoolInfoId
+        const posts = await SugPost.find({ schoolInfoId }) // Now this will match correctly
+            .populate("adminId", "sugFullName email") 
+            .populate({
+                path: "likes",
+                model: "User",
+                select: "_id fullName"
+            })
+            .populate({
+                path: "comments",
+                select: "text userId createdAt isAdmin",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    select: "_id fullName"
+                }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        console.log("Fetched posts:", posts); // Log fetched posts
+
+        if (posts.length === 0) {
+            return res.status(404).json({ message: "No posts found for this school." });
+        }
+
+        res.json({ posts });
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+        res.status(500).json({ message: "Error fetching posts", error });
+    }
+};
+
+
+// In your routes file
+// router.get('/posts/school/:schoolId', fetchPostsForSchool);
 
 
 
@@ -228,4 +290,4 @@ const fetchPostDetails = async (req, res) => {
 
 
 
-module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails}
+module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails,fetchPostsForSchool}

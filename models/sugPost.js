@@ -27,6 +27,11 @@ const sugPostSchema = new mongoose.Schema({
     commentsCount: { 
         type: Number, 
         default: 0 
+    },
+    schoolInfoId: {  // Add this line
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SchoolInfo",
+        required: true
     }
 });
 

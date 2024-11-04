@@ -238,10 +238,14 @@ const fetchPostsForSchool = async (req, res) => {
     const { schoolInfoId } = req.params; 
     console.log("Received schoolInfoId:", schoolInfoId);
 
+    // Validate the ObjectId
+    if (!mongoose.Types.ObjectId.isValid(schoolInfoId)) {
+        return res.status(400).json({ message: "Invalid schoolInfoId" });
+    }
+
     try {
-        // Find all posts associated with the given schoolInfoId
-        const posts = await SugPost.find({ schoolInfoId }) // Now this will match correctly
-            .populate("adminId", "sugFullName email") 
+        const posts = await SugPost.find({ schoolInfoId })
+            .populate("adminId", "sugFullName email")
             .populate({
                 path: "likes",
                 model: "User",
@@ -258,8 +262,6 @@ const fetchPostsForSchool = async (req, res) => {
             })
             .sort({ createdAt: -1 })
             .lean();
-
-        console.log("Fetched posts:", posts); // Log fetched posts
 
         if (posts.length === 0) {
             return res.status(404).json({ message: "No posts found for this school." });

@@ -22,7 +22,7 @@ const schoolInfoSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], // Add this line
+  faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], 
   students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }]
 });
 

@@ -657,6 +657,27 @@ const schoolresetPassword = async (req, res, next) => {
       res.status(500).json({ message: "Internal Server Error" });
     }
   };
+
+  const getAllRegisteredSchools = async (req, res) => {
+    console.log("Received request:", req.method, req.url);
+    try {
+        const schools = await SchoolInfo.find()
+            .populate("faculties", "name")
+            .populate("students", "name registrationNumber");
+
+        console.log("Schools found:", schools);
+        res.status(200).json({ message: "Schools fetched successfully", schools });
+    } catch (error) {
+        console.error("Error fetching schools:", error);
+        res.status(500).json({ message: "Error fetching schools", error });
+    }
+};
+
+
+
+
+
+
   
   
   
@@ -672,6 +693,7 @@ module.exports = {
   getSugUserDetails,
   schoolForgotPassword,
   schoolverifyResetCode,
-  schoolresetPassword
+  schoolresetPassword,
+  getAllRegisteredSchools
 
 };

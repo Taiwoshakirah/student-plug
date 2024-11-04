@@ -80,9 +80,10 @@ const signUp = async (req, res, next) => {
         password,
         agreedToTerms: agreedToTermsBool,
       });
-
+      
+      const redirectUrl = `/dashboard/school/${newUser.schoolInfoId}`;
       const token = jwt.sign({ userId: newUser._id, schoolId: newUser.schoolInfoId }, process.env.JWT_SECRET, { expiresIn: "3d" });
-      return res.json({ success: true, message: "User created successfully", data: newUser, token, redirectUrl: `/dashboard/school/${newUser.schoolInfoId}` });
+      return res.json({ success: true, message: "User created successfully", data: newUser, token, redirectUrl });
 
     } catch (error) {
       console.error("Normal sign-up error:", error);
@@ -159,10 +160,13 @@ const studentInformation = async (req, res) => {
     user.schoolInfoId = savedStudentInfo._id;
     await user.save();
 
+    // Redirect URL to the student dashboard
+    const redirectUrl = `/dashboard/school/${savedStudentInfo.university}`;
+
     res.status(201).json({ 
       message: "Student information saved", 
       newStudentInfo: savedStudentInfo, 
-      redirectUrl: `/dashboard/school/${savedStudentInfo.university}` 
+      redirectUrl 
     });
   } catch (error) {
     console.error("Error in studentInformation:", error);

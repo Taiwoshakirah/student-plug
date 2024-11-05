@@ -9,6 +9,7 @@ const Roles = require('../middlewares/role');
 const User = require('../models/signUp')
 const SugUser = require('../models/schoolSug')
 const { Types: { ObjectId } } = require('mongoose'); // Make sure to import ObjectId
+const SchoolInfo = require('../models/schoolInfo')
 
 
 
@@ -235,7 +236,7 @@ const fetchPostDetails = async (req, res) => {
 
 
 const fetchPostsForSchool = async (req, res) => {
-    const { schoolInfoId } = req.params; 
+    const { schoolInfoId } = req.params;
     console.log("Received schoolInfoId:", schoolInfoId);
 
     // Validate the ObjectId
@@ -244,6 +245,22 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
+        // Fetch the school information separately
+        const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+            .select("university state aboutUniversity userId") // Select specific fields
+            .populate({
+                path: "userId", // Populate userId if it references a User model
+                model: "User",  // Adjust this to the correct model name if needed
+                select: "fullName email"
+            })
+            .lean();
+
+        // Check if the schoolInfo was found
+        if (!schoolInfo) {
+            return res.status(404).json({ message: "School not found" });
+        }
+
+        // Fetch posts associated with the schoolInfoId
         const posts = await SugPost.find({ schoolInfoId })
             .populate("adminId", "sugFullName email")
             .populate({
@@ -260,28 +277,22 @@ const fetchPostsForSchool = async (req, res) => {
                     select: "_id fullName"
                 }
             })
-
-            .populate({
-                path: "schoolInfoId",  // Populate school information
-                model: "SchoolInfo",
-                select: "university state aboutUniversity userId", // Select the specific fields you want
-                populate: {
-                    path: "userId",  // Populate userId field if it references another model
-                    model: "User",   // Adjust this to the model for users if it's not "User"
-                    select: "fullName email" // Select fields in the User model
-                }
-            })
             .sort({ createdAt: -1 })
             .lean();
 
+        // If there are no posts found for this school
         if (posts.length === 0) {
             return res.status(404).json({ message: "No posts found for this school." });
         }
 
-        res.json({ posts });
+        // Return both the school info and the posts
+        res.json({
+            schoolInfo,
+            posts
+        });
     } catch (error) {
-        console.error("Error fetching posts:", error);
-        res.status(500).json({ message: "Error fetching posts", error });
+        console.error("Error fetching school info and posts:", error);
+        res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
 

@@ -260,6 +260,17 @@ const fetchPostsForSchool = async (req, res) => {
                     select: "_id fullName"
                 }
             })
+
+            .populate({
+                path: "schoolInfoId",  // Populate school information
+                model: "SchoolInfo",
+                select: "university state aboutUniversity userId", // Select the specific fields you want
+                populate: {
+                    path: "userId",  // Populate userId field if it references another model
+                    model: "User",   // Adjust this to the model for users if it's not "User"
+                    select: "fullName email" // Select fields in the User model
+                }
+            })
             .sort({ createdAt: -1 })
             .lean();
 

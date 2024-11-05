@@ -257,7 +257,7 @@ const fetchPostsForSchool = async (req, res) => {
     try {
         // Fetch the school information with the uniProfilePicture included
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-            .select("university state aboutUniversity userId uniProfilePicture")
+            .select("university state aboutUniversity userId uniProfilePicture") 
             .populate({
                 path: "userId",
                 model: "User",
@@ -276,6 +276,11 @@ const fetchPostsForSchool = async (req, res) => {
                 path: "adminId",
                 model: "SugUser",
                 select: "sugFullName email role",
+                populate: {
+                    path: "schoolInfo",
+                    model: "SchoolInfo",
+                    select: "university uniProfilePicture" // Include university name and uniProfilePicture
+                }
             })
             .populate({
                 path: "likes",
@@ -294,16 +299,18 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Add `isAdmin` field to each post to indicate if created by an admin
-        const postsWithAdminFlag = posts.map(post => ({
+        // Add `isAdmin` field and include university info in each post
+        const postsWithDetails = posts.map(post => ({
             ...post,
-            isAdmin: post.adminId?.role === "admin", // Add isAdmin flag based on role
+            isAdmin: post.adminId?.role === "admin",
+            university: post.adminId?.schoolInfo?.university || "",
+            uniProfilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
         }));
 
         // Return both the school info and the posts
         res.json({
             schoolInfo,
-            posts: postsWithAdminFlag
+            posts: postsWithDetails
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);

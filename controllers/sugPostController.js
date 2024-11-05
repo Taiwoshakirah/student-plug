@@ -255,7 +255,7 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
-        // Fetch the school information
+        // Fetch the school information with the uniProfilePicture included
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
             .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
@@ -270,16 +270,16 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch posts and directly populate the schoolInfoId for each post
+        // Fetch posts associated with the schoolInfoId
         const posts = await SugPost.find({ schoolInfoId })
             .populate({
                 path: "adminId",
-                select: "sugFullName email"
+                model: "SugUser",
+                select: "sugFullName email role",
             })
-            .populate("schoolInfoId", "university uniProfilePicture") // Populate university and uniProfilePicture
             .populate({
                 path: "likes",
-                model: "User",
+                model: "SugUser",
                 select: "_id fullName"
             })
             .populate({
@@ -287,33 +287,30 @@ const fetchPostsForSchool = async (req, res) => {
                 select: "text userId createdAt isAdmin",
                 populate: {
                     path: "userId",
-                    model: "User",
+                    model: "SugUser",
                     select: "_id fullName"
                 }
             })
             .sort({ createdAt: -1 })
             .lean();
 
-        // Embed university name and uniProfilePicture into each post's adminId object
-        const postsWithUniversityInfo = posts.map(post => {
-            if (post.schoolInfoId) {
-                post.university = post.schoolInfoId.university;
-                post.uniProfilePicture = post.schoolInfoId.uniProfilePicture;
-                delete post.schoolInfoId; // Remove schoolInfoId to avoid redundancy
-            }
-            return post;
-        });
+        // Add `isAdmin` field to each post to indicate if created by an admin
+        const postsWithAdminFlag = posts.map(post => ({
+            ...post,
+            isAdmin: post.adminId?.role === "admin", // Add isAdmin flag based on role
+        }));
 
-        // Return both the school info and the modified posts
+        // Return both the school info and the posts
         res.json({
             schoolInfo,
-            posts: postsWithUniversityInfo
+            posts: postsWithAdminFlag
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
 
 
 

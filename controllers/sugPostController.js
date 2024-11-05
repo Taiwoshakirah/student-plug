@@ -20,11 +20,11 @@ const createSugPost = async (req, res) => {
     }
 
     try {
-        let imageUrls = []; 
+        let imageUrls = [];
 
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-            console.log("Images received in request:", images); 
+            console.log("Images received in request:", images);
 
             for (const image of images) {
                 const tempFilePath = `uploads/${image.name}`;
@@ -33,7 +33,7 @@ const createSugPost = async (req, res) => {
                 console.log(`File moved to temporary path: ${tempFilePath}`);
 
                 const result = await uploadToCloudinary(tempFilePath);
-                console.log("Cloudinary upload result:", result); 
+                console.log("Cloudinary upload result:", result);
 
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
@@ -41,7 +41,7 @@ const createSugPost = async (req, res) => {
                     console.error("Failed to upload image to Cloudinary:", result);
                 }
 
-                // Temporary file Deleted   
+                // Temporary file deleted   
                 fs.unlink(tempFilePath, (unlinkErr) => {
                     if (unlinkErr) {
                         console.error("Error deleting temporary file:", unlinkErr);
@@ -49,12 +49,22 @@ const createSugPost = async (req, res) => {
                 });
             }
         }
-        console.log("Final image URLs to be saved:", imageUrls); 
+        console.log("Final image URLs to be saved:", imageUrls);
 
-        // Post saved with all image URLs and schoolInfoId
+        // Create post with all image URLs and schoolInfoId
         const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
         await post.save();
-        res.status(201).json({ message: "Post created", post });
+
+        // Fetch the post with populated school information (uniProfilePicture and university name)
+        const populatedPost = await SugPost.findById(post._id)
+            .populate({
+                path: "schoolInfoId",
+                select: "university uniProfilePicture",
+                model: "SchoolInfo"
+            })
+            .populate("adminId", "sugFullName email"); // Optionally, populate admin info
+
+        res.status(201).json({ message: "Post created", post: populatedPost });
     } catch (error) {
         console.error("Error creating post:", error);
         res.status(500).json({ message: "Error creating post", error });
@@ -245,12 +255,12 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
-        // Fetch the school information separately
+        // Fetch the school information with the uniProfilePicture included
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-            .select("university state aboutUniversity userId") // Select specific fields
+            .select("university state aboutUniversity userId uniProfilePicture") // Added uniProfilePicture field
             .populate({
-                path: "userId", // Populate userId if it references a User model
-                model: "User",  // Adjust this to the correct model name if needed
+                path: "userId",
+                model: "User",
                 select: "fullName email"
             })
             .lean();

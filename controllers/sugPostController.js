@@ -255,9 +255,9 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
-        // Fetch the school information with the uniProfilePicture included
+        // Fetch the school information
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-            .select("university state aboutUniversity userId uniProfilePicture") // Added uniProfilePicture field
+            .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
                 path: "userId",
                 model: "User",
@@ -270,9 +270,13 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch posts associated with the schoolInfoId
+        // Fetch posts and directly populate the schoolInfoId for each post
         const posts = await SugPost.find({ schoolInfoId })
-            .populate("adminId", "sugFullName email")
+            .populate({
+                path: "adminId",
+                select: "sugFullName email"
+            })
+            .populate("schoolInfoId", "university uniProfilePicture") // Populate university and uniProfilePicture
             .populate({
                 path: "likes",
                 model: "User",
@@ -290,21 +294,27 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // If there are no posts found for this school
-        if (posts.length === 0) {
-            return res.status(404).json({ message: "No posts found for this school." });
-        }
+        // Embed university name and uniProfilePicture into each post's adminId object
+        const postsWithUniversityInfo = posts.map(post => {
+            if (post.schoolInfoId) {
+                post.university = post.schoolInfoId.university;
+                post.uniProfilePicture = post.schoolInfoId.uniProfilePicture;
+                delete post.schoolInfoId; // Remove schoolInfoId to avoid redundancy
+            }
+            return post;
+        });
 
-        // Return both the school info and the posts
+        // Return both the school info and the modified posts
         res.json({
             schoolInfo,
-            posts
+            posts: postsWithUniversityInfo
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
 
 
 // In your routes file

@@ -28,7 +28,11 @@ const serviceAccount = {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
-app.use(fileUpload());
+app.use(fileUpload({
+  createParentPath: true,
+  useTempFiles: true,
+  // tempFileDir: tempDir
+}));
 
 
 // Initializing Firebase Admin
@@ -57,13 +61,14 @@ app.use(session({
 const signUpRouter = require("./routes/signUpRouter");
 const schoolRouter = require('./routes/schoolRouter')
 const sugPostRouter = require('./routes/sugPostRouter')
-const postRouter = require('./routes/postRouter');
+const postRouter = require('./routes/postRouter')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
 
 app.use("/api/auth", signUpRouter);
 app.use('/api/school',schoolRouter)
 app.use('/api/sugPost',sugPostRouter)
+app.use('/api/students',postRouter)
 app.use(notFound);
 app.use(methodNotAllowed);
 

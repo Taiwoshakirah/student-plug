@@ -1,17 +1,27 @@
 const UserPost = require('../models/post')
 const UserComment = require('../models/userComment')
+const {uploadToCloudinary} = require('../config/cloudinaryConfig')
+const User = require('../models/signUp'); // Import the User model
+const StudentInfo = require('../models/studentInfo'); // Import the StudentInfo model
+const mongoose = require('mongoose');
 
-const createPost = async (req, res) => {
+const studentCreatePost = async (req, res) => {
     try {
         const { userId, text } = req.body;
         let imageUrls = [];
 
-        // If images are provided, upload them to Cloudinary (or another storage) and get URLs
+        // If images are provided, upload them to Cloudinary and get URLs
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-            
+
             for (const image of images) {
-                const result = await uploadToCloudinary(image); // upload function for Cloudinary
+                if (!image.tempFilePath) {
+                    const tempPath = `./tmp/${image.name}`;
+                    await image.mv(tempPath);
+                    image.tempFilePath = tempPath;
+                }
+
+                const result = await uploadToCloudinary(image.tempFilePath);
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
                 }
@@ -23,6 +33,7 @@ const createPost = async (req, res) => {
             return res.status(400).json({ message: "Post text or image is required" });
         }
 
+        // Create the post
         const post = new UserPost({
             user: userId,
             text,
@@ -30,12 +41,38 @@ const createPost = async (req, res) => {
         });
 
         await post.save();
-        res.status(201).json({ message: "Post created successfully", post });
+
+        // Find user and populate school info
+        const userWithInfo = await User.findById(userId).populate('schoolInfoId');
+
+        if (!userWithInfo) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Ensure studentInfo is properly populated
+        const studentInfo = userWithInfo.schoolInfoId || null;
+
+        // Debugging: Log the user and student info
+        console.log("User with info:", userWithInfo);
+        console.log("Student Info:", studentInfo);
+
+        // Send response with post and student info
+        res.status(201).json({
+            message: "Post created successfully",
+            post,
+            studentInfo // Include student info in the response
+        });
     } catch (error) {
         console.error("Error creating post:", error);
         res.status(500).json({ message: "Failed to create post", error });
     }
 };
+
+
+
+
+
+
 
 const likePost = async (req, res) => {
     try {
@@ -60,6 +97,7 @@ const likePost = async (req, res) => {
         res.status(500).json({ message: "Failed to like post", error });
     }
 };
+
 
 const sharePost = async (req, res) => {
     try {
@@ -116,9 +154,63 @@ const commentOnPost = async (req, res) => {
     }
 };
 
+const fetchUserPost = async (req, res) => {
+    try {
+      const userId = req.params.userId;
+  
+      // Fetch user and populate student info
+      const user = await User.findById(userId)
+        .populate("schoolInfoId") // Assuming 'schoolInfoId' is used to reference 'StudentInfo'
+        .lean();
+  
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+  
+      // Fetch user posts
+      const posts = await UserPost.find({ user: userId })
+  .populate({
+    path: "comments", 
+    model: "UserComment", 
+    populate: { path: "user", select: "fullName profilePhoto" },
+  })
+  .populate("likes", "fullName profilePhoto")
+  .populate("shares", "fullName profilePhoto")
+  .lean();
+
+  
+      res.status(200).json({
+        message: "User posts and student information retrieved successfully",
+        user: {
+          fullName: user.fullName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          profilePhoto: user.profilePhoto,
+          studentInfo: {
+            university: user.schoolInfoId ? user.schoolInfoId.university : null,
+            faculty: user.schoolInfoId ? user.schoolInfoId.faculty : null,
+            department: user.schoolInfoId ? user.schoolInfoId.department : null,
+            level: user.schoolInfoId ? user.schoolInfoId.level : null,
+          },
+        },
+        posts,
+      });
+    } catch (error) {
+      console.error("Error fetching user's posts and student info:", error);
+      res.status(500).json({ message: "Error retrieving user data" });
+    }
+  };
+  
+  
+  
+  
+  
+  
 
 
 
 
-    module.exports = {createPost,likePost,sharePost,commentOnPost}
+
+
+    module.exports = {studentCreatePost,likePost,sharePost,commentOnPost,fetchUserPost}
     

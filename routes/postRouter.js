@@ -1,10 +1,11 @@
-// const express = require('express')
-// const methodNotAllowed = require('../utils/methodNot Allowed')
-// const post = require('../controllers/postController')
-// const uploadPostImage = require('../middlewares/uploadPostImage')
-// const router = express.Router()
+const express = require('express')
+const { studentCreatePost, likePost, commentOnPost, fetchUserPost } = require('../controllers/postController')
+const methodNotAllowed = require('../utils/methodNotAllowed')
+const router = express.Router()
 
-// router.route("/upload-post").post(authenticateToken, uploadPostImage.single("postImage"), uploadPostPicture).all(methodNotAllowed);
+router.route('/create-post').post(studentCreatePost).all(methodNotAllowed)
+router.route('/likepost/:postId').post(likePost).all(methodNotAllowed)
+router.route('/comments/:postId').post(commentOnPost).all(methodNotAllowed)
+router.route('/getUserPost/:userId').get(fetchUserPost).all(methodNotAllowed)
 
-
-// module.exports = router
+module.exports = router

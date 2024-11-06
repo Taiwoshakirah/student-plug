@@ -1,5 +1,5 @@
-const cloudinary = require("./cloudinaryConfig");
+// const cloudinary = require("./cloudinaryConfig");
 
 
 
-module.exports = uploadToCloudinary;
+// module.exports = uploadToCloudinary;

@@ -4,11 +4,82 @@ const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const User = require('../models/signUp'); // Import the User model
 const StudentInfo = require('../models/studentInfo'); // Import the StudentInfo model
 const mongoose = require('mongoose');
+//for student post creation with control
+const restrictedWords = [
+    "abuse",
+    "idiot",
+    "stupid",
+    "dumb",
+    "hate",
+    "kill",
+    "darn",
+    "shut up",
+    "loser",
+    "moron",
+    "jerk",
+    "fool",
+    "racist",
+    "terrorist",
+    "scam",
+    "fraud",
+    "offend",
+    "nonsense",
+    "trash",
+    "dirtbag",
+    "lame",
+    "pervert",
+    "filth",
+    "bastard",
+    "threaten",
+    "mock",
+    "harass",
+    "attack",
+    "insult",
+    "creep",
+    "creepy",
+    "sick",
+    "weird",
+    "pathetic",
+    "crap",
+    "spam",
+    "bully",
+    "toxic",
+    "unacceptable",
+    "disgusting",
+    "rude",
+    "unwanted",
+    "sex",
+    "dirty",
+    "rape",
+    "immoral",
+    "nasty",
+    "shame",
+    "vulgar",
+    "offensive",
+    "disrespectful",
+    "aggressive",
+    "lousy",
+    "annoying",
+    "unpleasant",
+    "disturb",
+    "harassment",
+    "mad"
+];
+
+
+const containsRestrictedWords = (text) => {
+    return restrictedWords.some((word) => text.toLowerCase().includes(word));
+};
 
 const studentCreatePost = async (req, res) => {
     try {
         const { userId, text } = req.body;
         let imageUrls = [];
+
+        // Check for restricted words in text
+        if (text && containsRestrictedWords(text)) {
+            return res.status(400).json({ message: "Your post contains inappropriate content." });
+        }
 
         // If images are provided, upload them to Cloudinary and get URLs
         if (req.files && req.files.image) {
@@ -67,7 +138,6 @@ const studentCreatePost = async (req, res) => {
         res.status(500).json({ message: "Failed to create post", error });
     }
 };
-
 
 
 
@@ -154,7 +224,7 @@ const commentOnPost = async (req, res) => {
     }
 };
 
-const fetchUserPost = async (req, res) => {
+const fetchUserPost = async (req, res) => { 
     try {
       const userId = req.params.userId;
   
@@ -167,17 +237,17 @@ const fetchUserPost = async (req, res) => {
         return res.status(404).json({ message: "User not found" });
       }
   
-      // Fetch user posts
+      // Fetch user posts and sort by 'createdAt' in descending order
       const posts = await UserPost.find({ user: userId })
-  .populate({
-    path: "comments", 
-    model: "UserComment", 
-    populate: { path: "user", select: "fullName profilePhoto" },
-  })
-  .populate("likes", "fullName profilePhoto")
-  .populate("shares", "fullName profilePhoto")
-  .lean();
-
+        .sort({ createdAt: -1 })  // Sort posts by createdAt in descending order (newest posts first)
+        .populate({
+          path: "comments", 
+          model: "UserComment", 
+          populate: { path: "user", select: "fullName profilePhoto" },
+        })
+        .populate("likes", "fullName profilePhoto")
+        .populate("shares", "fullName profilePhoto")
+        .lean();
   
       res.status(200).json({
         message: "User posts and student information retrieved successfully",
@@ -193,13 +263,14 @@ const fetchUserPost = async (req, res) => {
             level: user.schoolInfoId ? user.schoolInfoId.level : null,
           },
         },
-        posts,
+        posts,  // Posts are now sorted in descending order
       });
     } catch (error) {
       console.error("Error fetching user's posts and student info:", error);
       res.status(500).json({ message: "Error retrieving user data" });
     }
   };
+  
   
   
   

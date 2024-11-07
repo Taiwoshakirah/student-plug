@@ -1,5 +1,5 @@
 const UserPost = require('../models/post')
-const UserComment = require('../models/userComment')
+const UserComment = require('../models/comment')
 const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const User = require('../models/signUp'); // Import the User model
 const StudentInfo = require('../models/studentInfo'); // Import the StudentInfo model
@@ -73,7 +73,7 @@ const containsRestrictedWords = (text) => {
 
 const studentCreatePost = async (req, res) => {
     try {
-        const { userId, text } = req.body;
+        const { userId, text } = req.body; // Only userId and text are needed
         let imageUrls = [];
 
         // Check for restricted words in text
@@ -84,14 +84,12 @@ const studentCreatePost = async (req, res) => {
         // If images are provided, upload them to Cloudinary and get URLs
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-
             for (const image of images) {
                 if (!image.tempFilePath) {
                     const tempPath = `./tmp/${image.name}`;
                     await image.mv(tempPath);
                     image.tempFilePath = tempPath;
                 }
-
                 const result = await uploadToCloudinary(image.tempFilePath);
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
@@ -104,34 +102,33 @@ const studentCreatePost = async (req, res) => {
             return res.status(400).json({ message: "Post text or image is required" });
         }
 
-        // Create the post
-        const post = new UserPost({
-            user: userId,
-            text,
-            image: imageUrls
-        });
-
-        await post.save();
-
-        // Find user and populate school info
-        const userWithInfo = await User.findById(userId).populate('schoolInfoId');
-
-        if (!userWithInfo) {
+        // Fetch the user document to get schoolInfoId
+        const user = await User.findById(userId).populate('schoolInfoId');
+        if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Ensure studentInfo is properly populated
-        const studentInfo = userWithInfo.schoolInfoId || null;
+        // Extract schoolInfoId from the user's information
+        const schoolInfoId = user.schoolInfoId;
+        if (!schoolInfoId) {
+            return res.status(400).json({ message: "User is not associated with a school" });
+        }
 
-        // Debugging: Log the user and student info
-        console.log("User with info:", userWithInfo);
-        console.log("Student Info:", studentInfo);
+        // Create the post with the schoolInfoId from the user's info
+        const post = new UserPost({
+            user: userId,
+            text,
+            image: imageUrls,
+            schoolInfoId // Link the post to the user's school
+        });
+
+        await post.save();
 
         // Send response with post and student info
         res.status(201).json({
             message: "Post created successfully",
             post,
-            studentInfo // Include student info in the response
+            studentInfo: schoolInfoId // Include the populated school info in the response
         });
     } catch (error) {
         console.error("Error creating post:", error);

@@ -9,7 +9,7 @@ const router = express.Router()
 router.route('/create').post(createSugPost).all(methodNotAllowed)
 router.route('/:postId/like').post(toggleLike).all(methodNotAllowed)
 router.route('/:postId/comment').post( verifySugToken,addComment).all(methodNotAllowed)
-router.route('/posts/:adminId').get(fetchPostDetails).all(methodNotAllowed)
+// router.route('/posts/:adminId').get(fetchPostDetails).all(methodNotAllowed)
 
 
 module.exports = router

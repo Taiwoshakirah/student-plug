@@ -9,6 +9,7 @@ const fs = require('fs')
 const path = require("path");
 const cloudinary = require('../config/cloudinaryConfig')
 const {uploadToCloudinary} = require('../config/cloudinaryConfig.js')
+const SchoolInfo = require('../models/schoolInfo')
 
 const admin = require('firebase-admin');
 
@@ -138,11 +139,19 @@ const studentInformation = async (req, res) => {
   }
 
   try {
+    // Find the user by ID
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Find the schoolInfo based on university name
+    const schoolInfo = await SchoolInfo.findOne({ university }).exec();
+    if (!schoolInfo) {
+      return res.status(404).json({ message: "School not found" });
+    }
+
+    // Create new StudentInfo
     const newStudentInfo = new StudentInfo({
       userId,
       university,
@@ -151,28 +160,32 @@ const studentInformation = async (req, res) => {
       level,
       yearOfAdmission: formatDate(yearOfAdmission),
       yearOfGraduation: formatDate(yearOfGraduation),
+      schoolInfoId: schoolInfo._id, // Assign correct schoolInfoId
     });
 
-    // Save the new StudentInfo document
+    // Save StudentInfo
     const savedStudentInfo = await newStudentInfo.save();
 
-    // Assign the ObjectId of the saved StudentInfo to the user's schoolInfoId field
-    user.schoolInfoId = savedStudentInfo._id;
+    // Update the user's schoolInfoId
+    user.schoolInfoId = schoolInfo._id;
     await user.save();
 
-    // Redirect URL to the student dashboard
-    const redirectUrl = `/dashboard/school/${savedStudentInfo.university}`;
+    // Redirect URL
+    const redirectUrl = `/dashboard/school/${schoolInfo.university}`;
 
-    res.status(201).json({ 
-      message: "Student information saved", 
-      newStudentInfo: savedStudentInfo, 
-      redirectUrl 
+    res.status(201).json({
+      message: "Student information saved",
+      newStudentInfo: savedStudentInfo,
+      redirectUrl,
     });
   } catch (error) {
     console.error("Error in studentInformation:", error);
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+
+
 
 
 

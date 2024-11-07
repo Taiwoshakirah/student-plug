@@ -30,6 +30,11 @@ const studentInfoSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  schoolInfoId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SchoolInfo",
+    required: true,
+  }
 });
 
 module.exports = mongoose.model("StudentInfo", studentInfoSchema);

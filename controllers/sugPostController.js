@@ -10,6 +10,8 @@ const User = require('../models/signUp')
 const SugUser = require('../models/schoolSug')
 const { Types: { ObjectId } } = require('mongoose'); // Make sure to import ObjectId
 const SchoolInfo = require('../models/schoolInfo')
+const UserPost = require('../models/post')
+const UserComment = require('../models/comment');
 
 
 
@@ -176,70 +178,70 @@ const addComment = async (req, res) => {
 
   
 
-const fetchPostDetails = async (req, res) => {
-    try {
-        const { adminId } = req.params; // Change this line to use req.params
+// const fetchPostDetails = async (req, res) => {
+//     try {
+//         const { adminId } = req.params; // Change this line to use req.params
 
-        console.log("Admin ID:", adminId);
+//         console.log("Admin ID:", adminId);
 
-        // Ensure adminId is provided and convert it to an ObjectId
-        if (!adminId) {
-            return res.status(400).json({ message: "Admin ID is required" });
-        }
+//         // Ensure adminId is provided and convert it to an ObjectId
+//         if (!adminId) {
+//             return res.status(400).json({ message: "Admin ID is required" });
+//         }
 
-        const adminObjectId = new mongoose.Types.ObjectId(adminId);
+//         const adminObjectId = new mongoose.Types.ObjectId(adminId);
 
-        // Find posts only for the given adminId
-        const posts = await SugPost.find({ adminId: adminObjectId })
-            .populate("adminId", "sugFullName email")
-            .populate({
-                path: "likes",
-                model: "User",
-                select: "_id fullName"
-            })
-            .populate({
-                path: "comments",
-                select: "text userId createdAt isAdmin",
-                populate: {
-                    path: "userId",
-                    model: "User",
-                    select: "_id fullName"
-                }
-            })
-            .sort({ createdAt: -1 })
-            .lean();
+//         // Find posts only for the given adminId
+//         const posts = await SugPost.find({ adminId: adminObjectId })
+//             .populate("adminId", "sugFullName email")
+//             .populate({
+//                 path: "likes",
+//                 model: "User",
+//                 select: "_id fullName"
+//             })
+//             .populate({
+//                 path: "comments",
+//                 select: "text userId createdAt isAdmin",
+//                 populate: {
+//                     path: "userId",
+//                     model: "User",
+//                     select: "_id fullName"
+//                 }
+//             })
+//             .sort({ createdAt: -1 })
+//             .lean();
 
-        // If no posts found, return a message
-        if (posts.length === 0) {
-            return res.status(404).json({ message: "No posts found for this admin." });
-        }
+//         // If no posts found, return a message
+//         if (posts.length === 0) {
+//             return res.status(404).json({ message: "No posts found for this admin." });
+//         }
 
-        // Process the fetched posts
-        posts.forEach(post => {
-            console.log(`Post ID: ${post._id}`);
-            console.log("Likes Array:", post.likes);
+//         // Process the fetched posts
+//         posts.forEach(post => {
+//             console.log(`Post ID: ${post._id}`);
+//             console.log("Likes Array:", post.likes);
 
-            // Check if admin has liked the post
-            post.adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
-            console.log(`Admin liked this post: ${post.adminLiked}`);
+//             // Check if admin has liked the post
+//             post.adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
+//             console.log(`Admin liked this post: ${post.adminLiked}`);
 
-            // Additional properties
-            post.commentsCount = post.comments.length;
-            post.likesCount = post.likes.length;
+//             // Additional properties
+//             post.commentsCount = post.comments.length;
+//             post.likesCount = post.likes.length;
 
-            // Ensure comments have a consistent `isAdmin` field
-            post.comments = post.comments.map(comment => ({
-                ...comment,
-                isAdmin: comment.isAdmin || false
-            }));
-        });
+//             // Ensure comments have a consistent `isAdmin` field
+//             post.comments = post.comments.map(comment => ({
+//                 ...comment,
+//                 isAdmin: comment.isAdmin || false
+//             }));
+//         });
 
-        res.json({ posts });
-    } catch (error) {
-        console.error("Error fetching posts:", error);
-        res.status(500).json({ message: "Error fetching posts", error });
-    }
-};
+//         res.json({ posts });
+//     } catch (error) {
+//         console.error("Error fetching posts:", error);
+//         res.status(500).json({ message: "Error fetching posts", error });
+//     }
+// };
 
 
 
@@ -257,7 +259,7 @@ const fetchPostsForSchool = async (req, res) => {
     try {
         // Fetch the school information with the uniProfilePicture included
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-            .select("university state aboutUniversity userId uniProfilePicture") 
+            .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
                 path: "userId",
                 model: "User",
@@ -270,8 +272,8 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch posts associated with the schoolInfoId
-        const posts = await SugPost.find({ schoolInfoId })
+        // Fetch admin posts (SugPost) associated with the schoolInfoId
+        const adminPosts = await SugPost.find({ schoolInfoId })
             .populate({
                 path: "adminId",
                 model: "SugUser",
@@ -279,7 +281,7 @@ const fetchPostsForSchool = async (req, res) => {
                 populate: {
                     path: "schoolInfo",
                     model: "SchoolInfo",
-                    select: "university uniProfilePicture" // Include university name and uniProfilePicture
+                    select: "university uniProfilePicture"
                 }
             })
             .populate({
@@ -289,34 +291,80 @@ const fetchPostsForSchool = async (req, res) => {
             })
             .populate({
                 path: "comments",
-                select: "text userId createdAt isAdmin",
+                model: "SugPostComment",
+                select: "text createdAt isAdmin",
                 populate: {
-                    path: "userId",
-                    model: "SugUser",
+                    path: "user",  // Correct the field name to 'user'
+                    model: "SugUser", // Ensure the right model
                     select: "_id fullName"
                 }
             })
             .sort({ createdAt: -1 })
             .lean();
 
-        // Add `isAdmin` field and include university info in each post
-        const postsWithDetails = posts.map(post => ({
+        // Transform admin posts with postType and university info
+        const adminPostsWithDetails = adminPosts.map(post => ({
             ...post,
+            postType: "admin",
             isAdmin: post.adminId?.role === "admin",
             university: post.adminId?.schoolInfo?.university || "",
             uniProfilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
         }));
 
-        // Return both the school info and the posts
+        // Fetch student posts (UserPost) associated with the schoolInfoId
+        const studentPosts = await UserPost.find({ schoolInfoId })
+            .populate({
+                path: "user",
+                model: "User",
+                select: "fullName email"
+            })
+            .populate({
+                path: "likes",
+                model: "User",
+                select: "_id fullName"
+            })
+            .populate({
+                path: "comments",
+                model: "UserComment",
+                select: "text createdAt",
+                populate: {
+                    path: "user",  // Correct the field name to 'user'
+                    model: "User", // Ensure the right model
+                    select: "_id fullName"
+                }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Transform student posts with postType
+        const studentPostsWithDetails = studentPosts.map(post => ({
+            ...post,
+            postType: "student"
+        }));
+
+        // Combine admin and student posts and sort them by creation date
+        const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+
+        // Return both the school info and the combined posts
         res.json({
             schoolInfo,
-            posts: postsWithDetails
+            posts: allPosts
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
+
+
+
+
+
+
+
 
 
 
@@ -338,4 +386,4 @@ const fetchPostsForSchool = async (req, res) => {
 
 
 
-module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails,fetchPostsForSchool}
+module.exports = {createSugPost,toggleLike,addComment,fetchPostsForSchool}

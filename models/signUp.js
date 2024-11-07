@@ -40,11 +40,15 @@ const userSchema =new mongoose.Schema({
   resetPasswordExpires: { 
     type: Date 
   },
-  
-  schoolInfoId: { // Add this field
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "StudentInfo" // Reference the StudentInfo model
+  schoolInfoId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "SchoolInfo" // Link to SchoolInfo model instead
   }
+  
+  // schoolInfoId: { // Add this field
+  //   type: mongoose.Schema.Types.ObjectId,
+  //   ref: "StudentInfo" // Reference the StudentInfo model
+  // }
 });
 
 userSchema.pre("save", async function (next) {

@@ -9,6 +9,12 @@ const admin = require('firebase-admin');
 const session = require("express-session");
 const MongoStore = require("connect-mongo"); 
 
+const tempDir = path.join(__dirname, 'tmp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir);
+}
+
+
 const app = express();
 const port = process.env.PORT || 5000;
 const serviceAccount = {
@@ -31,7 +37,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(fileUpload({
   createParentPath: true,
   useTempFiles: true,
-  // tempFileDir: tempDir
+  tempFileDir: tempDir
 }));
 
 

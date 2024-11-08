@@ -122,7 +122,7 @@ const studentCreatePost = async (req, res) => {
         const post = new UserPost({
             user: userId,
             text,
-            image: imageUrls,
+            images: imageUrls,
             schoolInfoId 
         });
         console.log("Post to be saved:", post);

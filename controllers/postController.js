@@ -78,7 +78,6 @@ const studentCreatePost = async (req, res) => {
         const { userId, text } = req.body;
         let imageUrls = [];
 
-        // Check for inappropriate content in the text, if provided
         if (text && containsRestrictedWords(text)) {
             return res.status(400).json({ message: "Your post contains inappropriate content." });
         }
@@ -100,10 +99,13 @@ const studentCreatePost = async (req, res) => {
             }
         }
 
-        // Validate that at least one of text or image is provided
-        if (!text && imageUrls.length === 0) {
-            return res.status(400).json({ message: "Please provide either text or an image" });
+        if (!text) {
+            return res.status(400).json({ message: "Please provide text " });
         }
+        if (imageUrls.length === 0) {
+            return res.status(400).json({ message: "Please provide image " });
+        }
+
 
         // Find the user and their school info
         const user = await User.findById(userId).populate('schoolInfoId');

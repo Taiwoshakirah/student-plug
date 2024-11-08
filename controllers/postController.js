@@ -73,14 +73,17 @@ const containsRestrictedWords = (text) => {
 
 const studentCreatePost = async (req, res) => {
     console.log("Files received in request:", req.files);
+
     try {
-        const { userId, text } = req.body; 
+        const { userId, text } = req.body;
         let imageUrls = [];
 
+        // Check for inappropriate content in the text, if provided
         if (text && containsRestrictedWords(text)) {
             return res.status(400).json({ message: "Your post contains inappropriate content." });
         }
 
+        // Check if images are provided and upload them if available
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
             for (const image of images) {
@@ -97,13 +100,12 @@ const studentCreatePost = async (req, res) => {
             }
         }
 
-        if (!text) {
-            return res.status(400).json({ message: "Please provide a test" });
-        }
-        if (imageUrls.length < 1) {
-            return res.status(400).json({ message: "Please provide image" });
+        // Validate that at least one of text or image is provided
+        if (!text && imageUrls.length === 0) {
+            return res.status(400).json({ message: "Please provide either text or an image" });
         }
 
+        // Find the user and their school info
         const user = await User.findById(userId).populate('schoolInfoId');
         if (!user) {
             return res.status(404).json({ message: "User not found" });
@@ -114,6 +116,7 @@ const studentCreatePost = async (req, res) => {
             return res.status(400).json({ message: "User is not associated with a school" });
         }
 
+        // Create and save the new post
         const post = new UserPost({
             user: userId,
             text,
@@ -124,6 +127,7 @@ const studentCreatePost = async (req, res) => {
 
         await post.save();
 
+        // Respond with success message
         res.status(201).json({
             message: "Post created successfully",
             post,
@@ -131,9 +135,10 @@ const studentCreatePost = async (req, res) => {
         });
     } catch (error) {
         console.error("Error creating post:", error);
-        res.status(500).json({ message: "Failed to create post", error });
+        res.status(500).json({ message: "Failed to create post", error: error.message });
     }
 };
+
 
 
 

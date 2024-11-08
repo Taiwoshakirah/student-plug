@@ -302,13 +302,13 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Transform admin posts with postType and university info
+        // Transform admin posts with postType and profilePicture (uniProfilePicture)
         const adminPostsWithDetails = adminPosts.map(post => ({
             ...post,
             postType: "admin",
             isAdmin: post.adminId?.role === "admin",
             university: post.adminId?.schoolInfo?.university || "",
-            uniProfilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+            profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || "" // Unified key for admin profile picture
         }));
 
         // Fetch student posts (UserPost) associated with the schoolInfoId
@@ -336,11 +336,11 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Transform student posts with postType
+        // Transform student posts with postType and profilePicture (user's profilePhoto)
         const studentPostsWithDetails = studentPosts.map(post => ({
             ...post,
             postType: "student",
-            userProfilePhoto: post.user?.profilePhoto || "" // Add profile photo to each student post
+            profilePicture: post.user?.profilePhoto || "" // Unified key for student profile picture
         }));
 
         // Combine admin and student posts and sort them by creation date

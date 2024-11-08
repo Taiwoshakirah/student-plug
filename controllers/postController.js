@@ -100,12 +100,11 @@ const studentCreatePost = async (req, res) => {
         }
 
         if (!text) {
-            return res.status(400).json({ message: "Please provide text " });
+            return res.status(400).json({ message: "Please provide text" });
         }
         if (imageUrls.length === 0) {
-            return res.status(400).json({ message: "Please provide image " });
+            return res.status(400).json({ message: "Please provide image" });
         }
-
 
         // Find the user and their school info
         const user = await User.findById(userId).populate('schoolInfoId');
@@ -122,7 +121,7 @@ const studentCreatePost = async (req, res) => {
         const post = new UserPost({
             user: userId,
             text,
-            images: imageUrls,
+            images: imageUrls, // Ensuring 'images' key is used consistently
             schoolInfoId 
         });
         console.log("Post to be saved:", post);
@@ -132,7 +131,10 @@ const studentCreatePost = async (req, res) => {
         // Respond with success message
         res.status(201).json({
             message: "Post created successfully",
-            post,
+            post: {
+                ...post.toObject(), // Convert the Mongoose document to a plain object
+                images: post.images // Ensure 'images' is the same key in the response
+            },
             studentInfo: schoolInfoId,
             profilePicture: user.profilePhoto 
         });
@@ -141,6 +143,7 @@ const studentCreatePost = async (req, res) => {
         res.status(500).json({ message: "Failed to create post", error: error.message });
     }
 };
+
 
 
 

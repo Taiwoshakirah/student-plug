@@ -294,8 +294,8 @@ const fetchPostsForSchool = async (req, res) => {
                 model: "SugPostComment",
                 select: "text createdAt isAdmin",
                 populate: {
-                    path: "user",  // Correct the field name to 'user'
-                    model: "SugUser", // Ensure the right model
+                    path: "user",
+                    model: "SugUser",
                     select: "_id fullName"
                 }
             })
@@ -316,7 +316,7 @@ const fetchPostsForSchool = async (req, res) => {
             .populate({
                 path: "user",
                 model: "User",
-                select: "fullName email"
+                select: "fullName email profilePhoto" // Include profilePhoto here
             })
             .populate({
                 path: "likes",
@@ -328,8 +328,8 @@ const fetchPostsForSchool = async (req, res) => {
                 model: "UserComment",
                 select: "text createdAt",
                 populate: {
-                    path: "user",  // Correct the field name to 'user'
-                    model: "User", // Ensure the right model
+                    path: "user",
+                    model: "User",
                     select: "_id fullName"
                 }
             })
@@ -339,7 +339,8 @@ const fetchPostsForSchool = async (req, res) => {
         // Transform student posts with postType
         const studentPostsWithDetails = studentPosts.map(post => ({
             ...post,
-            postType: "student"
+            postType: "student",
+            userProfilePhoto: post.user?.profilePhoto || "" // Add profile photo to each student post
         }));
 
         // Combine admin and student posts and sort them by creation date
@@ -357,6 +358,7 @@ const fetchPostsForSchool = async (req, res) => {
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
 
 
 

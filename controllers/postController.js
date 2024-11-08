@@ -72,16 +72,15 @@ const containsRestrictedWords = (text) => {
 };
 
 const studentCreatePost = async (req, res) => {
+    console.log("Files received in request:", req.files);
     try {
-        const { userId, text } = req.body; // Only userId and text are needed
+        const { userId, text } = req.body; 
         let imageUrls = [];
 
-        // Check for restricted words in text
         if (text && containsRestrictedWords(text)) {
             return res.status(400).json({ message: "Your post contains inappropriate content." });
         }
 
-        // If images are provided, upload them to Cloudinary and get URLs
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
             for (const image of images) {
@@ -91,44 +90,44 @@ const studentCreatePost = async (req, res) => {
                     image.tempFilePath = tempPath;
                 }
                 const result = await uploadToCloudinary(image.tempFilePath);
+                console.log("Cloudinary result:", result);
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
                 }
             }
         }
 
-        // Validate at least one of text or images is provided
-        if (!text && imageUrls.length === 0) {
-            return res.status(400).json({ message: "Post text or image is required" });
+        if (!text) {
+            return res.status(400).json({ message: "Please provide a test" });
+        }
+        if (imageUrls.length < 1) {
+            return res.status(400).json({ message: "Please provide image" });
         }
 
-        // Fetch the user document to get schoolInfoId
         const user = await User.findById(userId).populate('schoolInfoId');
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Extract schoolInfoId from the user's information
         const schoolInfoId = user.schoolInfoId;
         if (!schoolInfoId) {
             return res.status(400).json({ message: "User is not associated with a school" });
         }
 
-        // Create the post with the schoolInfoId from the user's info
         const post = new UserPost({
             user: userId,
             text,
             image: imageUrls,
-            schoolInfoId // Link the post to the user's school
+            schoolInfoId 
         });
+        console.log("Post to be saved:", post);
 
         await post.save();
 
-        // Send response with post and student info
         res.status(201).json({
             message: "Post created successfully",
             post,
-            studentInfo: schoolInfoId // Include the populated school info in the response
+            studentInfo: schoolInfoId 
         });
     } catch (error) {
         console.error("Error creating post:", error);
@@ -149,7 +148,7 @@ const likePost = async (req, res) => {
         const post = await UserPost.findById(postId);
         if (!post) return res.status(404).json({ message: "Post not found" });
 
-        // Check if the user already liked the post
+        // Check the user already liked the post
         if (post.likes.includes(userId)) {
             return res.status(400).json({ message: "User has already liked this post" });
         }

@@ -133,7 +133,8 @@ const studentCreatePost = async (req, res) => {
         res.status(201).json({
             message: "Post created successfully",
             post,
-            studentInfo: schoolInfoId 
+            studentInfo: schoolInfoId,
+            profilePicture: user.profilePhoto 
         });
     } catch (error) {
         console.error("Error creating post:", error);

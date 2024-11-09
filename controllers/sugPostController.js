@@ -251,13 +251,11 @@ const fetchPostsForSchool = async (req, res) => {
     const { schoolInfoId } = req.params;
     console.log("Received schoolInfoId:", schoolInfoId);
 
-    // Validate the ObjectId
     if (!mongoose.Types.ObjectId.isValid(schoolInfoId)) {
         return res.status(400).json({ message: "Invalid schoolInfoId" });
     }
 
     try {
-        // Fetch the school information with the uniProfilePicture included
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
             .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
@@ -267,12 +265,10 @@ const fetchPostsForSchool = async (req, res) => {
             })
             .lean();
 
-        // Check if the schoolInfo was found
         if (!schoolInfo) {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch admin posts (SugPost) associated with the schoolInfoId
         const adminPosts = await SugPost.find({ schoolInfoId })
             .populate({
                 path: "adminId",
@@ -302,21 +298,38 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Transform admin posts with postType and profilePicture (uniProfilePicture)
         const adminPostsWithDetails = adminPosts.map(post => ({
             ...post,
             postType: "admin",
             isAdmin: post.adminId?.role === "admin",
-            university: post.adminId?.schoolInfo?.university || "",
-            profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || "" // Unified key for admin profile picture
+            userId: {
+                id: post.adminId?._id || "",
+                university: post.adminId?.schoolInfo?.university || "",
+                schoolInfo: {
+                    id: post.adminId?.schoolInfo?._id || "",
+                    university: post.adminId?.schoolInfo?.university || ""
+                },
+                profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+            }
         }));
 
-        // Fetch student posts (UserPost) associated with the schoolInfoId
         const studentPosts = await UserPost.find({ schoolInfoId })
             .populate({
                 path: "user",
                 model: "User",
-                select: "fullName email profilePhoto" // Include profilePhoto here
+                select: "fullName email profilePhoto",
+                populate: [
+                    {
+                        path: "studentInfo",
+                        model: "StudentInfo",
+                        select: "faculty department"
+                    },
+                    {
+                        path: "schoolInfoId",  // Ensure schoolInfoId is populated in the User model
+                        model: "SchoolInfo",
+                        select: "university"
+                    }
+                ]
             })
             .populate({
                 path: "likes",
@@ -336,19 +349,26 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // Transform student posts with postType and profilePicture (user's profilePhoto)
         const studentPostsWithDetails = studentPosts.map(post => ({
             ...post,
             postType: "student",
-            profilePicture: post.user?.profilePhoto || "" // Unified key for student profile picture
+            userId: {
+                id: post.user?._id || "",
+                university: post.user?.schoolInfoId?.university || "",  // Access schoolInfoId.university here
+                schoolInfo: {
+                    id: post.user?.schoolInfoId?._id || "",
+                    university: post.user?.schoolInfoId?.university || ""
+                },
+                profilePicture: post.user?.profilePhoto || ""
+            },
+            faculty: post.user?.studentInfo?.faculty || "",
+            department: post.user?.studentInfo?.department || ""
         }));
 
-        // Combine admin and student posts and sort them by creation date
         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
-        // Return both the school info and the combined posts
         res.json({
             schoolInfo,
             posts: allPosts
@@ -358,6 +378,8 @@ const fetchPostsForSchool = async (req, res) => {
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
+
 
 
 

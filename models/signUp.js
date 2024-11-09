@@ -42,8 +42,14 @@ const userSchema =new mongoose.Schema({
   },
   schoolInfoId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "SchoolInfo" // Link to SchoolInfo model instead
+    ref: "SchoolInfo" 
+  },
+  studentInfo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "StudentInfo" // Reference to StudentInfo model
   }
+  
+  
   
   // schoolInfoId: { // Add this field
   //   type: mongoose.Schema.Types.ObjectId,

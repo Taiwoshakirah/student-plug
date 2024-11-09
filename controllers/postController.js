@@ -78,11 +78,12 @@ const studentCreatePost = async (req, res) => {
         const { userId, text } = req.body;
         let imageUrls = [];
 
+        // Check for restricted words in text
         if (text && containsRestrictedWords(text)) {
             return res.status(400).json({ message: "Your post contains inappropriate content." });
         }
 
-        // Check if images are provided and upload them if available
+        // Handle image upload and store URLs
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
             for (const image of images) {
@@ -99,6 +100,7 @@ const studentCreatePost = async (req, res) => {
             }
         }
 
+        // Validation: Ensure text and image are provided
         if (!text) {
             return res.status(400).json({ message: "Please provide text" });
         }
@@ -106,8 +108,17 @@ const studentCreatePost = async (req, res) => {
             return res.status(400).json({ message: "Please provide image" });
         }
 
-        // Find the user and their school info
-        const user = await User.findById(userId).populate('schoolInfoId');
+        // Fetch user and populate related data (schoolInfo and studentInfo)
+        const user = await User.findById(userId)
+            .populate('schoolInfoId')  // Populate school info
+            .populate({
+                path: 'studentInfo',  // Singular reference field in User model
+                model: 'StudentInfo',  // Specify the model name explicitly
+                select: 'faculty department'  // Select specific fields from studentInfo
+            });
+
+        console.log("Populated user:", user); // Verify populated user data
+
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -117,32 +128,55 @@ const studentCreatePost = async (req, res) => {
             return res.status(400).json({ message: "User is not associated with a school" });
         }
 
-        // Create and save the new post
+        // Log the studentInfo to see if faculty/department are populated correctly
+        console.log("Student Info:", user.studentInfo);
+
+        // Create and save the post
         const post = new UserPost({
             user: userId,
             text,
             images: imageUrls, // Ensuring 'images' key is used consistently
             schoolInfoId 
         });
-        console.log("Post to be saved:", post);
 
         await post.save();
 
-        // Respond with success message
+        // Return the response with populated student info and school info
         res.status(201).json({
             message: "Post created successfully",
             post: {
-                ...post.toObject(), // Convert the Mongoose document to a plain object
-                images: post.images // Ensure 'images' is the same key in the response
+                ...post.toObject(),
+                images: post.images
             },
-            studentInfo: schoolInfoId,
-            profilePicture: user.profilePhoto 
+            studentInfo: {
+                faculty: user.studentInfo ? user.studentInfo.faculty : 'N/A',  // Ensure faculty is populated
+                department: user.studentInfo ? user.studentInfo.department : 'N/A' // Ensure department is populated
+            },
+            profilePicture: user.profilePhoto,
+            schoolInfo: {
+                id: schoolInfoId._id,
+                university: schoolInfoId.university
+            }
         });
+        console.log('Post with populated studentInfo:', post);
+
     } catch (error) {
         console.error("Error creating post:", error);
         res.status(500).json({ message: "Failed to create post", error: error.message });
     }
 };
+
+
+  
+
+
+
+
+
+
+
+
+
 
 
 

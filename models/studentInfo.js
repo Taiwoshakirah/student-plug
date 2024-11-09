@@ -30,7 +30,7 @@ const studentInfoSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
-  schoolInfoId: {
+   schoolInfoId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "SchoolInfo",
     required: true,

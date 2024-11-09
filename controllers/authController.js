@@ -167,6 +167,7 @@ const studentInformation = async (req, res) => {
     const savedStudentInfo = await newStudentInfo.save();
 
     // Update the user's schoolInfoId
+    user.studentInfo = savedStudentInfo._id;
     user.schoolInfoId = schoolInfo._id;
     await user.save();
 

@@ -178,70 +178,77 @@ const addComment = async (req, res) => {
 
   
 
-// const fetchPostDetails = async (req, res) => {
-//     try {
-//         const { adminId } = req.params; // Change this line to use req.params
+const fetchPostDetails = async (req, res) => {
+    try {
+        const { adminId } = req.params;
 
-//         console.log("Admin ID:", adminId);
+        console.log("Admin ID:", adminId);
 
-//         // Ensure adminId is provided and convert it to an ObjectId
-//         if (!adminId) {
-//             return res.status(400).json({ message: "Admin ID is required" });
-//         }
+        // Ensure adminId is provided
+        if (!adminId) {
+            return res.status(400).json({ message: "Admin ID is required" });
+        }
 
-//         const adminObjectId = new mongoose.Types.ObjectId(adminId);
+        const adminObjectId = new mongoose.Types.ObjectId(adminId);
 
-//         // Find posts only for the given adminId
-//         const posts = await SugPost.find({ adminId: adminObjectId })
-//             .populate("adminId", "sugFullName email")
-//             .populate({
-//                 path: "likes",
-//                 model: "User",
-//                 select: "_id fullName"
-//             })
-//             .populate({
-//                 path: "comments",
-//                 select: "text userId createdAt isAdmin",
-//                 populate: {
-//                     path: "userId",
-//                     model: "User",
-//                     select: "_id fullName"
-//                 }
-//             })
-//             .sort({ createdAt: -1 })
-//             .lean();
+        // Find posts for the given adminId
+        const posts = await SugPost.find({ adminId: adminObjectId })
+            .populate({
+                path: "adminId",
+                select: "sugFullName email",
+                populate: {
+                    path: "schoolInfo",  // Assuming `schoolInfo` is the field in `adminId` model
+                    model: "SchoolInfo",
+                    select: "uniProfilePicture"
+                }
+            })
+            .populate({
+                path: "likes",
+                model: "User",
+                select: "_id fullName"
+            })
+            .populate({
+                path: "comments",
+                select: "text userId createdAt isAdmin",
+                populate: {
+                    path: "userId",
+                    model: "User",
+                    select: "_id fullName"
+                }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
 
-//         // If no posts found, return a message
-//         if (posts.length === 0) {
-//             return res.status(404).json({ message: "No posts found for this admin." });
-//         }
+        // If no posts found, return a message
+        if (posts.length === 0) {
+            return res.status(404).json({ message: "No posts found for this admin." });
+        }
 
-//         // Process the fetched posts
-//         posts.forEach(post => {
-//             console.log(`Post ID: ${post._id}`);
-//             console.log("Likes Array:", post.likes);
+        // Process each post
+        const processedPosts = posts.map(post => {
+            // Check if admin has liked the post
+            const adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
 
-//             // Check if admin has liked the post
-//             post.adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
-//             console.log(`Admin liked this post: ${post.adminLiked}`);
+            return {
+                ...post,
+                adminLiked,
+                commentsCount: post.comments.length,
+                likesCount: post.likes.length,
+                comments: post.comments.map(comment => ({
+                    ...comment,
+                    isAdmin: comment.isAdmin || false
+                })),
+                // Add `profilePicture` from `uniProfilePicture`
+                profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+            };
+        });
 
-//             // Additional properties
-//             post.commentsCount = post.comments.length;
-//             post.likesCount = post.likes.length;
-
-//             // Ensure comments have a consistent `isAdmin` field
-//             post.comments = post.comments.map(comment => ({
-//                 ...comment,
-//                 isAdmin: comment.isAdmin || false
-//             }));
-//         });
-
-//         res.json({ posts });
-//     } catch (error) {
-//         console.error("Error fetching posts:", error);
-//         res.status(500).json({ message: "Error fetching posts", error });
-//     }
-// };
+        res.json({ posts: processedPosts });
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+        res.status(500).json({ message: "Error fetching posts", error });
+    }
+};
 
 
 
@@ -410,4 +417,4 @@ const fetchPostsForSchool = async (req, res) => {
 
 
 
-module.exports = {createSugPost,toggleLike,addComment,fetchPostsForSchool}
+module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails,fetchPostsForSchool}

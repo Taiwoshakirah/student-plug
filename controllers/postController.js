@@ -4,6 +4,9 @@ const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const User = require('../models/signUp'); // Import the User model
 const StudentInfo = require('../models/studentInfo'); // Import the StudentInfo model
 const mongoose = require('mongoose');
+const { cloudinary } = require('../config/cloudinaryConfig');
+const Roles = require('../middlewares/role');
+const SugUser = require('../models/schoolSug')
 //for student post creation with control
 const restrictedWords = [
     "abuse",
@@ -167,22 +170,6 @@ const studentCreatePost = async (req, res) => {
 };
 
 
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 const likePost = async (req, res) => {
@@ -313,16 +300,117 @@ const fetchUserPost = async (req, res) => {
   };
   
   
+  const deleteUserPost = async (req, res) => {
+    const { postId } = req.params;
+    const { userId } = req.body;
+
+    if (!postId) {
+        return res.status(400).json({ message: "Post ID is required" });
+    }
+
+    try {
+        // Find the post by its ID
+        const post = await UserPost.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        // Find the user making the request (either from User or SugSchema)
+        let user = await User.findById(userId);
+        
+        // Check if user not found in User model, then look in SugSchema (admin model)
+        if (!user) {
+            user = await SugUser.findById(userId);
+            if (!user) {
+                return res.status(404).json({ message: "User not found" });
+            }
+        }
+
+        // Check if the user is either the post owner or an admin
+        const isAuthorized = post.user.toString() === userId || user.role === Roles.ADMIN;
+        if (!isAuthorized) {
+            return res.status(403).json({ message: "Unauthorized to delete this post" });
+        }
+
+        // Remove associated comments
+        await UserComment.deleteMany({ post: postId });
+
+        // Delete images from Cloudinary if applicable
+        if (post.images && post.images.length > 0) {
+            for (const imageUrl of post.images) {
+                const publicId = imageUrl.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(publicId); // Use cloudinary.uploader.destroy directly
+            }
+        }
+
+        // Delete the post itself
+        await post.deleteOne();
+
+        res.status(200).json({ message: "Post and associated comments deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        res.status(500).json({ message: "Failed to delete post", error });
+    }
+};
+
+// Function to approve or decline a post
+// const updatePostStatus = async (req, res) => {
+//     const { postId } = req.params;
+//     const { action } = req.body; // 'approve' or 'decline'
+//     const { userId } = req.body; // the admin's user ID
+
+//     try {
+//         // Find the admin user making the request
+//         const user = await User.findById(userId);
+//         if (!user || user.role !== "admin") {
+//             return res.status(403).json({ message: "Unauthorized: Only admins can approve or decline posts" });
+//         }
+
+//         // Find the post
+//         const post = await UserPost.findById(postId);
+//         if (!post) {
+//             return res.status(404).json({ message: "Post not found" });
+//         }
+
+//         // Update the post status based on the action
+//         if (action === "approve") {
+//             post.status = "approved";
+//         } else if (action === "decline") {
+//             post.status = "declined";
+//         } else {
+//             return res.status(400).json({ message: "Invalid action. Use 'approve' or 'decline'." });
+//         }
+
+//         // Save the updated post
+//         await post.save();
+
+//         res.status(200).json({ message: `Post ${action}d successfully`, post });
+//     } catch (error) {
+//         console.error("Error updating post status:", error);
+//         res.status(500).json({ message: "Failed to update post status", error });
+//     }
+// };
+
+// Function to get all approved posts
+// const getApprovedPosts = async (req, res) => {
+//     try {
+//         const posts = await UserPost.find({ status: "approved" });
+//         res.status(200).json(posts);
+//     } catch (error) {
+//         console.error("Error fetching posts:", error);
+//         res.status(500).json({ message: "Failed to fetch posts", error });
+//     }
+// };
+
   
   
   
   
-  
 
 
 
 
 
 
-    module.exports = {studentCreatePost,likePost,sharePost,commentOnPost,fetchUserPost}
+    module.exports = {studentCreatePost,likePost,sharePost,commentOnPost,fetchUserPost,deleteUserPost}
     

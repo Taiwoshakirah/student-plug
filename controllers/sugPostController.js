@@ -84,63 +84,65 @@ const toggleLike = async (req, res) => {
     try {
         const { postId } = req.params;
         const { userId, adminId } = req.body;
+        const likerId = userId || adminId;
 
+        // Find the post by ID
         const post = await SugPost.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        const user = userId ? await User.findById(userId) : null;
-        const admin = adminId ? await User.findById(adminId) : null;
+        // Check if the liker already exists in the post likes
+        const alreadyLikedIndex = post.likes.findIndex(
+            like => like._id.toString() === likerId
+        );
 
-        // Initialize userLiked and adminLiked status
-        const userLiked = user ? post.likes.some(like => like.id.toString() === userId.toString()) : false;
-        const adminLiked = admin ? post.likes.some(like => like.id.toString() === adminId.toString()) : false;
-
-        // Toggle user like if userId is provided
-        if (userId && user) {
-            if (userLiked) {
-                // User is unliking the post
-                post.likes = post.likes.filter(like => like.id.toString() !== userId.toString()); // Remove user like
-            } else {
-                // User is liking the post
-                post.likes.push({ _id: userId, fullName: user.fullName || "Unknown User", id: userId }); // Use placeholder if fullName is not available
-            }
+        // Toggle like
+        if (alreadyLikedIndex !== -1) {
+            post.likes.splice(alreadyLikedIndex, 1);  // Remove like
+        } else {
+            // Add like
+            post.likes.push({ _id: likerId });
         }
 
-        // Toggle admin like if adminId is provided
-        if (adminId && admin) {
-            if (adminLiked) {
-                // Admin is unliking the post
-                post.likes = post.likes.filter(like => like.id.toString() !== adminId.toString()); // Remove admin like
-            } else {
-                // Admin is liking the post
-                post.likes.push({ _id: adminId, fullName: admin.fullName || "Unknown Admin", id: adminId }); // Use placeholder if fullName is not available
-            }
-        }
-
+        // Save the updated post
         await post.save();
 
-        // Prepare response with updated likes information
-        const updatedLikes = post.likes.map(like => ({
-            userId: like.id,
-            fullName: like.fullName || "Unknown User",
-            liked: true
-        }));
+        // Collect unique liker IDs
+        const likerIds = post.likes.map(like => like._id);
 
-        return res.status(200).json({
+        // Fetch user information from User collection for regular users
+        const users = await User.find({ _id: { $in: likerIds } });
+        
+        // Fetch admin information from SugUser collection only if adminId is provided
+        const admins = await SugUser.find({ _id: { $in: likerIds } });
+
+        // Map the likes array to include fullName from User or SugUser, if available
+        const updatedLikes = post.likes.map(like => {
+            const userLiker = users.find(user => user._id.toString() === like._id.toString());
+            const adminLiker = admins.find(admin => admin._id.toString() === like._id.toString());
+
+            return {
+                userId: like._id,
+                fullName: userLiker?.fullName || adminLiker?.sugFullName || "Unknown Liker",
+                liked: true,
+            };
+        });
+
+        res.status(200).json({
             message: "Post like toggled",
             likesCount: post.likes.length,
-            likesArray: post.likes,
-            userLiked: !userLiked, 
-            adminLiked: !adminLiked, 
-            allLikes: updatedLikes
+            likesArray: updatedLikes,
+            userLiked: !!userId && alreadyLikedIndex === -1,
+            adminLiked: !!adminId && alreadyLikedIndex === -1,
+            allLikes: updatedLikes,
         });
     } catch (error) {
         console.error("Error toggling like:", error);
-        return res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Internal server error" });
     }
 };
+
 
 
 
@@ -263,6 +265,7 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
+        // Fetch school information
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
             .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
@@ -276,6 +279,7 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
+        // Fetch admin posts
         const adminPosts = await SugPost.find({ schoolInfoId })
             .populate({
                 path: "adminId",
@@ -286,11 +290,6 @@ const fetchPostsForSchool = async (req, res) => {
                     model: "SchoolInfo",
                     select: "university uniProfilePicture"
                 }
-            })
-            .populate({
-                path: "likes",
-                model: "SugUser",
-                select: "_id fullName"
             })
             .populate({
                 path: "comments",
@@ -305,6 +304,7 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Format admin posts
         const adminPostsWithDetails = adminPosts.map(post => ({
             ...post,
             postType: "admin",
@@ -320,6 +320,7 @@ const fetchPostsForSchool = async (req, res) => {
             }
         }));
 
+        // Fetch student posts
         const studentPosts = await UserPost.find({ schoolInfoId })
             .populate({
                 path: "user",
@@ -332,16 +333,11 @@ const fetchPostsForSchool = async (req, res) => {
                         select: "faculty department"
                     },
                     {
-                        path: "schoolInfoId",  // Ensure schoolInfoId is populated in the User model
+                        path: "schoolInfoId",
                         model: "SchoolInfo",
                         select: "university"
                     }
                 ]
-            })
-            .populate({
-                path: "likes",
-                model: "User",
-                select: "_id fullName"
             })
             .populate({
                 path: "comments",
@@ -356,12 +352,13 @@ const fetchPostsForSchool = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
+        // Format student posts
         const studentPostsWithDetails = studentPosts.map(post => ({
             ...post,
             postType: "student",
             userId: {
                 id: post.user?._id || "",
-                university: post.user?.schoolInfoId?.university || "",  // Access schoolInfoId.university here
+                university: post.user?.schoolInfoId?.university || "",
                 schoolInfo: {
                     id: post.user?.schoolInfoId?._id || "",
                     university: post.user?.schoolInfoId?.university || ""
@@ -372,19 +369,38 @@ const fetchPostsForSchool = async (req, res) => {
             department: post.user?.studentInfo?.department || ""
         }));
 
+        // Combine posts and sort by creation date
         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
+        // Populate likes with fullName for each post
+        const allPostsWithLikes = await Promise.all(
+            allPosts.map(async post => {
+                const likesWithDetails = await Promise.all(
+                    post.likes.map(async like => {
+                        const userLike = await User.findById(like._id).select("fullName");
+                        const adminLike = await SugUser.findById(like._id).select("sugFullName");
+                        return {
+                            _id: like._id,
+                            fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
+                        };
+                    })
+                );
+                return { ...post, likes: likesWithDetails };
+            })
+        );
+
         res.json({
             schoolInfo,
-            posts: allPosts
+            posts: allPostsWithLikes
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
 
 
 

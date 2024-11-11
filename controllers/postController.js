@@ -180,21 +180,29 @@ const likePost = async (req, res) => {
         const post = await UserPost.findById(postId);
         if (!post) return res.status(404).json({ message: "Post not found" });
 
-        // Check the user already liked the post
-        if (post.likes.includes(userId)) {
-            return res.status(400).json({ message: "User has already liked this post" });
+        // Check if the user already liked the post
+        const likeIndex = post.likes.indexOf(userId);
+
+        if (likeIndex !== -1) {
+            // User has already liked the post, so unlike it
+            post.likes.splice(likeIndex, 1);
+            post.likeCount -= 1;
+            await post.save();
+            return res.status(200).json({ message: "Post unliked", post });
         }
 
+        // Otherwise, add a like
         post.likes.push(userId);
         post.likeCount += 1;
         await post.save();
 
         res.status(200).json({ message: "Post liked", post });
     } catch (error) {
-        console.error("Error liking post:", error);
-        res.status(500).json({ message: "Failed to like post", error });
+        console.error("Error liking/unliking post:", error);
+        res.status(500).json({ message: "Failed to like/unlike post", error });
     }
 };
+
 
 
 const sharePost = async (req, res) => {

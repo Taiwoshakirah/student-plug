@@ -319,7 +319,7 @@ const signin = async (req, res) => {
   res.status(200).json({
     token,
     redirectUrl, // Add the redirect URL to the response
-    user: {
+    data: {
       _id: user._id,
       email: user.email,
       phone: user.phone,

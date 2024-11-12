@@ -7,7 +7,9 @@ const fileUpload = require("express-fileupload");
 require("dotenv").config();
 const admin = require('firebase-admin');
 const session = require("express-session");
-const MongoStore = require("connect-mongo"); 
+const MongoStore = require("connect-mongo");
+const http = require("http"); // Import http module
+const { initWebSocketServer } = require('./utils/websocket');
 
 const tempDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(tempDir)) {
@@ -68,6 +70,7 @@ const signUpRouter = require("./routes/signUpRouter");
 const schoolRouter = require('./routes/schoolRouter')
 const sugPostRouter = require('./routes/sugPostRouter')
 const postRouter = require('./routes/postRouter')
+const postComment = require('./routes/postComment')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
 
@@ -75,14 +78,22 @@ app.use("/api/auth", signUpRouter);
 app.use('/api/school',schoolRouter)
 app.use('/api/sugPost',sugPostRouter)
 app.use('/api/students',postRouter)
+app.use('/api/add',postComment)
 app.use(notFound);
 app.use(methodNotAllowed);
+
+
+// Create HTTP server and initialize WebSocket
+const server = http.createServer(app); // Create HTTP server
+initWebSocketServer(server); // Initialize WebSocket with HTTP server
+
 
 const start = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log("DB Connected");
-    app.listen(port, () => {
+    // changing app.listen to server.listen to integrate web socket because app.listen does not work with it
+    server.listen(port, () => {
       console.log(`Server is listening on port: ${port}`);
     });
   } catch (error) {

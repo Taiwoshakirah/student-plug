@@ -12,6 +12,7 @@ const { Types: { ObjectId } } = require('mongoose'); // Make sure to import Obje
 const SchoolInfo = require('../models/schoolInfo')
 const UserPost = require('../models/post')
 const UserComment = require('../models/comment');
+const { sendNotification } = require('../utils/websocket');
 
 
 
@@ -87,7 +88,7 @@ const toggleLike = async (req, res) => {
         const likerId = userId || adminId;
 
         // Find the post by ID
-        const post = await SugPost.findById(postId);
+        const post = await UserPost.findById(postId) || await SugPost.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
@@ -101,12 +102,23 @@ const toggleLike = async (req, res) => {
         if (alreadyLikedIndex !== -1) {
             post.likes.splice(alreadyLikedIndex, 1);  // Remove like
         } else {
-            // Add like
-            post.likes.push({ _id: likerId });
+            post.likes.push({ _id: likerId });  // Add like
         }
 
         // Save the updated post
         await post.save();
+
+        const postOwnerId = post.user ? post.user._id.toString() : post.adminId._id.toString();
+
+        // Send notification to the post owner if liked by someone else
+        if (postOwnerId !== likerId) {
+            sendNotification(postOwnerId, {
+                type: "like",
+                message: `Your post was ${alreadyLikedIndex !== -1 ? "unliked" : "liked"}`,
+                postId: post._id,
+                likerId: likerId
+            });
+        }
 
         // Collect unique liker IDs
         const likerIds = post.likes.map(like => like._id);
@@ -149,31 +161,114 @@ const toggleLike = async (req, res) => {
 
 
 
+
+// const addComment = async (req, res) => {
+//     const { postId } = req.params;
+//     const text = req.body.text;
+
+//     const userId = req.user.userId; 
+//     const role = req.user.role; 
+//     if (!userId) {
+//         return res.status(400).json({ message: "User ID is required" });
+//     }
+//     if (!text) {
+//         return res.status(400).json({ message: "Comment text is required" });
+//     }
+
+//     const isAdmin = role === "admin"; 
+
+//     try {
+//         const comment = new SugPostComment({ postId, userId, text, isAdmin, role });
+//         await comment.save();
+
+//         await SugPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+
+//         res.status(201).json({ message: "Comment added", comment });
+//     } catch (error) {
+//         console.error("Error adding comment:", error);
+//         res.status(500).json({ message: "Error commenting on post", error });
+//     }
+// };
+
+// POST /api/posts/:postId/comments
 const addComment = async (req, res) => {
     const { postId } = req.params;
-    const text = req.body.text;
-
-    const userId = req.user.userId; 
-    const role = req.user.role; 
-    if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
-    }
-    if (!text) {
-        return res.status(400).json({ message: "Comment text is required" });
-    }
-
-    const isAdmin = role === "admin"; 
+    const { postType, text, userId } = req.body; // `postType` distinguishes between "admin" and "user" posts
 
     try {
-        const comment = new SugPostComment({ postId, userId, text, isAdmin, role });
-        await comment.save();
+        let newComment;
 
-        await SugPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+        // Ensure postId is passed correctly
+        if (!postId || !userId || !text) {
+            return res.status(400).json({ message: "postId, userId, and text are required" });
+        }
 
-        res.status(201).json({ message: "Comment added", comment });
+        // Check postType to determine where to add the comment
+        if (postType === "admin") {
+            // Commenting on an admin post
+            newComment = await SugPostComment.create({
+                post: postId,  // Ensure it's `post` and not `postId`
+                text,
+                user: userId,  // Ensure it's `user` and not `userId`
+                isAdmin: true,
+                createdAt: new Date(),
+            });
+        } else if (postType === "user") {
+            // Commenting on a user post
+            newComment = await UserComment.create({
+                post: postId,
+                text,
+                user: userId,
+                createdAt: new Date(),
+            });
+        } else {
+            return res.status(400).json({ message: "Invalid post type" });
+        }
+
+        res.status(201).json({ message: "Comment added", comment: newComment });
     } catch (error) {
         console.error("Error adding comment:", error);
-        res.status(500).json({ message: "Error commenting on post", error });
+        res.status(500).json({ message: "Error adding comment", error });
+    }
+};
+
+
+// GET /api/posts/:postId/comments
+const fetchComments = async (req, res) => {
+    const { postId } = req.params;
+    const { postType } = req.query; // postType is sent as a query parameter (either "admin" or "user")
+
+    try {
+        let comments;
+        
+        if (postType === "admin") {
+            // Fetch comments for an admin post
+            comments = await SugPostComment.find({ post: postId })
+                .populate({
+                    path: "user",
+                    model: "SugUser",
+                    select: "_id fullName",
+                })
+                .sort({ createdAt: -1 })
+                .lean();
+        } else if (postType === "user") {
+            // Fetch comments for a user post
+            comments = await UserComment.find({ post: postId })
+                .populate({
+                    path: "user",
+                    model: "User",
+                    select: "_id fullName",
+                })
+                .sort({ createdAt: -1 })
+                .lean();
+        } else {
+            return res.status(400).json({ message: "Invalid post type" });
+        }
+
+        res.json(comments);
+    } catch (error) {
+        console.error("Error fetching comments:", error);
+        res.status(500).json({ message: "Error fetching comments", error });
     }
 };
 
@@ -433,4 +528,4 @@ const fetchPostsForSchool = async (req, res) => {
 
 
 
-module.exports = {createSugPost,toggleLike,addComment,fetchPostDetails,fetchPostsForSchool}
+module.exports = {createSugPost,toggleLike,addComment,fetchComments,fetchPostDetails,fetchPostsForSchool}

@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const { cloudinary } = require('../config/cloudinaryConfig');
 const Roles = require('../middlewares/role');
 const SugUser = require('../models/schoolSug')
+const { sendNotification } = require('../utils/websocket');
 //for student post creation with control
 const restrictedWords = [
     "abuse",
@@ -195,6 +196,17 @@ const likePost = async (req, res) => {
         post.likes.push(userId);
         post.likeCount += 1;
         await post.save();
+
+        // Send notification to the post owner if someone else liked their post
+        const postOwnerId = post.user._id.toString();
+        if (postOwnerId !== userId) {
+            sendNotification(postOwnerId, {
+                type: "like",
+                message: `Your post was ${likeIndex !== -1 ? "unliked" : "liked"}`,
+                postId: post._id,
+                likerId: userId
+            });
+        }
 
         res.status(200).json({ message: "Post liked", post });
     } catch (error) {

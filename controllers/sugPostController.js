@@ -595,26 +595,47 @@ const fetchPostsForSchool = async (req, res) => {
 
 const deletePost = async (req, res) => {
     const { postId } = req.params;
-    const { userId, role } = req.user; // Getting userId and role from req.user, set by the verifySugToken middleware
+    const { userId, role } = req.user;
 
-    if (!postId) {
-        return res.status(400).json({ message: "Post ID is required" });
+    console.log("Post ID from params:", postId); // Debugging log
+
+    // Check if the postId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(postId)) {
+        return res.status(400).json({ message: "Invalid Post ID format" });
+    }
+
+    // Determine which model to use based on the role
+    let postModel;
+    if (role === Roles.ADMIN) {
+        // Admin can delete both SugPost (admin posts) and UserPost (user posts)
+        console.log("Admin role detected, checking both UserPost and SugPost models.");
+        postModel = [UserPost, SugPost]; // Both models can be queried
+    } else {
+        // Regular users can only delete their own posts in UserPost collection
+        console.log("Regular user role detected, checking UserPost model.");
+        postModel = UserPost;
     }
 
     try {
-        // Find the post by its ID
-        const post = await UserPost.findById(postId);
+        let post;
+        
+        // Check both models if the user is an admin
+        if (Array.isArray(postModel)) {
+            post = await postModel[0].findById(postId) || await postModel[1].findById(postId);
+        } else {
+            // Use the single model for regular users
+            post = await postModel.findById(postId);
+        }
+        
+        console.log("Found post:", post); // Debugging log
+
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        // Debugging logs to check values
-        console.log("Post owner (post.user):", post.user.toString());
-        console.log("Requesting user ID (userId from token):", userId);
-        console.log("User role:", role);
-
-        // Check if the user is an admin (no longer allows user to delete their own posts)
-        const isAuthorized = role === Roles.ADMIN;
+        // Admins can delete both types of posts (their own or any user's post)
+        // For regular users, they can only delete their own posts.
+        const isAuthorized = role === Roles.ADMIN || post.user.toString() === userId.toString();
         if (!isAuthorized) {
             return res.status(403).json({ message: "Unauthorized to delete this post" });
         }
@@ -622,7 +643,7 @@ const deletePost = async (req, res) => {
         // Remove associated comments
         await UserComment.deleteMany({ post: postId });
 
-        // Delete images from Cloudinary if applicable
+        // Delete images from Cloudinary if they exist
         if (post.images && post.images.length > 0) {
             for (const imageUrl of post.images) {
                 const publicId = imageUrl.split('/').pop().split('.')[0];
@@ -639,6 +660,16 @@ const deletePost = async (req, res) => {
         res.status(500).json({ message: "Failed to delete post", error });
     }
 };
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -441,6 +441,7 @@ const getSugUser = async (req, res) => {
       });
       res.status(200).json({
         success: true,
+        token,
         userId: user._id,
         message: "You have successfully signed in"
       });

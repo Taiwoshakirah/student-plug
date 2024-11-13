@@ -323,7 +323,7 @@ const fetchUserPost = async (req, res) => {
   
   const deleteUserPost = async (req, res) => {
     const { postId } = req.params;
-    const { userId } = req.body;
+    const { userId, role } = req.user; // Getting userId and role from req.user, set by the verifySugToken middleware
 
     if (!postId) {
         return res.status(400).json({ message: "Post ID is required" });
@@ -336,19 +336,13 @@ const fetchUserPost = async (req, res) => {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        // Find the user making the request (either from User or SugSchema)
-        let user = await User.findById(userId);
-        
-        // Check if user not found in User model, then look in SugSchema (admin model)
-        if (!user) {
-            user = await SugUser.findById(userId);
-            if (!user) {
-                return res.status(404).json({ message: "User not found" });
-            }
-        }
+        // Debugging logs to check values
+        console.log("Post owner (post.user):", post.user.toString());
+        console.log("Requesting user ID (userId from token):", userId);
+        console.log("User role:", role);
 
         // Check if the user is either the post owner or an admin
-        const isAuthorized = post.user.toString() === userId || user.role === Roles.ADMIN;
+        const isAuthorized = post.user.toString() === userId || role === Roles.ADMIN;
         if (!isAuthorized) {
             return res.status(403).json({ message: "Unauthorized to delete this post" });
         }
@@ -360,7 +354,7 @@ const fetchUserPost = async (req, res) => {
         if (post.images && post.images.length > 0) {
             for (const imageUrl of post.images) {
                 const publicId = imageUrl.split('/').pop().split('.')[0];
-                await cloudinary.uploader.destroy(publicId); // Use cloudinary.uploader.destroy directly
+                await cloudinary.uploader.destroy(publicId);
             }
         }
 
@@ -373,6 +367,8 @@ const fetchUserPost = async (req, res) => {
         res.status(500).json({ message: "Failed to delete post", error });
     }
 };
+
+
 
 // Function to approve or decline a post
 // const updatePostStatus = async (req, res) => {

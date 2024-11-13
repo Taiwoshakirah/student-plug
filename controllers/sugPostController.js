@@ -593,6 +593,52 @@ const fetchPostsForSchool = async (req, res) => {
 
 
 
+const deletePost = async (req, res) => {
+    const { postId } = req.params;
+    const { userId, role } = req.user; // Getting userId and role from req.user, set by the verifySugToken middleware
+
+    if (!postId) {
+        return res.status(400).json({ message: "Post ID is required" });
+    }
+
+    try {
+        // Find the post by its ID
+        const post = await UserPost.findById(postId);
+        if (!post) {
+            return res.status(404).json({ message: "Post not found" });
+        }
+
+        // Debugging logs to check values
+        console.log("Post owner (post.user):", post.user.toString());
+        console.log("Requesting user ID (userId from token):", userId);
+        console.log("User role:", role);
+
+        // Check if the user is an admin (no longer allows user to delete their own posts)
+        const isAuthorized = role === Roles.ADMIN;
+        if (!isAuthorized) {
+            return res.status(403).json({ message: "Unauthorized to delete this post" });
+        }
+
+        // Remove associated comments
+        await UserComment.deleteMany({ post: postId });
+
+        // Delete images from Cloudinary if applicable
+        if (post.images && post.images.length > 0) {
+            for (const imageUrl of post.images) {
+                const publicId = imageUrl.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(publicId);
+            }
+        }
+
+        // Delete the post itself
+        await post.deleteOne();
+
+        res.status(200).json({ message: "Post and associated comments deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        res.status(500).json({ message: "Failed to delete post", error });
+    }
+};
 
 
 
@@ -619,4 +665,4 @@ const fetchPostsForSchool = async (req, res) => {
 
 
 
-module.exports = {createSugPost,toggleLike,addComment,fetchComments,fetchPostDetails,fetchPostsForSchool}
+module.exports = {createSugPost,toggleLike,addComment,fetchComments,fetchPostDetails,fetchPostsForSchool,deletePost}

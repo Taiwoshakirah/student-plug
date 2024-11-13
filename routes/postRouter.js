@@ -9,6 +9,5 @@ router.route('/create-post').post(studentCreatePost).all(methodNotAllowed)
 router.route('/likepost/:postId').post(likePost).all(methodNotAllowed)
 router.route('/comments/:postId').post(commentOnPost).all(methodNotAllowed)
 router.route('/getUserPost/:userId').get(fetchUserPost).all(methodNotAllowed)
-router.route('/deletePost/:postId').delete(authenticateToken,deleteUserPost).all(methodNotAllowed)
 
 module.exports = router

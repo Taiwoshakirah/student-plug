@@ -156,7 +156,7 @@ const studentCreatePost = async (req, res) => {
                 faculty: user.studentInfo ? user.studentInfo.faculty : 'N/A',  // Ensure faculty is populated
                 department: user.studentInfo ? user.studentInfo.department : 'N/A' // Ensure department is populated
             },
-            profilePicture: user.profilePhoto,
+            profilePicture: user.profilePhoto || null, // Return the profile picture (null if not uploaded)
             schoolInfo: {
                 id: schoolInfoId._id,
                 university: schoolInfoId.university
@@ -169,6 +169,7 @@ const studentCreatePost = async (req, res) => {
         res.status(500).json({ message: "Failed to create post", error: error.message });
     }
 };
+
 
 
 

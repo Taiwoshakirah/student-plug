@@ -1,7 +1,7 @@
 const SugPostCommentSchema = new mongoose.Schema({
   post: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Post",  // Reference to the Post model
+    ref: "SugPost",  // Reference to the Post model
     required: true,
   },
   text: {
@@ -17,6 +17,7 @@ const SugPostCommentSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  parentComment: { type: mongoose.Schema.Types.ObjectId, ref: 'SugPostComment', default: null }, // For nested comments
   createdAt: {
     type: Date,
     default: Date.now,

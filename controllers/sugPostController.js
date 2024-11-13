@@ -193,24 +193,23 @@ const toggleLike = async (req, res) => {
 // POST /api/posts/:postId/comments
 const addComment = async (req, res) => {
     const { postId } = req.params;
-    const { postType, text, userId } = req.body; // `postType` distinguishes between "admin" and "user" posts
+    const { postType, text, userId, parentCommentId } = req.body;
 
     try {
-        let newComment;
-
-        // Ensure postId is passed correctly
         if (!postId || !userId || !text) {
             return res.status(400).json({ message: "postId, userId, and text are required" });
         }
 
-        // Check postType to determine where to add the comment
+        let newComment;
+        
         if (postType === "admin") {
             // Commenting on an admin post
             newComment = await SugPostComment.create({
-                post: postId,  // Ensure it's `post` and not `postId`
+                post: postId,
                 text,
-                user: userId,  // Ensure it's `user` and not `userId`
+                user: userId,
                 isAdmin: true,
+                parentComment: parentCommentId || null,
                 createdAt: new Date(),
             });
         } else if (postType === "user") {
@@ -219,13 +218,26 @@ const addComment = async (req, res) => {
                 post: postId,
                 text,
                 user: userId,
+                parentComment: parentCommentId || null,
                 createdAt: new Date(),
             });
         } else {
             return res.status(400).json({ message: "Invalid post type" });
         }
 
-        res.status(201).json({ message: "Comment added", comment: newComment });
+        // Debugging: Log the user and its profile photo before population
+        const user = await User.findById(userId);
+        console.log("User Before Population:", user);
+
+        // Populate the user with profile photo and full name
+        const populatedComment = await newComment.populate({
+            path: 'user',
+            select: 'fullName profilePhoto',
+        });
+
+        console.log("Populated Comment:", populatedComment);  // Check if profilePhoto is populated now
+
+        res.status(201).json({ message: "Comment added", comment: populatedComment });
     } catch (error) {
         console.error("Error adding comment:", error);
         res.status(500).json({ message: "Error adding comment", error });
@@ -233,44 +245,123 @@ const addComment = async (req, res) => {
 };
 
 
-// GET /api/posts/:postId/comments
+
+
+
 const fetchComments = async (req, res) => {
     const { postId } = req.params;
-    const { postType } = req.query; // postType is sent as a query parameter (either "admin" or "user")
+    const { postType } = req.query;
 
     try {
         let comments;
-        
+
         if (postType === "admin") {
-            // Fetch comments for an admin post
             comments = await SugPostComment.find({ post: postId })
                 .populate({
                     path: "user",
-                    model: "SugUser",
-                    select: "_id fullName",
-                })
-                .sort({ createdAt: -1 })
-                .lean();
+                    select: "fullName profilePhoto",
+                    transform: (doc) => {
+                        if (doc) {
+                            console.log("Profile Photo for User:", doc.profilePhoto); // Log the actual profile photo URL
+                            return {
+                                _id: doc._id,
+                                fullName: doc.fullName,
+                                profilePhoto: doc.profilePhoto, // Remove fallback temporarily for testing
+                            };
+                        }
+                        return null; // Handle missing user
+                    },
+                });
         } else if (postType === "user") {
-            // Fetch comments for a user post
             comments = await UserComment.find({ post: postId })
                 .populate({
                     path: "user",
-                    model: "User",
-                    select: "_id fullName",
-                })
-                .sort({ createdAt: -1 })
-                .lean();
+                    select: "fullName profilePhoto",
+                    transform: (doc) => {
+                        if (doc) {
+                            console.log("Profile Photo for User:", doc.profilePhoto); // Log for verification
+                            return {
+                                _id: doc._id,
+                                fullName: doc.fullName,
+                                profilePhoto: doc.profilePhoto,
+                            };
+                        }
+                        return null;
+                    },
+                });
         } else {
             return res.status(400).json({ message: "Invalid post type" });
         }
 
-        res.json(comments);
+        if (!comments.length) {
+            return res.status(404).json({ message: "No comments found for this post." });
+        }
+
+        // Build comment tree
+        const commentTree = comments.reduce((tree, comment) => {
+            const commentObj = { ...comment.toObject(), replies: [] };
+            if (!comment.parentComment) {
+                tree.push(commentObj);
+            } else {
+                const parent = tree.find(c => c._id.equals(comment.parentComment));
+                if (parent) {
+                    parent.replies.push(commentObj);
+                }
+            }
+            return tree;
+        }, []);
+
+        res.status(200).json({ comments: commentTree });
     } catch (error) {
         console.error("Error fetching comments:", error);
         res.status(500).json({ message: "Error fetching comments", error });
     }
 };
+
+
+
+
+
+
+
+// GET /api/posts/:postId/comments
+// const fetchComments = async (req, res) => {
+//     const { postId } = req.params;
+//     const { postType } = req.query; // postType is sent as a query parameter (either "admin" or "user")
+
+//     try {
+//         let comments;
+        
+//         if (postType === "admin") {
+//             // Fetch comments for an admin post
+//             comments = await SugPostComment.find({ post: postId })
+//                 .populate({
+//                     path: "user",
+//                     model: "SugUser",
+//                     select: "_id fullName",
+//                 })
+//                 .sort({ createdAt: -1 })
+//                 .lean();
+//         } else if (postType === "user") {
+//             // Fetch comments for a user post
+//             comments = await UserComment.find({ post: postId })
+//                 .populate({
+//                     path: "user",
+//                     model: "User",
+//                     select: "_id fullName",
+//                 })
+//                 .sort({ createdAt: -1 })
+//                 .lean();
+//         } else {
+//             return res.status(400).json({ message: "Invalid post type" });
+//         }
+
+//         res.json(comments);
+//     } catch (error) {
+//         console.error("Error fetching comments:", error);
+//         res.status(500).json({ message: "Error fetching comments", error });
+//     }
+// };
 
 
   

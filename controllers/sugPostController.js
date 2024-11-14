@@ -564,14 +564,16 @@ const fetchPostsForSchool = async (req, res) => {
         const allPostsWithLikes = await Promise.all(
             allPosts.map(async post => {
                 const likesWithDetails = await Promise.all(
-                    post.likes.map(async like => {
-                        const userLike = await User.findById(like._id).select("fullName");
-                        const adminLike = await SugUser.findById(like._id).select("sugFullName");
-                        return {
-                            _id: like._id,
-                            fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
-                        };
-                    })
+                    post.likes
+                        .filter(like => like) // Filter out null or undefined likes
+                        .map(async like => {
+                            const userLike = await User.findById(like._id).select("fullName");
+                            const adminLike = await SugUser.findById(like._id).select("sugFullName");
+                            return {
+                                _id: like._id,
+                                fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
+                            };
+                        })
                 );
                 return { ...post, likes: likesWithDetails };
             })
@@ -586,6 +588,7 @@ const fetchPostsForSchool = async (req, res) => {
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
 
 
 

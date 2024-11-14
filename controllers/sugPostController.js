@@ -85,6 +85,14 @@ const toggleLike = async (req, res) => {
     try {
         const { postId } = req.params;
         const { userId, adminId } = req.body;
+
+        console.log("userId:", userId, "adminId:", adminId);
+
+        // Check if at least one of userId or adminId is provided
+        if (!userId && !adminId) {
+            return res.status(400).json({ message: "Invalid liker ID" });
+        }
+
         const likerId = userId || adminId;
 
         // Find the post by ID
@@ -95,7 +103,7 @@ const toggleLike = async (req, res) => {
 
         // Check if the liker already exists in the post likes
         const alreadyLikedIndex = post.likes.findIndex(
-            like => like._id.toString() === likerId
+            like => like && like._id && like._id.toString() === likerId
         );
 
         // Toggle like
@@ -108,10 +116,10 @@ const toggleLike = async (req, res) => {
         // Save the updated post
         await post.save();
 
-        const postOwnerId = post.user ? post.user._id.toString() : post.adminId._id.toString();
+        const postOwnerId = post.user ? post.user._id.toString() : post.adminId?._id.toString();
 
         // Send notification to the post owner if liked by someone else
-        if (postOwnerId !== likerId) {
+        if (postOwnerId && postOwnerId !== likerId) {
             sendNotification(postOwnerId, {
                 type: "like",
                 message: `Your post was ${alreadyLikedIndex !== -1 ? "unliked" : "liked"}`,
@@ -120,23 +128,29 @@ const toggleLike = async (req, res) => {
             });
         }
 
-        // Collect unique liker IDs
-        const likerIds = post.likes.map(like => like._id);
+        // Collect unique liker IDs and filter out any undefined values
+        const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
 
         // Fetch user information from User collection for regular users
         const users = await User.find({ _id: { $in: likerIds } });
         
-        // Fetch admin information from SugUser collection only if adminId is provided
+        // Fetch admin information from SugUser collection for admins
         const admins = await SugUser.find({ _id: { $in: likerIds } });
+
+        // Convert the users and admins arrays to maps for quicker lookup
+        const userMap = new Map(users.map(user => [user._id.toString(), user.fullName]));
+        const adminMap = new Map(admins.map(admin => [admin._id.toString(), admin.sugFullName]));
 
         // Map the likes array to include fullName from User or SugUser, if available
         const updatedLikes = post.likes.map(like => {
-            const userLiker = users.find(user => user._id.toString() === like._id.toString());
-            const adminLiker = admins.find(admin => admin._id.toString() === like._id.toString());
+            if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true };
+            
+            const likeId = like._id.toString();
+            const fullName = userMap.get(likeId) || adminMap.get(likeId) || "Unknown Liker";
 
             return {
                 userId: like._id,
-                fullName: userLiker?.fullName || adminLiker?.sugFullName || "Unknown Liker",
+                fullName,
                 liked: true,
             };
         });
@@ -154,6 +168,9 @@ const toggleLike = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+
+
 
 
 

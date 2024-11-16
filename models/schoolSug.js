@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 const schoolSugSchema = new mongoose.Schema({
     sugFullName: {
         type: String,
-        required: true,  // Fixed typo from "require" to "required"
+        required: true,  
     },
     email: {
         type: String,
@@ -18,35 +18,35 @@ const schoolSugSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true,  // Ensure password is required
+        required: true,  
     },
     agreedToTerms: { 
         type: Boolean, 
         required: true, 
     },
-    role: {  // Add a dedicated field for the role
+    role: {  
         type: String,
-        enum: ["user", "admin"], // Specify allowed roles
-        default: "user", // Default role
+        enum: ["user", "admin"], 
+        default: "user", 
     },
 
     faculties: [
-        { type: Schema.Types.ObjectId, ref: 'Faculty' }  // References Faculty IDs
+        { type: Schema.Types.ObjectId, ref: 'Faculty' }  
       ],
       schoolInfo: { type: mongoose.Schema.Types.ObjectId, ref: 'SchoolInfo' },
     resetPasswordCode: {
         type: String,
-        required: false, // Optional if you want to reset
+        required: false, 
     },
     resetPasswordExpires: {
         type: Date,
-        required: false, // Optional
+        required: false, 
     },
    
   
 });
 
-// Hash password before saving
+
 schoolSugSchema.pre("save", async function (next) {
     if (!this.isModified("password")) {
         return next();

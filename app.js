@@ -8,7 +8,7 @@ require("dotenv").config();
 const admin = require('firebase-admin');
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
-const http = require("http"); // Import http module
+const http = require("http"); 
 const { initWebSocketServer } = require('./utils/websocket');
 
 const tempDir = path.join(__dirname, 'tmp');
@@ -59,10 +59,10 @@ app.use(session({
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.MONGO_URI,
-    collectionName: 'sessions', // Name of the session collection in MongoDB
+    collectionName: 'sessions', 
   }),
   cookie: {
-    maxAge: 1000 * 60 * 60 * 24, // Session duration (1 day)
+    maxAge: 1000 * 60 * 60 * 24, 
   },
 }));
 
@@ -83,16 +83,15 @@ app.use(notFound);
 app.use(methodNotAllowed);
 
 
-// Create HTTP server and initialize WebSocket
-const server = http.createServer(app); // Create HTTP server
-initWebSocketServer(server); // Initialize WebSocket with HTTP server
+// HTTP server and initialize WebSocket
+const server = http.createServer(app); 
+initWebSocketServer(server); 
 
 
 const start = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log("DB Connected");
-    // changing app.listen to server.listen to integrate web socket because app.listen does not work with it
     server.listen(port, () => {
       console.log(`Server is listening on port: ${port}`);
     });

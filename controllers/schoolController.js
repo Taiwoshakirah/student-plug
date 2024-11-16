@@ -22,51 +22,44 @@ const sendMail = require('../utils/sendMail')
 const schoolSugSignup = async (req, res, next) => {
     const { sugFullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
 
-    // Check for missing fields
     if (!sugFullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTerms) {
         return res.status(422).json({ message: "Input all fields" });
     }
 
-    // Check if passwords match
     if (password !== confirmPassword) {
         return res.status(400).json({ success: false, message: "Passwords do not match" });
     }
 
     try {
-        // Create a new user
         const newUser = await SugUser.create({
             sugFullName,
             email,
             phoneNumber,
             password,
             agreedToTerms,
-            role: "admin", // Set role to admin here
+            role: "admin", 
         });
 
-        // Optionally, you can hash the password here before storing (if not done already)
 
-        // Set session user ID (if using sessions)
+        // Set session user ID 
         req.session.userId = newUser._id; 
 
-        // Generate a token
-        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" }); // Adjust expiry as needed
+        const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: "3d" }); 
 
-        // Return response with token
         res.json({
             success: true,
             message: "User created successfully, proceed to university info",
             userId: newUser._id,
             role:"admin",
-            token // Include the token in the response
+            token 
         });
     } catch (error) {
         console.error("User signup error:", error);
         if (error.code === 11000) {
-            // Handle duplicate key error (e.g., email or phone number already exists)
             const field = Object.keys(error.keyPattern)[0];
             return res.status(400).json({ success: false, message: "User already exists" });
         }
-        next(error); // Pass error to error handler
+        next(error); 
     }
 };
 
@@ -86,19 +79,17 @@ const schoolInformation = async (req, res, next) => {
         return res.status(422).json({ message: "All school details are required" });
     }
 
-    // Path to temporarily store the file
+    //  to temporarily store the file
     const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
 
     // Moving the uploaded file to the desired location
     await uniProfilePicture.mv(tempPath);
 
     try {
-        const uploadResult = await uploadToCloudinary(tempPath); // Use your function to upload
+        const uploadResult = await uploadToCloudinary(tempPath); 
 
-        // Extracting the URL from the upload result
-        const imageUrl = uploadResult.secure_url; // Cloudinary returns a secure URL for the image
+        const imageUrl = uploadResult.secure_url; 
 
-        // Creating the school data with the image URL
         const schoolData = await SchoolInfo.create({
             userId,
             university,
@@ -125,7 +116,6 @@ const schoolInformation = async (req, res, next) => {
 
 
 const uploadStudentsRegNo = async (req, res) => {
-    // Process facultyName as an array
     let facultyNames = req.body["facultyName[]"];
     if (!Array.isArray(facultyNames)) {
         facultyNames = facultyNames ? [facultyNames] : [];
@@ -137,7 +127,7 @@ const uploadStudentsRegNo = async (req, res) => {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    // Fetch school information and ensure selectedFaculties is array
+    // Fetching school information and also ensuring selectedFaculties is array
     const { schoolInfoId } = req.body;
     let selectedFaculties = req.body["selectedFaculties[]"];
     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
@@ -153,7 +143,7 @@ const uploadStudentsRegNo = async (req, res) => {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Fetch all faculties based on selectedFaculties
+    // Fetching all faculties based on selectedFaculties
     const faculties = await Faculty.find({ _id: { $in: selectedFaculties } });
     console.log("Selected faculties retrieved:", faculties);
 
@@ -161,7 +151,7 @@ const uploadStudentsRegNo = async (req, res) => {
         return res.status(400).json({ message: "No valid faculties found for selection" });
     }
 
-    // Proceed with file upload and processing
+    // Proceeding with file upload and processing
     if (!req.files || !req.files.file) {
         return res.status(400).send("No files were uploaded.");
     }
@@ -223,12 +213,12 @@ const uploadStudentsRegNo = async (req, res) => {
         return res.status(500).send("Error processing file.");
     }
 
-    // Save selected faculties with school information
+    // Saving of selected faculties with school information
 try {
     const updatedSchoolData = await SchoolInfo.findByIdAndUpdate(
         schoolInfoId,
         { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } },
-        { new: true } // This option returns the modified document
+        { new: true } 
     );
 
     if (!updatedSchoolData) {
@@ -247,29 +237,27 @@ try {
 
 };
 
-// Validate registration numbers
 const isValidRegNumber = (regNum) => {
     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
     return regNum && regNumberPattern.test(regNum);
 };
 
-// Function to handle file processing completion and saving to the database
 const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolInfoId, tempPath, res) => {
     try {
         console.log("Registration numbers being processed:", registrationNumbers);
         const studentsToInsert = [];
-        const insertedRegNumbers = new Set(); // Track inserted reg numbers
+        const insertedRegNumbers = new Set(); 
 
         for (const faculty of facultyDocs) {
             const facultyId = faculty._id;
 
-            // Retrieve existing students across all faculties with matching reg numbers
+            // Retrieving existing students across all faculties with matching reg numbers
             const existingStudents = await Student.find({
                 registrationNumber: { $in: registrationNumbers },
             });
             const existingRegNums = new Set(existingStudents.map(student => student.registrationNumber));
 
-            // Filter and prepare new students only if the reg number doesn't already exist
+            // Filtering and preparing new students only if the reg number doesn't already exist
             for (const regNum of registrationNumbers) {
                 if (!existingRegNums.has(regNum) && !insertedRegNumbers.has(regNum)) {
                     studentsToInsert.push({
@@ -277,7 +265,7 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
                         faculty: facultyId,
                         schoolInfo: schoolInfoId,
                     });
-                    insertedRegNumbers.add(regNum); // Mark this reg number as processed
+                    insertedRegNumbers.add(regNum); 
                 } else {
                     console.log(`Duplicate: ${regNum} for faculty ${faculty.facultyName}`);
                 }
@@ -298,7 +286,7 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
             }
         }
 
-        // Link inserted students to the SchoolInfo
+        // Linking inserted students to the SchoolInfo
         if (insertedStudents.length > 0) {
             await SchoolInfo.findByIdAndUpdate(
                 schoolInfoId,
@@ -326,14 +314,13 @@ const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolI
 
 
 const addFaculty = async (req, res) => {
-    const { facultyNames } = req.body; // Expecting an array of faculty names
+    const { facultyNames } = req.body; 
 
     if (!Array.isArray(facultyNames) || facultyNames.length === 0) {
         return res.status(400).json({ message: "An array of faculty names is required." });
     }
 
     try {
-        // Create an array of faculty objects to be inserted
         const facultiesToAdd = facultyNames.map(name => ({ facultyName: name }));
         const newFaculties = await Faculty.insertMany(facultiesToAdd);
         
@@ -347,18 +334,7 @@ const addFaculty = async (req, res) => {
 
 
 
-//, { _id: 1, facultyName: 1 }
-  
-// const getFaculty = async (req, res) => {
-//     const { schoolId } = req.params;
-//     try {
-//         const faculties = await Faculty.find({ schoolId });
-//         res.status(200).json(faculties);
-//     } catch (error) {
-//         console.error("Error fetching faculties:", error);
-//         res.status(500).json({ message: "Error fetching faculties." });
-//     }
-// };
+
 
 const getFaculty = async (req, res) => {
     try {
@@ -382,10 +358,8 @@ const getSugUser = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Fetch school information based on userId
         const school = await schoolInfo.findOne({ userId });
 
-        // Prepare the profile photo URL from the schoolInfo model
         const profilePhotoUrl = school?.uniProfilePicture || null;
 
         res.status(200).json({
@@ -425,14 +399,14 @@ const getSugUser = async (req, res) => {
         return res.status(401).json({ message: "Password incorrect" });
       }
   
-      // Fetch schoolInfo to get the profile picture
+      // Fetching schoolInfo to get the profile picture
       const school = await SchoolInfo.findOne({ userId: user._id });
       if (!school) {
         console.log("No school information found for this user.");
         return res.status(404).json({ message: "School information not found" });
       }
   
-      // Extract the correct profile picture URL
+      // Extracting the correct profile picture URL
       const profilePhotoUrl = school.uniProfilePicture || null;
       console.log("Fetched profile picture:", profilePhotoUrl); 
   
@@ -446,14 +420,6 @@ const getSugUser = async (req, res) => {
         message: "You have successfully signed in"
       });
   
-    //   res.status(200).json({
-    //     token,
-    //     user: {
-    //       _id: user._id,
-    //       email: user.email,
-    //       avatar: profilePhotoUrl, 
-    //     },
-    //   });
     } catch (error) {
       console.error("Error during sign-in:", error);
       res.status(500).json({ message: "Internal Server Error" });
@@ -469,16 +435,16 @@ const getSugUser = async (req, res) => {
             return res.status(400).json({ success: false, message: "User ID is required." });
         }
 
-        // Fetch the user and populate schoolInfo along with faculties and students
+        // Fetching the user and populating schoolInfo along with faculties and students
         const user = await SugUser.findById(userId)
             .populate({
                 path: 'schoolInfo',
                 populate: [
-                    { path: 'faculties', select: '_id facultyName' },  // Use facultyName instead of name
+                    { path: 'faculties', select: '_id facultyName' },  
                     {
                         path: 'students',
                         select: 'registrationNumber faculty',
-                        populate: { path: 'faculty', select: '_id facultyName' } // Use facultyName here as well
+                        populate: { path: 'faculty', select: '_id facultyName' } 
                     }
                 ]
             });
@@ -487,12 +453,11 @@ const getSugUser = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        // Check if schoolInfo exists
         if (!user.schoolInfo) {
             return res.status(404).json({ success: false, message: "School information not found for this user" });
         }
 
-        // Filter out duplicate registration numbers in students
+        // Filtering out of duplicate registration numbers in students
         const uniqueStudents = [];
         const seenRegistrationNumbers = new Set();
 
@@ -501,15 +466,14 @@ const getSugUser = async (req, res) => {
                 seenRegistrationNumbers.add(student.registrationNumber);
                 uniqueStudents.push({
                     registrationNumber: student.registrationNumber,
-                    // facultyId: student.faculty ? student.faculty._id : null,
                 });
             }
         });
 
-        // Map faculties to include both facultyId and facultyName
+        // Maping faculties to include both facultyId and facultyName
         const faculties = user.schoolInfo.faculties.map(faculty => ({
             facultyId: faculty._id,
-            facultyName: faculty.facultyName // Updated to access facultyName
+            facultyName: faculty.facultyName 
         }));
 
         return res.status(200).json({
@@ -520,7 +484,7 @@ const getSugUser = async (req, res) => {
                     fullName: user.sugFullName,
                     email: user.email,
                     phoneNumber: user.phoneNumber,
-                    faculties: faculties, // Including both facultyId and facultyName
+                    faculties: faculties, 
                     students: uniqueStudents
                 },
                 university: user.schoolInfo.university,
@@ -547,7 +511,6 @@ const getSugUser = async (req, res) => {
     try {
         let user;
 
-        // Find the user by email 
         if (email) {
             user = await SugUser.findOne({ email });
         }
@@ -556,25 +519,22 @@ const getSugUser = async (req, res) => {
             return res.status(400).json({ message: "User with this email does not exist" });
         }
 
-        // Generate a new 4-digit reset code (regenerate on every resend request)
         const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-        // Hash the reset code and set expiration
         user.resetPasswordCode = crypto.createHash('sha256').update(resetCode).digest('hex');
-        user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiration
+        user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; 
 
-        // Log the hashed code and expiration time for debugging
-        console.log("Hashed reset code saved:", user.resetPasswordCode);  // Log the hashed code
-        console.log("Reset password expires at:", new Date(user.resetPasswordExpires)); // Log the expiration time
+        console.log("Hashed reset code saved:", user.resetPasswordCode);  
+        console.log("Reset password expires at:", new Date(user.resetPasswordExpires)); 
 
-        await user.save(); // Ensure that you are saving the user document
+        await user.save(); 
 
         // Send the plain-text reset code via email 
         if (email) {
             const options = {
                 email: email,
                 subject: "Password Reset Code",
-                text: `Your password reset code is ${resetCode}`,  // Send the plain-text code
+                text: `Your password reset code is ${resetCode}`,  
             };
             await sendMail(options);
         }
@@ -596,7 +556,7 @@ const schoolverifyResetCode = async (req, res, next) => {
 
     try {
         const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
-        console.log("Hashed code provided by user:", hashedCode);  // Log the hashed code for comparison
+        console.log("Hashed code provided by user:", hashedCode);  
 
         // Find the user with the hashed code and valid expiration time
         const user = await SugUser.findOne({
@@ -604,19 +564,16 @@ const schoolverifyResetCode = async (req, res, next) => {
             resetPasswordExpires: { $gt: Date.now() },
         });
 
-        // Log the current time and the expiration time for debugging
         console.log("Current time:", Date.now());
-        console.log("Expiration time:", user ? user.resetPasswordExpires : null); // Log if user is found
+        console.log("Expiration time:", user ? user.resetPasswordExpires : null); 
 
         if (!user) {
             console.log("User not found or code expired");
             return res.status(400).json({ message: "Invalid or expired reset code" });
         }
 
-        // Log the found user details for debugging
         console.log("User found for verification:", user);
 
-        // Return the user ID or a temporary token after code verification
         res.status(200).json({ message: "Code verified successfully", userId: user._id });
     } catch (error) {
         console.error("Error in verifyResetCode:", error);
@@ -628,25 +585,21 @@ const schoolverifyResetCode = async (req, res, next) => {
 const schoolresetPassword = async (req, res, next) => {
     const { userId, password, confirmPassword } = req.body;
   
-    // Check for required fields
     if (!userId || !password || !confirmPassword) {
       return res.status(400).json({ message: "User ID, Password, and Confirm Password are required" });
     }
   
-    // Ensure the passwords match
     if (password !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
   
     try {
-      // Find the user by userId
       const user = await SugUser.findById(userId);
   
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
   
-      // Proceed with password reset
       user.password = password; 
       user.resetPasswordCode = undefined;  
       user.resetPasswordExpires = undefined;

@@ -1,4 +1,3 @@
-// models/userPost.js
 const mongoose = require('mongoose');
 
 const userPostSchema = new mongoose.Schema({
@@ -22,7 +21,7 @@ const userPostSchema = new mongoose.Schema({
     },
     comments: [{ 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'UserComment'  // Refers to 'UserComment' model
+        ref: 'UserComment'  
     }],
     shares: [{ 
         type: mongoose.Schema.Types.ObjectId, 

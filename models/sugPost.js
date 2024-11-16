@@ -1,10 +1,10 @@
-// SugPost Schema
+
 const mongoose = require("mongoose");
 
 const sugPostSchema = new mongoose.Schema({
     adminId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "SugUser", // Reference to admin users
+        ref: "SugUser", 
         required: true,
     },
     text: { 
@@ -28,23 +28,14 @@ const sugPostSchema = new mongoose.Schema({
         type: Number, 
         default: 0 
     },
-    schoolInfoId: {  // Add this line
+    schoolInfoId: {  
         type: mongoose.Schema.Types.ObjectId,
         ref: "SchoolInfo",
         required: true
     }
 });
 
-// Virtual for comments
-sugPostSchema.virtual("comments", {
-    ref: "SugPostComment", // Reference to the comments collection
-    localField: "_id", // The field in the SugPost model
-    foreignField: "postId" // The field in the SugPostComment model
-});
 
-// Ensure virtuals are included when converting documents to JSON or Objects
-sugPostSchema.set("toJSON", { virtuals: true });
-sugPostSchema.set("toObject", { virtuals: true });
 
 module.exports = mongoose.model("SugPost", sugPostSchema);
 

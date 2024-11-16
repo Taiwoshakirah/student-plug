@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const SugUser = require("../models/schoolSug"); // Adjust the path to your model
+const mongoose = require("mongoose");
+const SugUser = require("../models/schoolSug");
 
 const verifySugToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -12,17 +13,24 @@ const verifySugToken = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await SugUser.findById(decoded.userId).select("-password");
-        
+
+        // Casting userId to ObjectId
+        const userId = mongoose.Types.ObjectId.isValid(decoded.userId)
+            ?new mongoose.Types.ObjectId(decoded.userId)
+            : decoded.userId;
+
+        const user = await SugUser.findById(userId).select("-password");
+
         if (!user) {
             return res.status(401).json({ message: "User not found" });
         }
 
         req.user = {
             userId: user._id,
-            role: user.role, // Attach the role to req.user
+            role: user.role,
         };
 
+        console.log("Authenticated User:", req.user);
         next();
     } catch (error) {
         console.error("Token verification error:", error);

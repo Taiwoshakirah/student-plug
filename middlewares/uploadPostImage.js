@@ -13,10 +13,10 @@ if (!fs.existsSync(postUploadsDir)) {
 // Set storage engine for post image uploads
 const postStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, postUploadsDir); // Save post images to uploads/posts directory
+        cb(null, postUploadsDir); 
     },
     filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Append timestamp to filename
+        cb(null, Date.now() + path.extname(file.originalname)); 
     }
 });
 

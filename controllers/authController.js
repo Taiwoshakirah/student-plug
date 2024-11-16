@@ -16,10 +16,8 @@ const admin = require('firebase-admin');
 const signUp = async (req, res, next) => {
   const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
   
-  // Convert agreedToTerms to boolean if it's a string
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
-  // Validate required fields for non-Google sign-up
   if (!idToken && (!fullName || !email || !phoneNumber || !password || !confirmPassword || !agreedToTermsBool)) {
     return res.status(422).json({ success: false, message: "Input all fields" });
   }
@@ -28,13 +26,11 @@ const signUp = async (req, res, next) => {
     return res.status(400).json({ success: false, message: "You must agree to the terms and conditions" });
   }
 
-  // Google sign-up logic
   if (idToken) {
     try {
       const decodedToken = await admin.auth().verifyIdToken(idToken, true);
       const { uid, email: googleEmail, name, picture } = decodedToken;
 
-      // Check if the user already exists
       const existingUser = await User.findOne({ email: googleEmail });
       if (existingUser) {
         if (existingUser.googleId) {
@@ -44,7 +40,6 @@ const signUp = async (req, res, next) => {
         }
       }
 
-      // Create new user with Google sign-up details
       const newUser = await User.create({
         fullName: name,
         email: googleEmail,
@@ -139,19 +134,16 @@ const studentInformation = async (req, res) => {
   }
 
   try {
-    // Find the user by ID
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Find the schoolInfo based on university name
     const schoolInfo = await SchoolInfo.findOne({ university }).exec();
     if (!schoolInfo) {
       return res.status(404).json({ message: "School not found" });
     }
 
-    // Create new StudentInfo
     const newStudentInfo = new StudentInfo({
       userId,
       university,
@@ -160,18 +152,17 @@ const studentInformation = async (req, res) => {
       level,
       yearOfAdmission: formatDate(yearOfAdmission),
       yearOfGraduation: formatDate(yearOfGraduation),
-      schoolInfoId: schoolInfo._id, // Assign correct schoolInfoId
+      schoolInfoId: schoolInfo._id, 
     });
 
-    // Save StudentInfo
+    //StudentInfo saved
     const savedStudentInfo = await newStudentInfo.save();
 
-    // Update the user's schoolInfoId
+    // user's schoolInfoId Updated
     user.studentInfo = savedStudentInfo._id;
     user.schoolInfoId = schoolInfo._id;
     await user.save();
 
-    // Redirect URL
     const redirectUrl = `/dashboard/school/${schoolInfo.university}`;
 
     res.status(201).json({
@@ -207,24 +198,22 @@ const uploadProfilePicture = async (req, res) => {
 
     const profilePhoto = req.files.profilePhoto;
 
-    // Define the upload path
     const uploadDir = path.join(__dirname, "uploads/profiles");
     const uploadPath = path.join(uploadDir, profilePhoto.name);
 
-    // Ensure the uploads directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Move the file to the desired location
+    // the file is Moved to the desired location
     await profilePhoto.mv(uploadPath);
 
-    // Upload to Cloudinary using the helper function
+    // user's profile picture is uploaded to cloudinary using the helper function
     const result = await uploadToCloudinary(uploadPath);
 
     const profilePhotoPath = result.secure_url;
 
-    // Update the user's profile photo in the database
+    //user's profile photo is Updated in the database
     await User.findByIdAndUpdate(userId, { profilePhoto: profilePhotoPath }, { new: true });
 
     return res.status(200).json({
@@ -239,30 +228,25 @@ const uploadProfilePicture = async (req, res) => {
 
 
 
-// Middleware to fetch school-specific data
 const getSchoolDashboard = async (req, res) => {
-  // Extract userId from the decoded token
-  const userId = req.user.userId; // Corrected to use userId instead of id
+  const userId = req.user.userId; 
   try {
-    // Check if user is authenticated
+    // Checking if user is authenticated
     if (!req.user || !userId) {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
-    // Fetch the user from the database and populate the schoolInfoId field
+    // Fetching of the the user from the database and populate the schoolInfoId field
     const user = await User.findById(userId).populate("schoolInfoId");
 
-    // Check if the user exists
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check if the user has associated school information
+    // Checking if the user has associated school information
     if (!user.schoolInfoId) {
       return res.status(400).json({ message: "School information not available" });
     }
-
-    // Generate the dashboard URL using the university field
     const schoolDashboardUrl = `/dashboard/${user.schoolInfoId.university}`;
     res.json({ redirectUrl: schoolDashboardUrl });
   } catch (error) {
@@ -288,12 +272,12 @@ const signin = async (req, res) => {
   if (email) {
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (isEmail) {
-      user = await User.findOne({ email }).populate("schoolInfoId"); // Populate schoolInfoId
+      user = await User.findOne({ email }).populate("schoolInfoId"); 
     }
   } else if (phoneNumber) {
     const parsedPhone = parsePhoneNumberFromString(phoneNumber, "NG");
     if (parsedPhone && parsedPhone.isValid()) {
-      user = await User.findOne({ phoneNumber: parsedPhone.number }).populate("schoolInfoId"); // Populate schoolInfoId
+      user = await User.findOne({ phoneNumber: parsedPhone.number }).populate("schoolInfoId");
     }
   }
 
@@ -312,13 +296,12 @@ const signin = async (req, res) => {
     expiresIn: "3d",
   });
 
-  // Assuming user's schoolInfoId contains their university or school name
   const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;
 
 
   res.status(200).json({
     token,
-    redirectUrl, // Add the redirect URL to the response
+    redirectUrl, 
     data: {
       _id: user._id,
       email: user.email,
@@ -340,8 +323,8 @@ const googleSignIn = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
 
-    // Check if the user already exists
-    let user = await User.findOne({ googleId: uid }).populate("schoolInfoId"); // Populate schoolInfoId
+    // Checking if the user already exists
+    let user = await User.findOne({ googleId: uid }).populate("schoolInfoId"); 
 
 
     if (!user) {
@@ -357,13 +340,12 @@ const googleSignIn = async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
-    // Assuming user's schoolInfoId contains their university or school name
   const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;
 
 
     return res.status(200).json({
       message: "Success",
-      redirectUrl, // Add the redirect URL to the response
+      redirectUrl,
       user: {
         _id: user._id,
         email: user.email,
@@ -422,7 +404,6 @@ const forgotPassword = async (req, res, next) => {
   try {
     let user;
 
-    // Find the user by email or phone number
     if (email) {
       user = await User.findOne({ email });
     } else if (phoneNumber) {
@@ -433,29 +414,25 @@ const forgotPassword = async (req, res, next) => {
       return res.status(400).json({ message: "User with this email or phone number does not exist" });
     }
 
-    // Block password reset for Google accounts
     if (user.googleId) {
       return res.status(400).json({ message: "Password reset is not allowed for Google accounts" });
     }
 
-    // Generate a new 4-digit reset code (regenerate on every resend request)
     const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    // Hash the reset code and set expiration
     user.resetPasswordCode = crypto.createHash('sha256').update(resetCode).digest('hex');
     user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiration
     await user.save();
 
-    // Send the plain-text reset code via email or SMS
     if (email) {
       const options = {
         email: email,
         subject: "Password Reset Code",
-        text: `Your password reset code is ${resetCode}`,  // Send the plain-text code
+        text: `Your password reset code is ${resetCode}`,  
       };
       await sendMail(options);
     } else if (phoneNumber) {
-      await sendSMS(phoneNumber, `Your password reset code is ${resetCode}`);  // Send the plain-text code
+      await sendSMS(phoneNumber, `Your password reset code is ${resetCode}`);  
     }
 
     res.status(200).json({ message: "Password reset code sent successfully" });
@@ -487,7 +464,6 @@ const verifyResetCode = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid or expired reset code" });
     }
 
-    // Return the user ID or a temporary token after code verification
     res.status(200).json({ message: "Code verified successfully", userId: user._id });
   } catch (error) {
     console.error("Error in verifyResetCode:", error);
@@ -502,18 +478,15 @@ const verifyResetCode = async (req, res, next) => {
 const resetPassword = async (req, res, next) => {
   const { userId, password, confirmPassword } = req.body;
 
-  // Check for required fields
   if (!userId || !password || !confirmPassword) {
     return res.status(400).json({ message: "User ID, Password, and Confirm Password are required" });
   }
 
-  // Ensure the passwords match
   if (password !== confirmPassword) {
     return res.status(400).json({ message: "Passwords do not match" });
   }
 
   try {
-    // Find the user by userId
     const user = await User.findById(userId);
 
     if (!user) {

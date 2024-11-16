@@ -1,4 +1,3 @@
-// models/userComment.js
 const mongoose = require('mongoose');
 
 const userCommentSchema = new mongoose.Schema({
@@ -16,7 +15,11 @@ const userCommentSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    parentComment: { type: mongoose.Schema.Types.ObjectId, ref: 'UserComment', default: null }, // For nested comments
+    parentComment: { type: mongoose.Schema.Types.ObjectId, ref: 'UserComment', default: null }, 
+    replies: [{ 
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'UserComment' 
+    }],
     createdAt: {
         type: Date,
         default: Date.now,

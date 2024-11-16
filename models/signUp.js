@@ -27,12 +27,14 @@ const userSchema =new mongoose.Schema({
   },
   profilePhoto: { 
     type: String, 
-    default: null 
+    default: null
   },
 
   googleId: { 
     type: String, 
-    unique: true }, 
+    unique: true,
+    sparse: true
+   }, 
 
   resetPasswordCode: { 
     type: String 
@@ -46,15 +48,10 @@ const userSchema =new mongoose.Schema({
   },
   studentInfo: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "StudentInfo" // Reference to StudentInfo model
+    ref: "StudentInfo" 
   }
   
   
-  
-  // schoolInfoId: { // Add this field
-  //   type: mongoose.Schema.Types.ObjectId,
-  //   ref: "StudentInfo" // Reference the StudentInfo model
-  // }
 });
 
 userSchema.pre("save", async function (next) {

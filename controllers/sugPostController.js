@@ -2,23 +2,24 @@ const SugPost = require('../models/sugPost')
 const SugPostComment = require('../models/sugComment')
 const { promisify } = require("util");
 const cloudinary = require("cloudinary");
-const { uploadToCloudinary } = require("../config/cloudinaryConfig"); // Correctly import the function
+const { uploadToCloudinary } = require("../config/cloudinaryConfig"); 
 const fs = require("fs");;
 const mongoose = require('mongoose');
 const Roles = require('../middlewares/role');
 const User = require('../models/signUp')
 const SugUser = require('../models/schoolSug')
-const { Types: { ObjectId } } = require('mongoose'); // Make sure to import ObjectId
+const { Types: { ObjectId } } = require('mongoose'); 
 const SchoolInfo = require('../models/schoolInfo')
 const UserPost = require('../models/post')
 const UserComment = require('../models/comment');
 const { sendNotification } = require('../utils/websocket');
+const Comment = require('../models/allComment')
 
 
 
 const createSugPost = async (req, res) => {
-    const { adminId, text, schoolInfoId } = req.body; // Add schoolInfoId here
-    if (!adminId || !text || !schoolInfoId) { // Include schoolInfoId in validation
+    const { adminId, text, schoolInfoId } = req.body; 
+    if (!adminId || !text || !schoolInfoId) { 
         return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
     }
 
@@ -44,7 +45,7 @@ const createSugPost = async (req, res) => {
                     console.error("Failed to upload image to Cloudinary:", result);
                 }
 
-                // Temporary file deleted   
+                // Temporary file deletion  
                 fs.unlink(tempFilePath, (unlinkErr) => {
                     if (unlinkErr) {
                         console.error("Error deleting temporary file:", unlinkErr);
@@ -54,18 +55,17 @@ const createSugPost = async (req, res) => {
         }
         console.log("Final image URLs to be saved:", imageUrls);
 
-        // Create post with all image URLs and schoolInfoId
+        //post Created with all image URLs and schoolInfoId
         const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
         await post.save();
 
-        // Fetch the post with populated school information (uniProfilePicture and university name)
         const populatedPost = await SugPost.findById(post._id)
             .populate({
                 path: "schoolInfoId",
                 select: "university uniProfilePicture",
                 model: "SchoolInfo"
             })
-            .populate("adminId", "sugFullName email"); // Optionally, populate admin info
+            .populate("adminId", "sugFullName email");
 
         res.status(201).json({ message: "Post created", post: populatedPost });
     } catch (error) {
@@ -88,37 +88,32 @@ const toggleLike = async (req, res) => {
 
         console.log("userId:", userId, "adminId:", adminId);
 
-        // Check if at least one of userId or adminId is provided
         if (!userId && !adminId) {
             return res.status(400).json({ message: "Invalid liker ID" });
         }
 
         const likerId = userId || adminId;
 
-        // Find the post by ID
         const post = await UserPost.findById(postId) || await SugPost.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        // Check if the liker already exists in the post likes
         const alreadyLikedIndex = post.likes.findIndex(
             like => like && like._id && like._id.toString() === likerId
         );
 
-        // Toggle like
         if (alreadyLikedIndex !== -1) {
-            post.likes.splice(alreadyLikedIndex, 1);  // Remove like
+            post.likes.splice(alreadyLikedIndex, 1);  
         } else {
-            post.likes.push({ _id: likerId });  // Add like
+            post.likes.push({ _id: likerId });  
         }
 
-        // Save the updated post
         await post.save();
 
         const postOwnerId = post.user ? post.user._id.toString() : post.adminId?._id.toString();
 
-        // Send notification to the post owner if liked by someone else
+        // Send notification to the post owner if liked by someone else(websocket here also)
         if (postOwnerId && postOwnerId !== likerId) {
             sendNotification(postOwnerId, {
                 type: "like",
@@ -128,20 +123,16 @@ const toggleLike = async (req, res) => {
             });
         }
 
-        // Collect unique liker IDs and filter out any undefined values
         const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
 
-        // Fetch user information from User collection for regular users
         const users = await User.find({ _id: { $in: likerIds } });
         
-        // Fetch admin information from SugUser collection for admins
         const admins = await SugUser.find({ _id: { $in: likerIds } });
 
-        // Convert the users and admins arrays to maps for quicker lookup
         const userMap = new Map(users.map(user => [user._id.toString(), user.fullName]));
         const adminMap = new Map(admins.map(admin => [admin._id.toString(), admin.sugFullName]));
 
-        // Map the likes array to include fullName from User or SugUser, if available
+        // Maping the likes array to include fullName from User or SugUser
         const updatedLikes = post.likes.map(like => {
             if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true };
             
@@ -173,212 +164,282 @@ const toggleLike = async (req, res) => {
 
 
 
-
-
-
-
-
-
 // const addComment = async (req, res) => {
 //     const { postId } = req.params;
-//     const text = req.body.text;
-
-//     const userId = req.user.userId; 
-//     const role = req.user.role; 
-//     if (!userId) {
-//         return res.status(400).json({ message: "User ID is required" });
-//     }
-//     if (!text) {
-//         return res.status(400).json({ message: "Comment text is required" });
-//     }
-
-//     const isAdmin = role === "admin"; 
+//     const { postType, text, userId, parentCommentId } = req.body;
 
 //     try {
-//         const comment = new SugPostComment({ postId, userId, text, isAdmin, role });
-//         await comment.save();
+//         if (!postId || !userId || !text) {
+//             return res.status(400).json({ message: "postId, userId, and text are required" });
+//         }
 
-//         await SugPost.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+//         let newComment;
 
-//         res.status(201).json({ message: "Comment added", comment });
+//         if (postType === "admin") {
+//             newComment = await SugPostComment.create({
+//                 post: postId,
+//                 text,
+//                 admin: userId,
+//                 parentComment: parentCommentId || null,
+//                 createdAt: new Date(),
+//             });
+//         } else if (postType === "user") {
+//             newComment = await SugPostComment.create({
+//                 post: postId,
+//                 text,
+//                 user: userId,
+//                 parentComment: parentCommentId || null,
+//                 createdAt: new Date(),
+//             });
+//         } else {
+//             return res.status(400).json({ message: "Invalid post type" });
+//         }
+
+//         if (parentCommentId) {
+//             await SugPostComment.findByIdAndUpdate(parentCommentId, {
+//                 $push: { replies: newComment._id },
+//             });
+//         }
+
+//         const populatedComment = await newComment.populate(postType === "admin" ? {
+//     path: 'admin',
+//     select: 'sugfullName uniProfilePicture',
+// } : {
+//     path: 'user',
+//     select: 'fullName profilePhoto',
+// });
+
+
+//         res.status(201).json({ message: "Comment added", comment: populatedComment });
 //     } catch (error) {
 //         console.error("Error adding comment:", error);
-//         res.status(500).json({ message: "Error commenting on post", error });
+//         res.status(500).json({ message: "Error adding comment", error });
 //     }
 // };
 
-// POST /api/posts/:postId/comments
+
+
+// const fetchComments = async (req, res) => {
+//     const { postId } = req.params;
+//     const { postType } = req.query;
+
+//     try {
+//         let comments;
+
+//         if (postType === "admin") {
+//             comments = await SugPostComment.find({ post: postId })
+//                 .populate({
+//                     path: "user",
+//                     select: "fullName profilePhoto",
+//                     transform: (doc) => {
+//                         if (doc) {
+//                             console.log("Profile Photo for User:", doc.profilePhoto); // Log the actual profile photo URL
+//                             return {
+//                                 _id: doc._id,
+//                                 fullName: doc.fullName,
+//                                 profilePhoto: doc.profilePhoto, // Remove fallback temporarily for testing
+//                             };
+//                         }
+//                         return null; // Handle missing user
+//                     },
+//                 });
+//         } else if (postType === "user") {
+//             comments = await UserComment.find({ post: postId })
+//                 .populate({
+//                     path: "user",
+//                     select: "fullName profilePhoto",
+//                     transform: (doc) => {
+//                         if (doc) {
+//                             console.log("Profile Photo for User:", doc.profilePhoto); // Log for verification
+//                             return {
+//                                 _id: doc._id,
+//                                 fullName: doc.fullName,
+//                                 profilePhoto: doc.profilePhoto,
+//                             };
+//                         }
+//                         return null;
+//                     },
+//                 });
+//         } else {
+//             return res.status(400).json({ message: "Invalid post type" });
+//         }
+
+//         if (!comments.length) {
+//             return res.status(404).json({ message: "No comments found for this post." });
+//         }
+
+//         // Build comment tree
+//         const commentTree = comments.reduce((tree, comment) => {
+//             const commentObj = { ...comment.toObject(), replies: [] };
+//             if (!comment.parentComment) {
+//                 tree.push(commentObj);
+//             } else {
+//                 const parent = tree.find(c => c._id.equals(comment.parentComment));
+//                 if (parent) {
+//                     parent.replies.push(commentObj);
+//                 }
+//             }
+//             return tree;
+//         }, []);
+
+//         res.status(200).json({ comments: commentTree });
+//     } catch (error) {
+//         console.error("Error fetching comments:", error);
+//         res.status(500).json({ message: "Error fetching comments", error });
+//     }
+// };
+
+
 const addComment = async (req, res) => {
     const { postId } = req.params;
-    const { postType, text, userId, parentCommentId } = req.body;
+    const { text, userId, isAdmin, parentCommentId } = req.body;
 
     try {
         if (!postId || !userId || !text) {
-            return res.status(400).json({ message: "postId, userId, and text are required" });
+            return res.status(400).json({ message: "postId, userId, and text are required." });
         }
 
-        let newComment;
+        const isAdminFlag = isAdmin === true || isAdmin === "true"; // Handle different types
+        const commentData = {
+            post: postId,
+            text,
+            parentComment: parentCommentId || null,
+            isAdmin: isAdminFlag,
+            ...(isAdminFlag ? { admin: userId } : { user: userId }),
+        };
+
+        const newComment = await Comment.create(commentData);
+
+        if (parentCommentId) {
+            await Comment.findByIdAndUpdate(parentCommentId, {
+                $push: { replies: newComment._id },
+            });
+        }
+
+        const populatedComment = await newComment.populate([
+            {
+                path: "user",
+                model: "User",
+                select: "fullName profilePhoto",
+            },
+            {
+                path: "admin",
+                model: "SugUser",
+                populate: {
+                    path: "schoolInfo", // Populate schoolInfo from SchoolInfo collection
+                    model: "SchoolInfo",
+                    select: "uniProfilePicture", // Select only uniProfilePicture
+                },
+                select: "sugFullName schoolInfo", // Ensure schoolInfo is included
+            },
+        ]);
         
-        if (postType === "admin") {
-            // Commenting on an admin post
-            newComment = await SugPostComment.create({
-                post: postId,
-                text,
-                user: userId,
-                isAdmin: true,
-                parentComment: parentCommentId || null,
-                createdAt: new Date(),
-            });
-        } else if (postType === "user") {
-            // Commenting on a user post
-            newComment = await UserComment.create({
-                post: postId,
-                text,
-                user: userId,
-                parentComment: parentCommentId || null,
-                createdAt: new Date(),
-            });
-        } else {
-            return res.status(400).json({ message: "Invalid post type" });
-        }
 
-        // Debugging: Log the user and its profile photo before population
-        const user = await User.findById(userId);
-        console.log("User Before Population:", user);
-
-        // Populate the user with profile photo and full name
-        const populatedComment = await newComment.populate({
-            path: 'user',
-            select: 'fullName profilePhoto',
+        res.status(201).json({
+            message: "Comment added successfully",
+            comment: populatedComment,
         });
-
-        console.log("Populated Comment:", populatedComment);  // Check if profilePhoto is populated now
-
-        res.status(201).json({ message: "Comment added", comment: populatedComment });
     } catch (error) {
-        console.error("Error adding comment:", error);
-        res.status(500).json({ message: "Error adding comment", error });
+        console.error("Error adding comment:", error.message || error);
+        res.status(500).json({
+            message: "Error adding comment",
+            error: error.message || error,
+        });
     }
 };
-
 
 
 
 
 const fetchComments = async (req, res) => {
     const { postId } = req.params;
-    const { postType } = req.query;
 
     try {
-        let comments;
-
-        if (postType === "admin") {
-            comments = await SugPostComment.find({ post: postId })
-                .populate({
-                    path: "user",
-                    select: "fullName profilePhoto",
+        // Fetch all top-level comments for the post (both admin and user)
+        const comments = await Comment.find({ post: postId, parentComment: null })
+            .populate({
+                path: "user", // Populate user field for regular users
+                select: "fullName profilePhoto",
+                transform: (doc) => {
+                    if (doc) {
+                        return {
+                            _id: doc._id,
+                            fullName: doc.fullName,
+                            profilePicture: doc.profilePhoto, // Rename profilePhoto to profilePicture
+                        };
+                    }
+                    return null;
+                },
+            })
+            .populate({
+                path: "admin", // Populate admin field for admin users
+                select: "sugFullName",
+                populate: {
+                    path: "schoolInfo", // Populate the schoolInfo for the admin to get uniProfilePicture
+                    model: "SchoolInfo",
+                    select: "uniProfilePicture",
                     transform: (doc) => {
                         if (doc) {
-                            console.log("Profile Photo for User:", doc.profilePhoto); // Log the actual profile photo URL
                             return {
-                                _id: doc._id,
-                                fullName: doc.fullName,
-                                profilePhoto: doc.profilePhoto, // Remove fallback temporarily for testing
-                            };
-                        }
-                        return null; // Handle missing user
-                    },
-                });
-        } else if (postType === "user") {
-            comments = await UserComment.find({ post: postId })
-                .populate({
-                    path: "user",
-                    select: "fullName profilePhoto",
-                    transform: (doc) => {
-                        if (doc) {
-                            console.log("Profile Photo for User:", doc.profilePhoto); // Log for verification
-                            return {
-                                _id: doc._id,
-                                fullName: doc.fullName,
-                                profilePhoto: doc.profilePhoto,
+                                uniProfilePicture: doc.uniProfilePicture,
                             };
                         }
                         return null;
                     },
-                });
-        } else {
-            return res.status(400).json({ message: "Invalid post type" });
-        }
+                },
+                transform: (doc) => {
+                    if (doc) {
+                        return {
+                            _id: doc._id,
+                            sugFullName: doc.sugFullName,
+                            profilePicture: doc.schoolInfo ? doc.schoolInfo.uniProfilePicture : null, // Rename uniProfilePicture to profilePicture
+                        };
+                    }
+                    return null;
+                },
+            })
+            .populate({
+                path: "replies", // Populate replies
+                populate: {
+                    path: "user", // Populate user field in replies for regular users
+                    select: "fullName profilePhoto",
+                    transform: (doc) => {
+                        if (doc) {
+                            return {
+                                _id: doc._id,
+                                fullName: doc.fullName,
+                                profilePicture: doc.profilePhoto, // Rename profilePhoto to profilePicture
+                            };
+                        }
+                        return null;
+                    },
+                },
+            });
 
         if (!comments.length) {
             return res.status(404).json({ message: "No comments found for this post." });
         }
 
-        // Build comment tree
-        const commentTree = comments.reduce((tree, comment) => {
-            const commentObj = { ...comment.toObject(), replies: [] };
-            if (!comment.parentComment) {
-                tree.push(commentObj);
-            } else {
-                const parent = tree.find(c => c._id.equals(comment.parentComment));
-                if (parent) {
-                    parent.replies.push(commentObj);
+        // Helper function to build a nested comment tree
+        const buildCommentTree = (comments) => {
+            return comments.map((comment) => {
+                const commentObj = { ...comment.toObject() };
+                if (comment.replies && comment.replies.length > 0) {
+                    commentObj.replies = buildCommentTree(comment.replies);
                 }
-            }
-            return tree;
-        }, []);
+                return commentObj;
+            });
+        };
+
+        // Generate the comment tree structure
+        const commentTree = buildCommentTree(comments);
 
         res.status(200).json({ comments: commentTree });
     } catch (error) {
         console.error("Error fetching comments:", error);
-        res.status(500).json({ message: "Error fetching comments", error });
+        res.status(500).json({ message: "Error fetching comments", error: error.message });
     }
 };
-
-
-
-
-
-
-
-// GET /api/posts/:postId/comments
-// const fetchComments = async (req, res) => {
-//     const { postId } = req.params;
-//     const { postType } = req.query; // postType is sent as a query parameter (either "admin" or "user")
-
-//     try {
-//         let comments;
-        
-//         if (postType === "admin") {
-//             // Fetch comments for an admin post
-//             comments = await SugPostComment.find({ post: postId })
-//                 .populate({
-//                     path: "user",
-//                     model: "SugUser",
-//                     select: "_id fullName",
-//                 })
-//                 .sort({ createdAt: -1 })
-//                 .lean();
-//         } else if (postType === "user") {
-//             // Fetch comments for a user post
-//             comments = await UserComment.find({ post: postId })
-//                 .populate({
-//                     path: "user",
-//                     model: "User",
-//                     select: "_id fullName",
-//                 })
-//                 .sort({ createdAt: -1 })
-//                 .lean();
-//         } else {
-//             return res.status(400).json({ message: "Invalid post type" });
-//         }
-
-//         res.json(comments);
-//     } catch (error) {
-//         console.error("Error fetching comments:", error);
-//         res.status(500).json({ message: "Error fetching comments", error });
-//     }
-// };
 
 
   
@@ -389,20 +450,18 @@ const fetchPostDetails = async (req, res) => {
 
         console.log("Admin ID:", adminId);
 
-        // Ensure adminId is provided
         if (!adminId) {
             return res.status(400).json({ message: "Admin ID is required" });
         }
 
         const adminObjectId = new mongoose.Types.ObjectId(adminId);
 
-        // Find posts for the given adminId
         const posts = await SugPost.find({ adminId: adminObjectId })
             .populate({
                 path: "adminId",
                 select: "sugFullName email",
                 populate: {
-                    path: "schoolInfo",  // Assuming `schoolInfo` is the field in `adminId` model
+                    path: "schoolInfo",  
                     model: "SchoolInfo",
                     select: "uniProfilePicture"
                 }
@@ -424,12 +483,10 @@ const fetchPostDetails = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        // If no posts found, return a message
         if (posts.length === 0) {
             return res.status(404).json({ message: "No posts found for this admin." });
         }
 
-        // Process each post
         const processedPosts = posts.map(post => {
             // Check if admin has liked the post
             const adminLiked = post.likes.some(like => like._id.equals(adminObjectId));
@@ -582,7 +639,7 @@ const fetchPostsForSchool = async (req, res) => {
             allPosts.map(async post => {
                 const likesWithDetails = await Promise.all(
                     post.likes
-                        .filter(like => like) // Filter out null or undefined likes
+                        .filter(like => like) 
                         .map(async like => {
                             const userLike = await User.findById(like._id).select("fullName");
                             const adminLike = await SugUser.findById(like._id).select("sugFullName");
@@ -617,21 +674,17 @@ const deletePost = async (req, res) => {
     const { postId } = req.params;
     const { userId, role } = req.user;
 
-    console.log("Post ID from params:", postId); // Debugging log
+    console.log("Post ID from params:", postId); 
 
-    // Check if the postId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(postId)) {
         return res.status(400).json({ message: "Invalid Post ID format" });
     }
 
-    // Determine which model to use based on the role
     let postModel;
     if (role === Roles.ADMIN) {
-        // Admin can delete both SugPost (admin posts) and UserPost (user posts)
         console.log("Admin role detected, checking both UserPost and SugPost models.");
-        postModel = [UserPost, SugPost]; // Both models can be queried
+        postModel = [UserPost, SugPost]; 
     } else {
-        // Regular users can only delete their own posts in UserPost collection
         console.log("Regular user role detected, checking UserPost model.");
         postModel = UserPost;
     }
@@ -639,31 +692,27 @@ const deletePost = async (req, res) => {
     try {
         let post;
         
-        // Check both models if the user is an admin
         if (Array.isArray(postModel)) {
             post = await postModel[0].findById(postId) || await postModel[1].findById(postId);
         } else {
-            // Use the single model for regular users
             post = await postModel.findById(postId);
         }
         
-        console.log("Found post:", post); // Debugging log
+        console.log("Found post:", post);
 
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        // Admins can delete both types of posts (their own or any user's post)
-        // For regular users, they can only delete their own posts.
+        
         const isAuthorized = role === Roles.ADMIN || post.user.toString() === userId.toString();
         if (!isAuthorized) {
             return res.status(403).json({ message: "Unauthorized to delete this post" });
         }
 
-        // Remove associated comments
         await UserComment.deleteMany({ post: postId });
 
-        // Delete images from Cloudinary if they exist
+        
         if (post.images && post.images.length > 0) {
             for (const imageUrl of post.images) {
                 const publicId = imageUrl.split('/').pop().split('.')[0];
@@ -671,7 +720,6 @@ const deletePost = async (req, res) => {
             }
         }
 
-        // Delete the post itself
         await post.deleteOne();
 
         res.status(200).json({ message: "Post and associated comments deleted successfully" });
@@ -681,26 +729,6 @@ const deletePost = async (req, res) => {
     }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// In your routes file
-// router.get('/posts/school/:schoolId', fetchPostsForSchool);
 
 
 

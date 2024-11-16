@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const SugPostCommentSchema = new mongoose.Schema({
     post: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Post",  // Reference to the Post model
+      ref: "SugPost",  
       required: true,
     },
     text: {
@@ -11,13 +11,18 @@ const SugPostCommentSchema = new mongoose.Schema({
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",  // Reference to the User model
+      ref: "User",  
       required: true,
     },
     isAdmin: {
       type: Boolean,
       default: false,
     },
+    parentComment: { type: mongoose.Schema.Types.ObjectId, ref: 'SugPostComment', default: null },  
+    replies: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'SugPostComment' 
+  }],
     createdAt: {
       type: Date,
       default: Date.now,
@@ -31,7 +36,7 @@ const SugPostCommentSchema = new mongoose.Schema({
 
 
 
-// const mongoose = require("mongoose");
+// // const mongoose = require("mongoose");
 // const Roles = require("../middlewares/role"); // Adjust the path according to your project structure
 
 

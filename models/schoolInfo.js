@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const schoolInfoSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "SugUser", // Ensure this matches the model name
+    ref: "SugUser", 
     required: true,
   },
   university: {

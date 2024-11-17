@@ -378,22 +378,13 @@ const fetchComments = async (req, res) => {
                     path: "schoolInfo", // Populate the schoolInfo for the admin to get uniProfilePicture
                     model: "SchoolInfo",
                     select: "uniProfilePicture",
-                    transform: (doc) => {
-                        if (doc) {
-                            return {
-                                uniProfilePicture: doc.uniProfilePicture,
-                            };
-                        }
-                        return null;
-                    },
                 },
                 transform: (doc) => {
                     if (doc) {
                         return {
                             _id: doc._id,
-                            sugFullName: doc.sugFullName,
+                            fullName: doc.sugFullName, // Standardize field name to fullName for consistency
                             profilePicture: doc.schoolInfo ? doc.schoolInfo.uniProfilePicture : null, // Rename uniProfilePicture to profilePicture
-                            user: doc
                         };
                     }
                     return null;
@@ -421,10 +412,35 @@ const fetchComments = async (req, res) => {
             return res.status(404).json({ message: "No comments found for this post." });
         }
 
+        // Transform fetched comments to replace `admin` with `user` dynamically
+        const transformedComments = comments.map((comment) => {
+            const obj = comment.toObject();
+
+            if (obj.admin) {
+                // Assign admin to user key
+                obj.user = { ...obj.admin };
+                delete obj.admin; // Remove admin key
+            }
+
+            // Recursively handle replies if they exist
+            if (obj.replies && obj.replies.length > 0) {
+                obj.replies = obj.replies.map((reply) => {
+                    const replyObj = { ...reply };
+                    if (replyObj.admin) {
+                        replyObj.user = { ...replyObj.admin };
+                        delete replyObj.admin;
+                    }
+                    return replyObj;
+                });
+            }
+
+            return obj;
+        });
+
         // Helper function to build a nested comment tree
         const buildCommentTree = (comments) => {
             return comments.map((comment) => {
-                const commentObj = { ...comment.toObject() };
+                const commentObj = { ...comment };
                 if (comment.replies && comment.replies.length > 0) {
                     commentObj.replies = buildCommentTree(comment.replies);
                 }
@@ -433,7 +449,7 @@ const fetchComments = async (req, res) => {
         };
 
         // Generate the comment tree structure
-        const commentTree = buildCommentTree(comments);
+        const commentTree = buildCommentTree(transformedComments);
 
         res.status(200).json({ comments: commentTree });
     } catch (error) {
@@ -441,6 +457,7 @@ const fetchComments = async (req, res) => {
         res.status(500).json({ message: "Error fetching comments", error: error.message });
     }
 };
+
 
 
   

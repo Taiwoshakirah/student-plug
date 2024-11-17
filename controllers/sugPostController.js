@@ -525,7 +525,7 @@ const fetchPostsForSchool = async (req, res) => {
     }
 
     try {
-        // Fetch school information
+        // Fetching school information
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
             .select("university state aboutUniversity userId uniProfilePicture")
             .populate({
@@ -668,13 +668,6 @@ const fetchPostsForSchool = async (req, res) => {
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
-
-
-
-
-
-
-
 
 
 

@@ -393,6 +393,7 @@ const fetchComments = async (req, res) => {
                             _id: doc._id,
                             sugFullName: doc.sugFullName,
                             profilePicture: doc.schoolInfo ? doc.schoolInfo.uniProfilePicture : null, // Rename uniProfilePicture to profilePicture
+                            user: doc
                         };
                     }
                     return null;

@@ -539,28 +539,36 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch admin posts
+        // Fetch admin posts with comments
         const adminPosts = await SugPost.find({ schoolInfoId })
-            .populate({
-                path: "adminId",
-                model: "SugUser",
-                select: "sugFullName email role",
-                populate: {
-                    path: "schoolInfo",
-                    model: "SchoolInfo",
-                    select: "university uniProfilePicture"
-                }
-            })
-            .populate({
-                path: "comments",
-                model: "SugPostComment",
-                select: "text createdAt isAdmin",
-                populate: {
-                    path: "user",
+            .populate([
+                {
+                    path: "adminId",
                     model: "SugUser",
-                    select: "_id fullName"
+                    select: "sugFullName email role",
+                    populate: {
+                        path: "schoolInfo",
+                        model: "SchoolInfo",
+                        select: "university uniProfilePicture"
+                    }
+                },
+                {
+                    path: "comments",
+                    model: "Comment",
+                    populate: [
+                        { path: "user", model: "User", select: "fullName profilePhoto" },
+                        { path: "admin", model: "SugUser", select: "sugFullName" },
+                        {
+                            path: "replies",
+                            model: "Comment",
+                            populate: [
+                                { path: "user", model: "User", select: "fullName profilePhoto" },
+                                { path: "admin", model: "SugUser", select: "sugFullName" }
+                            ]
+                        }
+                    ]
                 }
-            })
+            ])
             .sort({ createdAt: -1 })
             .lean();
 
@@ -580,35 +588,35 @@ const fetchPostsForSchool = async (req, res) => {
             }
         }));
 
-        // Fetch student posts
+        // Fetch student posts with comments
         const studentPosts = await UserPost.find({ schoolInfoId })
-            .populate({
-                path: "user",
-                model: "User",
-                select: "fullName email profilePhoto",
-                populate: [
-                    {
-                        path: "studentInfo",
-                        model: "StudentInfo",
-                        select: "faculty department"
-                    },
-                    {
-                        path: "schoolInfoId",
-                        model: "SchoolInfo",
-                        select: "university"
-                    }
-                ]
-            })
-            .populate({
-                path: "comments",
-                model: "UserComment",
-                select: "text createdAt",
-                populate: {
+            .populate([
+                {
                     path: "user",
                     model: "User",
-                    select: "_id fullName"
+                    select: "fullName email profilePhoto",
+                    populate: [
+                        { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
+                        { path: "schoolInfoId", model: "SchoolInfo", select: "university" }
+                    ]
+                },
+                {
+                    path: "comments",
+                    model: "Comment",
+                    populate: [
+                        { path: "user", model: "User", select: "fullName profilePhoto" },
+                        { path: "admin", model: "SugUser", select: "sugFullName" },
+                        {
+                            path: "replies",
+                            model: "Comment",
+                            populate: [
+                                { path: "user", model: "User", select: "fullName profilePhoto" },
+                                { path: "admin", model: "SugUser", select: "sugFullName" }
+                            ]
+                        }
+                    ]
                 }
-            })
+            ])
             .sort({ createdAt: -1 })
             .lean();
 
@@ -629,25 +637,23 @@ const fetchPostsForSchool = async (req, res) => {
             department: post.user?.studentInfo?.department || ""
         }));
 
-        // Combine posts and sort by creation date
+        // Combine and sort posts
         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
-        // Populate likes with fullName for each post
+        // Fetch likes for each post with details
         const allPostsWithLikes = await Promise.all(
             allPosts.map(async post => {
                 const likesWithDetails = await Promise.all(
-                    post.likes
-                        .filter(like => like) 
-                        .map(async like => {
-                            const userLike = await User.findById(like._id).select("fullName");
-                            const adminLike = await SugUser.findById(like._id).select("sugFullName");
-                            return {
-                                _id: like._id,
-                                fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
-                            };
-                        })
+                    post.likes.map(async like => {
+                        const userLike = await User.findById(like._id).select("fullName");
+                        const adminLike = await SugUser.findById(like._id).select("sugFullName");
+                        return {
+                            _id: like._id,
+                            fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
+                        };
+                    })
                 );
                 return { ...post, likes: likesWithDetails };
             })
@@ -662,6 +668,8 @@ const fetchPostsForSchool = async (req, res) => {
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
+
 
 
 

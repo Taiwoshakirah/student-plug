@@ -33,7 +33,7 @@ const serviceAccount = {
 };
 
 
-app.use(cors({ origin: 'https://school-plug.vercel.app/'}));
+app.use(cors({ origin: 'https://school-plug.vercel.app'}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(fileUpload({

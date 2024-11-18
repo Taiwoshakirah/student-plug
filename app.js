@@ -11,6 +11,18 @@ const MongoStore = require("connect-mongo");
 const http = require("http"); 
 const { initWebSocketServer } = require('./utils/websocket');
 
+
+const corsOptions = {
+  origin: [
+    "http://localhost:5173", 
+    "https://school-plug.vercel.app", 
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"], 
+  allowedHeaders: ["Content-Type", "Authorization"], 
+  credentials: true, 
+};
+
+
 const tempDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir);
@@ -33,7 +45,7 @@ const serviceAccount = {
 };
 
 
-app.use(cors({ origin: 'https://school-plug.vercel.app'}));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(fileUpload({

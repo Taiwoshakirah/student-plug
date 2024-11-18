@@ -170,47 +170,57 @@ const studentCreatePost = async (req, res) => {
 
 const likePost = async (req, res) => {
     try {
-        const { userId } = req.body;
-        const { postId } = req.params;
-        const { isAdminPost } = req.body;  
-
-        console.log("isAdminPost:", isAdminPost);  
-        console.log("postId:", postId);  
+        const { userId } = req.body;  // The userId from the request body (the user liking the post)
+        const { postId } = req.params; // The postId from the URL params
+        const { isAdminPost } = req.body;  // Flag indicating whether it's an admin post or a user post
 
         let post;
-        // If it's an admin post, query SugPost, otherwise query UserPost
+        // Query the correct post based on whether it's an admin post or user post
         if (isAdminPost) {
-            console.log("Fetching admin post from SugPost");  
-            post = await SugPost.findById(postId);
+            post = await SugPost.findById(postId); // For admin posts (SugPost)
         } else {
-            console.log("Fetching user post from UserPost");  
-            post = await UserPost.findById(postId);
+            post = await UserPost.findById(postId); // For user posts (UserPost)
         }
 
         if (!post) {
-            console.error("Post not found in database"); 
             return res.status(404).json({ message: "Post not found" });
         }
 
-        // Check if the user already liked the post
-        const likeIndex = post.likes.indexOf(userId);
+        // Ensure post.likes is always an array
+        if (!Array.isArray(post.likes)) {
+            post.likes = [];
+        }
 
-        if (likeIndex !== -1) {
-            // User had already liked the post, so unlike it
-            post.likes.splice(likeIndex, 1);
+        // Check if the user has already liked the post
+        const existingLikeIndex = post.likes.findIndex(like => like._id && like._id.toString() === userId);
+
+        if (existingLikeIndex !== -1) {
+            // User already liked the post, so remove the like (unlike it)
+            post.likes.splice(existingLikeIndex, 1);
             post.likeCount -= 1;
             await post.save();
             return res.status(200).json({ message: "Post unliked", post });
         }
 
-        // Otherwise, add a like
-        post.likes.push(userId);
+        // If the user hasn't liked the post yet, add a like
+        let liker = await User.findById(userId); // Fetch the user who is liking the post (from User schema)
+
+        if (!liker) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Add the like with the fullName and userId in the likes array
+        post.likes.push({
+            _id: liker._id.toString(),        // Ensure _id is converted to string
+            fullName: liker.fullName          // Store the fullName
+        });
+
         post.likeCount += 1;
         await post.save();
 
-        // Send notification to the post owner if someone else liked their post, this is where websocket is needed(i'm testing)
-        const postOwnerId = post.adminId ? post.adminId._id.toString() : post.user._id.toString();
-        if (postOwnerId !== userId) {
+        // Send notification to the post owner if someone else liked their post
+        const postOwnerId = isAdminPost ? post.adminId : post.user;
+        if (postOwnerId.toString() !== userId) {
             sendNotification(postOwnerId, {
                 type: "like",
                 message: `Your post was liked`,
@@ -219,12 +229,31 @@ const likePost = async (req, res) => {
             });
         }
 
-        res.status(200).json({ message: "Post liked", post });
+        // Return the updated post with the likes array containing fullName and userId
+        res.status(200).json({
+            message: "Post liked",
+            post: {
+                ...post.toObject(),  // Convert post to plain object to avoid any mongoose-related issues
+                likes: post.likes     // Return the updated likes array with fullName and userId
+            }
+        });
+
     } catch (error) {
         console.error("Error liking/unliking post:", error);
         res.status(500).json({ message: "Failed to like/unlike post", error });
     }
 };
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -12,8 +12,8 @@ const userPostSchema = new mongoose.Schema({
     },
     images: [String],
     likes: [{ 
-        type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User' 
+        _id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },  // Store userId
+        fullName: String  // Store fullName
     }],
     likeCount: { 
         type: Number, 

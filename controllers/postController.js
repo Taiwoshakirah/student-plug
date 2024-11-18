@@ -246,18 +246,6 @@ const likePost = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 const sharePost = async (req, res) => {
     try {
         const { userId } = req.body;

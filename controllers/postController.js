@@ -199,6 +199,10 @@ const likePost = async (req, res) => {
             post.likes.splice(existingLikeIndex, 1);
             post.likeCount -= 1;
             await post.save();
+
+            // Emit a real-time event for unliking
+            req.io.to(postOwnerId.toString()).emit("post_unliked", { postId, userId });
+
             return res.status(200).json({ message: "Post unliked", post });
         }
 
@@ -226,6 +230,14 @@ const likePost = async (req, res) => {
                 message: `Your post was liked`,
                 postId: post._id,
                 likerId: userId
+            });
+
+             // Emit a real-time event to the post owner
+             req.io.to(postOwnerId.toString()).emit("post_liked", {
+                type: "like",
+                postId,
+                likerId: userId,
+                likerName: liker.fullName
             });
         }
 

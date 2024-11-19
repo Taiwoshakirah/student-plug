@@ -121,6 +121,16 @@ const toggleLike = async (req, res) => {
                 postId: post._id,
                 likerId: likerId
             });
+
+
+            // Emit a WebSocket event to the post owner
+            req.io.to(postOwnerId).emit("post_like_toggled", {
+                postId,
+                likerId,
+                action, // either 'like' or 'unlike'
+            });
+
+
         }
 
         const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
@@ -144,6 +154,17 @@ const toggleLike = async (req, res) => {
                 fullName,
                 liked: true,
             };
+        });
+
+        console.log(`Updated likes for post ${post._id}:`, post.likes);
+        console.log(`Post ${post._id} now has ${post.likes.length} likes.`);
+
+
+         // Emit a real-time event to update all clients
+         req.io.emit("post_likes_updated", {
+            postId,
+            likesCount: post.likes.length,
+            updatedLikes,
         });
 
         res.status(200).json({

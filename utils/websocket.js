@@ -1,4 +1,3 @@
-
 const { Server } = require('socket.io');
 const corsOptions = {
     origin: [
@@ -9,31 +8,26 @@ const corsOptions = {
     allowedHeaders: ["Content-Type", "Authorization"], 
     credentials: true, 
   };
-
-let io; // Declare the Socket.IO instance
-
+let io; 
 function initWebSocketServer(server) {
     io = new Server(server, {
         cors: {
-            origin: corsOptions, // Adjust this to restrict origins for security
+            origin: corsOptions, 
         },
     });
-
-    // Handle new connections
+// Handle new connections
     io.on('connection', (socket) => {
         const userId = socket.handshake.query.userId;
         if (userId) {
             socket.join(userId);
             console.log(`User ${userId} joined the room`);
         }
-    
-        socket.on('disconnect', () => {
+       socket.on('disconnect', () => {
             console.log(`User ${userId} disconnected`);
             socket.leave(userId);
         });
     });
 }
-
 function sendNotification(userId, message) {
     try {
         io.to(userId).emit('notification', message);

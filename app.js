@@ -9,7 +9,9 @@ const admin = require('firebase-admin');
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const http = require("http"); 
+const { Server } = require("socket.io");
 const { initWebSocketServer } = require('./utils/websocket');
+
 
 
 const corsOptions = {
@@ -78,6 +80,13 @@ app.use(session({
   },
 }));
 
+
+// Attach io to the request object as a middleware (This should be before your routes)
+app.use((req, res, next) => {
+  req.io = io; // Make `io` available throughout the app
+  next(); // Proceed to the next middleware or route handler
+});
+
 const signUpRouter = require("./routes/signUpRouter");
 const schoolRouter = require('./routes/schoolRouter')
 const sugPostRouter = require('./routes/sugPostRouter')
@@ -98,6 +107,7 @@ app.use(methodNotAllowed);
 // HTTP server and initialize WebSocket
 const server = http.createServer(app); 
 initWebSocketServer(server); 
+const io = new Server(server);
 
 
 const start = async () => {

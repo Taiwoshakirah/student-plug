@@ -99,19 +99,23 @@ const toggleLike = async (req, res) => {
             return res.status(404).json({ message: "Post not found" });
         }
 
-        const alreadyLikedIndex = post.likes.findIndex(
-            like => like && like._id && like._id.toString() === likerId
-        );
+        const alreadyLikedIndex = post.likes.findIndex(like => like && like._id && like._id.toString && like._id.toString() === likerId);
 
         if (alreadyLikedIndex !== -1) {
-            post.likes.splice(alreadyLikedIndex, 1);  
+            post.likes.splice(alreadyLikedIndex, 1);  // Unlike the post
         } else {
-            post.likes.push({ _id: likerId });  
+            post.likes.push({ _id: likerId, fullName: "Unknown Liker" });  // Like the post with a default name if no fullName is found
         }
 
         await post.save();
 
-        const postOwnerId = post.user ? post.user._id.toString() : post.adminId?._id.toString();
+        const postOwnerId = post.user && post.user._id ? post.user._id.toString() : post.adminId && post.adminId._id ? post.adminId._id.toString() : null;
+
+        if (!postOwnerId) {
+            return res.status(400).json({ message: "Post owner not found" });
+        }
+
+        console.log("Post Owner ID: ", postOwnerId);
 
         // Send notification to the post owner if liked by someone else(websocket here also)
         if (postOwnerId && postOwnerId !== likerId) {
@@ -122,27 +126,28 @@ const toggleLike = async (req, res) => {
                 likerId: likerId
             });
 
-
             // Emit a WebSocket event to the post owner
-            req.io.to(postOwnerId).emit("post_like_toggled", {
-                postId,
-                likerId,
-                action, // either 'like' or 'unlike'
-            });
-
-
+            if (req.io) {
+                req.io.to(postOwnerId).emit("post_like_toggled", {
+                    postId,
+                    likerId,
+                    action: alreadyLikedIndex !== -1 ? "unlike" : "like",
+                });
+            } else {
+                console.error("Socket.IO instance not found");
+            }
+            
         }
 
+        // Updated likes array
         const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
-
         const users = await User.find({ _id: { $in: likerIds } });
-        
         const admins = await SugUser.find({ _id: { $in: likerIds } });
 
         const userMap = new Map(users.map(user => [user._id.toString(), user.fullName]));
         const adminMap = new Map(admins.map(admin => [admin._id.toString(), admin.sugFullName]));
 
-        // Maping the likes array to include fullName from User or SugUser
+        // Map likes to include fullName if it's available, or "Unknown Liker" if missing
         const updatedLikes = post.likes.map(like => {
             if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true };
             
@@ -159,9 +164,8 @@ const toggleLike = async (req, res) => {
         console.log(`Updated likes for post ${post._id}:`, post.likes);
         console.log(`Post ${post._id} now has ${post.likes.length} likes.`);
 
-
-         // Emit a real-time event to update all clients
-         req.io.emit("post_likes_updated", {
+        // Emit a real-time event to update all clients
+        req.io.emit("post_likes_updated", {
             postId,
             likesCount: post.likes.length,
             updatedLikes,
@@ -180,6 +184,7 @@ const toggleLike = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
 
 
 

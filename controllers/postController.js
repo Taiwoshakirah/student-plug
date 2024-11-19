@@ -191,6 +191,11 @@ const likePost = async (req, res) => {
             post.likes = [];
         }
 
+        const postOwnerId = isAdminPost ? post.adminId : post.user;
+        if (!postOwnerId) {
+            return res.status(400).json({ message: "Post owner not found" });
+        }
+
         // Check if the user has already liked the post
         const existingLikeIndex = post.likes.findIndex(like => like._id && like._id.toString() === userId);
 
@@ -223,7 +228,7 @@ const likePost = async (req, res) => {
         await post.save();
 
         // Send notification to the post owner if someone else liked their post
-        const postOwnerId = isAdminPost ? post.adminId : post.user;
+        
         if (postOwnerId.toString() !== userId) {
             sendNotification(postOwnerId, {
                 type: "like",

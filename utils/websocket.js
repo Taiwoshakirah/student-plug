@@ -1,35 +1,39 @@
 const { Server } = require("socket.io");
 
-const allowedOrigins = [
-    "http://localhost:5173", 
-    "https://school-plug.vercel.app"
-];
-
-let io; 
+let io;
 
 function initWebSocketServer(server) {
+  if (!io) {
     io = new Server(server, {
-        cors: {
-            origin: allowedOrigins, // Use an array of strings directly here
-            methods: ["GET", "POST", "PUT", "DELETE"], 
-            allowedHeaders: ["Content-Type", "Authorization"], 
-            credentials: true, // Allow credentials like cookies
-        },
+      cors: {
+        origin: [
+          "http://localhost:5173",
+          "https://school-plug.vercel.app",
+        ],
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true,
+      },
     });
 
-    // Handle new connections
     io.on("connection", (socket) => {
-        const userId = socket.handshake.query.userId; // Get userId from query parameters
-        if (userId) {
-            socket.join(userId); // Join a room for the user
-            console.log(`User ${userId} joined the room`);
-        }
+      const userId = socket.handshake.query.userId;
+      if (userId) {
+        socket.join(userId);
+        console.log(`User ${userId} joined the room`);
+      }
 
-        socket.on("disconnect", () => {
-            console.log(`User ${userId} disconnected`);
-            socket.leave(userId); // Leave the room on disconnect
-        });
+      socket.on("disconnect", () => {
+        console.log(`User ${userId} disconnected`);
+        socket.leave(userId);
+      });
     });
+
+    console.log("WebSocket server initialized");
+  } else {
+    console.log("WebSocket server already initialized");
+  }
+
+  return { io };
 }
 
 function sendNotification(userId, message) {
@@ -39,7 +43,7 @@ function sendNotification(userId, message) {
         console.error(`Error sending notification to user ${userId}:`, error);
     }
 }
-// here is modu
+
 module.exports = { initWebSocketServer, sendNotification };
 
 

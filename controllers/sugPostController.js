@@ -102,9 +102,9 @@ const toggleLike = async (req, res) => {
         const alreadyLikedIndex = post.likes.findIndex(like => like && like._id && like._id.toString && like._id.toString() === likerId);
 
         if (alreadyLikedIndex !== -1) {
-            post.likes.splice(alreadyLikedIndex, 1);  // Unlike the post
+            post.likes.splice(alreadyLikedIndex, 1);  
         } else {
-            post.likes.push({ _id: likerId, fullName: "Unknown Liker" });  // Like the post with a default name if no fullName is found
+            post.likes.push({ _id: likerId, fullName: "Unknown Liker" });  
         }
 
         await post.save();
@@ -126,7 +126,6 @@ const toggleLike = async (req, res) => {
                 likerId: likerId
             });
 
-            // Emit a WebSocket event to the post owner
             if (req.io) {
                 req.io.to(postOwnerId).emit("post_like_toggled", {
                     postId,

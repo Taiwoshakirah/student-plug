@@ -80,13 +80,6 @@ app.use(session({
   },
 }));
 
-
-// Attach io to the request object as a middleware (This should be before your routes)
-app.use((req, res, next) => {
-  req.io = io; // Make `io` available throughout the app
-  next(); // Proceed to the next middleware or route handler
-});
-
 const signUpRouter = require("./routes/signUpRouter");
 const schoolRouter = require('./routes/schoolRouter')
 const sugPostRouter = require('./routes/sugPostRouter')
@@ -94,6 +87,15 @@ const postRouter = require('./routes/postRouter')
 const postComment = require('./routes/postComment')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
+
+// Initialize WebSocket server once
+
+
+// Attach io to the request object as a middleware (This should be before your routes)
+app.use((req, res, next) => {
+  req.io = io; // Make `io` available throughout the app
+  next(); // Proceed to the next middleware or route handler
+});
 
 app.use("/api/auth", signUpRouter);
 app.use('/api/school',schoolRouter)
@@ -106,8 +108,8 @@ app.use(methodNotAllowed);
 
 // HTTP server and initialize WebSocket
 const server = http.createServer(app); 
-initWebSocketServer(server); 
-const io = new Server(server);
+
+const { io } = initWebSocketServer(server);
 
 
 const start = async () => {

@@ -166,100 +166,174 @@ const studentCreatePost = async (req, res) => {
 
 
 
-
-
 const likePost = async (req, res) => {
     try {
-        const { userId } = req.body;  // The userId from the request body (the user liking the post)
-        const { postId } = req.params; // The postId from the URL params
-        const { isAdminPost } = req.body;  // Flag indicating whether it's an admin post or a user post
-
+        const { userId } = req.body;  
+        const { postId } = req.params; 
+        const { isAdminPost } = req.body;  
         let post;
-        // Query the correct post based on whether it's an admin post or user post
+  
         if (isAdminPost) {
-            post = await SugPost.findById(postId); // For admin posts (SugPost)
+            post = await SugPost.findById(postId); 
         } else {
-            post = await UserPost.findById(postId); // For user posts (UserPost)
+            post = await UserPost.findById(postId); 
         }
-
+  
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
-
-        // Ensure post.likes is always an array
+  
         if (!Array.isArray(post.likes)) {
             post.likes = [];
         }
-
+  
         const postOwnerId = isAdminPost ? post.adminId : post.user;
         if (!postOwnerId) {
             return res.status(400).json({ message: "Post owner not found" });
         }
-
-        // Check if the user has already liked the post
+  
         const existingLikeIndex = post.likes.findIndex(like => like._id && like._id.toString() === userId);
-
+        
         if (existingLikeIndex !== -1) {
-            // User already liked the post, so remove the like (unlike it)
             post.likes.splice(existingLikeIndex, 1);
             post.likeCount -= 1;
             await post.save();
-
-            // Emit a real-time event for unliking
+            
             req.io.to(postOwnerId.toString()).emit("post_unliked", { postId, userId });
-
             return res.status(200).json({ message: "Post unliked", post });
         }
-
-        // If the user hasn't liked the post yet, add a like
-        let liker = await User.findById(userId); // Fetch the user who is liking the post (from User schema)
-
+  
+        let liker = await User.findById(userId); 
         if (!liker) {
             return res.status(404).json({ message: "User not found" });
         }
-
-        // Add the like with the fullName and userId in the likes array
+  
         post.likes.push({
-            _id: liker._id.toString(),        // Ensure _id is converted to string
-            fullName: liker.fullName          // Store the fullName
+            _id: liker._id.toString(),
+            fullName: liker.fullName          
         });
-
         post.likeCount += 1;
         await post.save();
-
-        // Send notification to the post owner if someone else liked their post
-        
+  
         if (postOwnerId.toString() !== userId) {
-            sendNotification(postOwnerId, {
+            await sendNotification(postOwnerId, {
                 type: "like",
-                message: `Your post was liked`,
+                message: "Your post was liked",
                 postId: post._id,
                 likerId: userId
             });
-
-             // Emit a real-time event to the post owner
-             req.io.to(postOwnerId.toString()).emit("post_liked", {
+  
+            req.io.to(postOwnerId.toString()).emit("post_liked", {
                 type: "like",
                 postId,
                 likerId: userId,
                 likerName: liker.fullName
             });
         }
-
-        // Return the updated post with the likes array containing fullName and userId
+  
         res.status(200).json({
             message: "Post liked",
             post: {
-                ...post.toObject(),  // Convert post to plain object to avoid any mongoose-related issues
-                likes: post.likes     // Return the updated likes array with fullName and userId
+                ...post.toObject(),  
+                likes: post.likes     
             }
         });
-
     } catch (error) {
         console.error("Error liking/unliking post:", error);
-        res.status(500).json({ message: "Failed to like/unlike post", error });
+        res.status(500).json({ message: "Failed to like/unlike post", error: error.message });
     }
-};
+  }
+
+
+
+
+// const likePost = async (req, res) => {
+//     try {
+//         const { userId } = req.body;  
+//         const { postId } = req.params; 
+//         const { isAdminPost } = req.body;  
+
+//         let post;
+//         // Query the correct post based on whether it's an admin post or user post
+//         if (isAdminPost) {
+//             post = await SugPost.findById(postId); 
+//         } else {
+//             post = await UserPost.findById(postId); 
+//         }
+
+//         if (!post) {
+//             return res.status(404).json({ message: "Post not found" });
+//         }
+//         if (!Array.isArray(post.likes)) {
+//             post.likes = [];
+//         }
+
+//         const postOwnerId = isAdminPost ? post.adminId : post.user;
+//         if (!postOwnerId) {
+//             return res.status(400).json({ message: "Post owner not found" });
+//         }
+
+//         // Checking if the user has already liked the post
+//         const existingLikeIndex = post.likes.findIndex(like => like._id && like._id.toString() === userId);
+
+//         if (existingLikeIndex !== -1) {
+//             // User already liked the post, so remove the like (unlike it)
+//             post.likes.splice(existingLikeIndex, 1);
+//             post.likeCount -= 1;
+//             await post.save();
+
+//             // Emit a real-time event for unliking
+//             req.io.to(postOwnerId.toString()).emit("post_unliked", { postId, userId });
+
+//             return res.status(200).json({ message: "Post unliked", post });
+//         }
+
+//         // If the user hasn't liked the post yet, add a like
+//         let liker = await User.findById(userId); 
+
+//         if (!liker) {
+//             return res.status(404).json({ message: "User not found" });
+//         }
+
+//         post.likes.push({
+//             _id: liker._id.toString(),        
+//             fullName: liker.fullName          
+//         });
+
+//         post.likeCount += 1;
+//         await post.save();
+
+//         // Send notification to the post owner if someone else liked their post
+        
+//         if (postOwnerId.toString() !== userId) {
+//             sendNotification(postOwnerId, {
+//                 type: "like",
+//                 message: `Your post was liked`,
+//                 postId: post._id,
+//                 likerId: userId
+//             });
+
+//              // Emit a real-time event to the post owner
+//              req.io.to(postOwnerId.toString()).emit("post_liked", {
+//                 type: "like",
+//                 postId,
+//                 likerId: userId,
+//                 likerName: liker.fullName
+//             });
+//         }
+//         res.status(200).json({
+//             message: "Post liked",
+//             post: {
+//                 ...post.toObject(),  
+//                 likes: post.likes     
+//             }
+//         });
+
+//     } catch (error) {
+//         console.error("Error liking/unliking post:", error);
+//         res.status(500).json({ message: "Failed to like/unlike post", error });
+//     }
+// };
 
 
 

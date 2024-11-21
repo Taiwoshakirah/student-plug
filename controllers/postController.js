@@ -216,18 +216,19 @@ const likePost = async (req, res) => {
         await post.save();
   
         if (postOwnerId.toString() !== userId) {
-            await sendNotification(postOwnerId, {
-                type: "like",
-                message: "Your post was liked",
-                postId: post._id,
-                likerId: userId
-            });
-  
+            
             req.io.to(postOwnerId.toString()).emit("post_liked", {
                 type: "like",
                 postId,
                 likerId: userId,
                 likerName: liker.fullName
+            });
+
+            await sendNotification(postOwnerId, {
+                type: "like",
+                message: "Your post was liked",
+                postId: post._id,
+                likerId: userId
             });
         }
   

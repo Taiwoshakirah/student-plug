@@ -168,23 +168,20 @@ const studentCreatePost = async (req, res) => {
 
 const likePost = async (req, res) => {
     try {
-        const { userId } = req.body;  
-        const { postId } = req.params; 
-        const { isAdminPost } = req.body;  
+        const { userId, isAdminPost } = req.body;
+        const { postId } = req.params;
         let post;
   
-        if (isAdminPost) {
-            post = await SugPost.findById(postId); 
-        } else {
-            post = await UserPost.findById(postId); 
-        }
-  
+        post = isAdminPost ? await SugPost.findById(postId) : await UserPost.findById(postId);
         if (!post) {
             return res.status(404).json({ message: "Post not found" });
         }
   
-        if (!Array.isArray(post.likes)) {
+        if (!post.likes) {
             post.likes = [];
+        }
+        if (!post.likeCount) {
+            post.likeCount = 0;
         }
   
         const postOwnerId = isAdminPost ? post.adminId : post.user;
@@ -192,57 +189,58 @@ const likePost = async (req, res) => {
             return res.status(400).json({ message: "Post owner not found" });
         }
   
+  
         const existingLikeIndex = post.likes.findIndex(like => like._id && like._id.toString() === userId);
-        
         if (existingLikeIndex !== -1) {
             post.likes.splice(existingLikeIndex, 1);
             post.likeCount -= 1;
             await post.save();
-            
-            req.io.to(postOwnerId.toString()).emit("post_unliked", { postId, userId });
+  
+            if (req.io) {
+                req.io.to(postOwnerId.toString()).emit("post_unliked", { postId, userId });
+            }
             return res.status(200).json({ message: "Post unliked", post });
         }
   
-        let liker = await User.findById(userId); 
+        const liker = await User.findById(userId);
         if (!liker) {
             return res.status(404).json({ message: "User not found" });
         }
   
-        post.likes.push({
-            _id: liker._id.toString(),
-            fullName: liker.fullName          
-        });
+        post.likes.push({ _id: liker._id.toString(), fullName: liker.fullName });
         post.likeCount += 1;
         await post.save();
   
         if (postOwnerId.toString() !== userId) {
-            
-                await sendNotification(postOwnerId, {
+            await sendNotification(postOwnerId, {
                 type: "like",
                 message: "Your post was liked",
                 postId: post._id,
-                likerId: userId
+                likerId: userId,
             });
+  
+            if (req.io) {
+                req.io.to(postOwnerId.toString()).emit("post_liked", {
+                    type: "like",
+                    postId,
+                    likerId: userId,
+                    likerName: liker.fullName,
+                });
+            }
         }
-        req.io.to(postOwnerId.toString()).emit("post_liked", {
-            type: "like", 
-            postId, 
-            likerId: userId, 
-            likerName: liker.fullName
-          });
   
         res.status(200).json({
             message: "Post liked",
             post: {
-                ...post.toObject(),  
-                likes: post.likes     
-            }
+                ...post.toObject(),
+                likes: post.likes,
+            },
         });
     } catch (error) {
         console.error("Error liking/unliking post:", error);
         res.status(500).json({ message: "Failed to like/unlike post", error: error.message });
     }
-  }
+  };
 
 
 

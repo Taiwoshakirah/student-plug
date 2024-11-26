@@ -85,6 +85,8 @@ const schoolRouter = require('./routes/schoolRouter')
 const sugPostRouter = require('./routes/sugPostRouter')
 const postRouter = require('./routes/postRouter')
 const postComment = require('./routes/postComment')
+const trendRouter = require('./routes/trendRouter')
+const studentPayRouter = require('./routes/studentPayRouter')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
 
@@ -102,6 +104,8 @@ app.use('/api/school',schoolRouter)
 app.use('/api/sugPost',sugPostRouter)
 app.use('/api/students',postRouter)
 app.use('/api/add',postComment)
+app.use('/api/getting',trendRouter)
+app.use('/api/payment',studentPayRouter)
 app.use(notFound);
 app.use(methodNotAllowed);
 

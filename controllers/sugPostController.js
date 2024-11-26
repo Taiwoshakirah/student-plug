@@ -14,12 +14,13 @@ const UserPost = require('../models/post')
 const UserComment = require('../models/comment');
 const { sendNotification } = require('../utils/websocket');
 const Comment = require('../models/allComment')
-
+const {extractHashtags} = require('./trendingController')
 
 
 const createSugPost = async (req, res) => {
-    const { adminId, text, schoolInfoId } = req.body; 
-    if (!adminId || !text || !schoolInfoId) { 
+    const { adminId, text, schoolInfoId } = req.body;
+
+    if (!adminId || !text || !schoolInfoId) {
         return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
     }
 
@@ -28,43 +29,36 @@ const createSugPost = async (req, res) => {
 
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-            console.log("Images received in request:", images);
-
             for (const image of images) {
                 const tempFilePath = `uploads/${image.name}`;
-
                 await image.mv(tempFilePath);
-                console.log(`File moved to temporary path: ${tempFilePath}`);
-
                 const result = await uploadToCloudinary(tempFilePath);
-                console.log("Cloudinary upload result:", result);
-
                 if (result && result.secure_url) {
                     imageUrls.push(result.secure_url);
-                } else {
-                    console.error("Failed to upload image to Cloudinary:", result);
                 }
-
-                // Temporary file deletion  
-                fs.unlink(tempFilePath, (unlinkErr) => {
-                    if (unlinkErr) {
-                        console.error("Error deleting temporary file:", unlinkErr);
-                    }
-                });
+                fs.unlinkSync(tempFilePath); // Clean up temporary file
             }
         }
-        console.log("Final image URLs to be saved:", imageUrls);
 
-        //post Created with all image URLs and schoolInfoId
-        const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
+        // Extract hashtags and check for trending hashtags
+        const hashtags = extractHashtags(text);
+        const trendingHashtags = ["#trending", "#viral"]; // Define trending hashtags
+        const isTrending = hashtags.some((hashtag) =>
+            trendingHashtags.includes(hashtag.toLowerCase())
+        );
+
+        // Create post
+        const post = new SugPost({
+            adminId,
+            text,
+            images: imageUrls,
+            schoolInfoId,
+            trending: text.includes('#'), // Set trending based on hashtags
+        });
         await post.save();
 
         const populatedPost = await SugPost.findById(post._id)
-            .populate({
-                path: "schoolInfoId",
-                select: "university uniProfilePicture",
-                model: "SchoolInfo"
-            })
+            .populate("schoolInfoId", "university uniProfilePicture")
             .populate("adminId", "sugFullName email");
 
         res.status(201).json({ message: "Post created", post: populatedPost });
@@ -73,6 +67,63 @@ const createSugPost = async (req, res) => {
         res.status(500).json({ message: "Error creating post", error });
     }
 };
+
+// const createSugPost = async (req, res) => {
+//     const { adminId, text, schoolInfoId } = req.body; 
+//     if (!adminId || !text || !schoolInfoId) { 
+//         return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
+//     }
+
+//     try {
+//         let imageUrls = [];
+
+//         if (req.files && req.files.image) {
+//             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
+//             console.log("Images received in request:", images);
+
+//             for (const image of images) {
+//                 const tempFilePath = `uploads/${image.name}`;
+
+//                 await image.mv(tempFilePath);
+//                 console.log(`File moved to temporary path: ${tempFilePath}`);
+
+//                 const result = await uploadToCloudinary(tempFilePath);
+//                 console.log("Cloudinary upload result:", result);
+
+//                 if (result && result.secure_url) {
+//                     imageUrls.push(result.secure_url);
+//                 } else {
+//                     console.error("Failed to upload image to Cloudinary:", result);
+//                 }
+
+//                 // Temporary file deletion  
+//                 fs.unlink(tempFilePath, (unlinkErr) => {
+//                     if (unlinkErr) {
+//                         console.error("Error deleting temporary file:", unlinkErr);
+//                     }
+//                 });
+//             }
+//         }
+//         console.log("Final image URLs to be saved:", imageUrls);
+
+//         //post Created with all image URLs and schoolInfoId
+//         const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
+//         await post.save();
+
+//         const populatedPost = await SugPost.findById(post._id)
+//             .populate({
+//                 path: "schoolInfoId",
+//                 select: "university uniProfilePicture",
+//                 model: "SchoolInfo"
+//             })
+//             .populate("adminId", "sugFullName email");
+
+//         res.status(201).json({ message: "Post created", post: populatedPost });
+//     } catch (error) {
+//         console.error("Error creating post:", error);
+//         res.status(500).json({ message: "Error creating post", error });
+//     }
+// };
 
 
 
@@ -104,7 +155,7 @@ const toggleLike = async (req, res) => {
         if (alreadyLikedIndex !== -1) {
             post.likes.splice(alreadyLikedIndex, 1);  
         } else {
-            post.likes.push({ _id: likerId, fullName: "Unknown Liker" });  
+            post.likes.push({ _id: likerId, fullName: "Unknown Liker",createdAt: new Date() });  
         }
 
         await post.save();
@@ -148,17 +199,19 @@ const toggleLike = async (req, res) => {
 
         // Map likes to include fullName if it's available, or "Unknown Liker" if missing
         const updatedLikes = post.likes.map(like => {
-            if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true };
+            if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true, createdAt: null };
             
             const likeId = like._id.toString();
             const fullName = userMap.get(likeId) || adminMap.get(likeId) || "Unknown Liker";
-
+        
             return {
                 userId: like._id,
                 fullName,
                 liked: true,
+                createdAt: like.createdAt || null, // Include createdAt if available
             };
         });
+        
 
         console.log(`Updated likes for post ${post._id}:`, post.likes);
         console.log(`Post ${post._id} now has ${post.likes.length} likes.`);

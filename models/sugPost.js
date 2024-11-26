@@ -25,7 +25,8 @@ const sugPostSchema = new mongoose.Schema({
     likes: [
         {
             _id: { type: mongoose.Schema.Types.ObjectId, ref: "SugUser" },
-            fullName: String
+            fullName: String,
+            createdAt: { type: Date, default: Date.now }
         }
     ],
     commentsCount: { 
@@ -36,7 +37,8 @@ const sugPostSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "SchoolInfo",
         required: true
-    }
+    },
+    // trending: { type: Boolean, default: false }, // New field
 });
 
 

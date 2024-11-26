@@ -610,10 +610,10 @@ const fetchPostDetails = async (req, res) => {
 
 
 
-
-
 const fetchPostsForSchool = async (req, res) => {
     const { schoolInfoId } = req.params;
+    const { page = 1, limit = 10 } = req.query; // Default to page 1, 10 posts per page
+
     console.log("Received schoolInfoId:", schoolInfoId);
 
     if (!mongoose.Types.ObjectId.isValid(schoolInfoId)) {
@@ -635,7 +635,11 @@ const fetchPostsForSchool = async (req, res) => {
             return res.status(404).json({ message: "School not found" });
         }
 
-        // Fetch admin posts with comments
+        // Convert page and limit to integers
+        const pageNumber = parseInt(page, 10);
+        const limitNumber = parseInt(limit, 10);
+
+        // Fetch admin posts with pagination
         const adminPosts = await SugPost.find({ schoolInfoId })
             .populate([
                 {
@@ -666,6 +670,8 @@ const fetchPostsForSchool = async (req, res) => {
                 }
             ])
             .sort({ createdAt: -1 })
+            .skip((pageNumber - 1) * limitNumber)
+            .limit(limitNumber)
             .lean();
 
         // Format admin posts
@@ -684,7 +690,7 @@ const fetchPostsForSchool = async (req, res) => {
             }
         }));
 
-        // Fetch student posts with comments
+        // Fetch student posts with pagination
         const studentPosts = await UserPost.find({ schoolInfoId })
             .populate([
                 {
@@ -714,6 +720,8 @@ const fetchPostsForSchool = async (req, res) => {
                 }
             ])
             .sort({ createdAt: -1 })
+            .skip((pageNumber - 1) * limitNumber)
+            .limit(limitNumber)
             .lean();
 
         // Format student posts
@@ -733,37 +741,185 @@ const fetchPostsForSchool = async (req, res) => {
             department: post.user?.studentInfo?.department || ""
         }));
 
-        // Combine and sort posts
+        // Combine posts
         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
 
-        // Fetch likes for each post with details
-        const allPostsWithLikes = await Promise.all(
-            allPosts.map(async post => {
-                const likesWithDetails = await Promise.all(
-                    post.likes.map(async like => {
-                        const userLike = await User.findById(like._id).select("fullName");
-                        const adminLike = await SugUser.findById(like._id).select("sugFullName");
-                        return {
-                            _id: like._id,
-                            fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
-                        };
-                    })
-                );
-                return { ...post, likes: likesWithDetails };
-            })
-        );
+        // Total post count
+        const totalAdminPosts = await SugPost.countDocuments({ schoolInfoId });
+        const totalStudentPosts = await UserPost.countDocuments({ schoolInfoId });
+        const totalPosts = totalAdminPosts + totalStudentPosts;
 
+        // Response
         res.json({
             schoolInfo,
-            posts: allPostsWithLikes
+            posts: allPosts,
+            totalPosts,
+            currentPage: pageNumber,
+            totalPages: Math.ceil(totalPosts / limitNumber)
         });
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });
     }
 };
+
+
+
+
+// const fetchPostsForSchool = async (req, res) => {
+//     const { schoolInfoId } = req.params;
+//     console.log("Received schoolInfoId:", schoolInfoId);
+
+//     if (!mongoose.Types.ObjectId.isValid(schoolInfoId)) {
+//         return res.status(400).json({ message: "Invalid schoolInfoId" });
+//     }
+
+//     try {
+//         // Fetching school information
+//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+//             .select("university state aboutUniversity userId uniProfilePicture")
+//             .populate({
+//                 path: "userId",
+//                 model: "User",
+//                 select: "fullName email"
+//             })
+//             .lean();
+
+//         if (!schoolInfo) {
+//             return res.status(404).json({ message: "School not found" });
+//         }
+
+//         // Fetch admin posts with comments
+//         const adminPosts = await SugPost.find({ schoolInfoId })
+//             .populate([
+//                 {
+//                     path: "adminId",
+//                     model: "SugUser",
+//                     select: "sugFullName email role",
+//                     populate: {
+//                         path: "schoolInfo",
+//                         model: "SchoolInfo",
+//                         select: "university uniProfilePicture"
+//                     }
+//                 },
+//                 {
+//                     path: "comments",
+//                     model: "Comment",
+//                     populate: [
+//                         { path: "user", model: "User", select: "fullName profilePhoto" },
+//                         { path: "admin", model: "SugUser", select: "sugFullName" },
+//                         {
+//                             path: "replies",
+//                             model: "Comment",
+//                             populate: [
+//                                 { path: "user", model: "User", select: "fullName profilePhoto" },
+//                                 { path: "admin", model: "SugUser", select: "sugFullName" }
+//                             ]
+//                         }
+//                     ]
+//                 }
+//             ])
+//             .sort({ createdAt: -1 })
+//             .lean();
+
+//         // Format admin posts
+//         const adminPostsWithDetails = adminPosts.map(post => ({
+//             ...post,
+//             postType: "admin",
+//             isAdmin: post.adminId?.role === "admin",
+//             userId: {
+//                 id: post.adminId?._id || "",
+//                 university: post.adminId?.schoolInfo?.university || "",
+//                 schoolInfo: {
+//                     id: post.adminId?.schoolInfo?._id || "",
+//                     university: post.adminId?.schoolInfo?.university || ""
+//                 },
+//                 profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+//             }
+//         }));
+
+//         // Fetch student posts with comments
+//         const studentPosts = await UserPost.find({ schoolInfoId })
+//             .populate([
+//                 {
+//                     path: "user",
+//                     model: "User",
+//                     select: "fullName email profilePhoto",
+//                     populate: [
+//                         { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
+//                         { path: "schoolInfoId", model: "SchoolInfo", select: "university" }
+//                     ]
+//                 },
+//                 {
+//                     path: "comments",
+//                     model: "Comment",
+//                     populate: [
+//                         { path: "user", model: "User", select: "fullName profilePhoto" },
+//                         { path: "admin", model: "SugUser", select: "sugFullName" },
+//                         {
+//                             path: "replies",
+//                             model: "Comment",
+//                             populate: [
+//                                 { path: "user", model: "User", select: "fullName profilePhoto" },
+//                                 { path: "admin", model: "SugUser", select: "sugFullName" }
+//                             ]
+//                         }
+//                     ]
+//                 }
+//             ])
+//             .sort({ createdAt: -1 })
+//             .lean();
+
+//         // Format student posts
+//         const studentPostsWithDetails = studentPosts.map(post => ({
+//             ...post,
+//             postType: "student",
+//             userId: {
+//                 id: post.user?._id || "",
+//                 university: post.user?.schoolInfoId?.university || "",
+//                 schoolInfo: {
+//                     id: post.user?.schoolInfoId?._id || "",
+//                     university: post.user?.schoolInfoId?.university || ""
+//                 },
+//                 profilePicture: post.user?.profilePhoto || ""
+//             },
+//             faculty: post.user?.studentInfo?.faculty || "",
+//             department: post.user?.studentInfo?.department || ""
+//         }));
+
+//         // Combine and sort posts
+//         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
+//             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+//         );
+
+//         // Fetch likes for each post with details
+//         const allPostsWithLikes = await Promise.all(
+//             allPosts.map(async post => {
+//                 const likesWithDetails = await Promise.all(
+//                     post.likes.map(async like => {
+//                         const userLike = await User.findById(like._id).select("fullName");
+//                         const adminLike = await SugUser.findById(like._id).select("sugFullName");
+//                         return {
+//                             _id: like._id,
+//                             fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
+//                         };
+//                     })
+//                 );
+//                 return { ...post, likes: likesWithDetails };
+//             })
+//         );
+
+//         res.json({
+//             schoolInfo,
+//             posts: allPostsWithLikes
+//         });
+//     } catch (error) {
+//         console.error("Error fetching school info and posts:", error);
+//         res.status(500).json({ message: "Error fetching school info and posts", error });
+//     }
+// };
 
 
 

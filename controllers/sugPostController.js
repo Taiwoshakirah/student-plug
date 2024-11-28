@@ -747,15 +747,17 @@ const fetchPostsForSchool = async (req, res) => {
             department: post.user?.studentInfo?.department || ""
         }));
 
-        // Combine posts
-        const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
-            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-        );
+        // Combine posts first
+const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails];
 
-        // Total post count
-        const totalAdminPosts = await SugPost.countDocuments({ schoolInfoId });
-        const totalStudentPosts = await UserPost.countDocuments({ schoolInfoId });
-        const totalPosts = totalAdminPosts + totalStudentPosts;
+// Sort the combined posts
+allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+// Apply pagination on the combined posts
+const paginatedPosts = allPosts.slice((pageNumber - 1) * limitNumber, pageNumber * limitNumber);
+
+// Total post count
+const totalPosts = allPosts.length;
 
         // Response
         res.json({

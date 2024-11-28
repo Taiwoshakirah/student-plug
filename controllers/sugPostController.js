@@ -642,131 +642,131 @@ const fetchPostsForSchool = async (req, res) => {
         }
 
         // Convert page and limit to integers
-        const pageNumber = parseInt(page, 10);
-        const limitNumber = parseInt(limit, 10);
+        // const pageNumber = parseInt(page, 10);
+        // const limitNumber = parseInt(limit, 10);
 
         // Fetch admin posts with pagination
-        const adminPosts = await SugPost.find({ schoolInfoId })
-            .populate([
-                {
-                    path: "adminId",
-                    model: "SugUser",
-                    select: "sugFullName email role",
-                    populate: {
-                        path: "schoolInfo",
-                        model: "SchoolInfo",
-                        select: "university uniProfilePicture"
-                    }
-                },
-                {
-                    path: "comments",
-                    model: "Comment",
-                    populate: [
-                        { path: "user", model: "User", select: "fullName profilePhoto" },
-                        { path: "admin", model: "SugUser", select: "sugFullName" },
-                        {
-                            path: "replies",
-                            model: "Comment",
-                            populate: [
-                                { path: "user", model: "User", select: "fullName profilePhoto" },
-                                { path: "admin", model: "SugUser", select: "sugFullName" }
-                            ]
-                        }
-                    ]
-                }
-            ])
-            .sort({ createdAt: -1 })
-            .skip((pageNumber - 1) * limitNumber)
-            .limit(limitNumber)
-            .lean();
-
-        // Format admin posts
-        const adminPostsWithDetails = adminPosts.map(post => ({
-            ...post,
-            postType: "admin",
-            isAdmin: post.adminId?.role === "admin",
-            userId: {
-                id: post.adminId?._id || "",
-                university: post.adminId?.schoolInfo?.university || "",
-                schoolInfo: {
-                    id: post.adminId?.schoolInfo?._id || "",
-                    university: post.adminId?.schoolInfo?.university || ""
-                },
-                profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+        // Fetch admin posts (no pagination applied here)
+const adminPosts = await SugPost.find({ schoolInfoId })
+.populate([
+    {
+        path: "adminId",
+        model: "SugUser",
+        select: "sugFullName email role",
+        populate: {
+            path: "schoolInfo",
+            model: "SchoolInfo",
+            select: "university uniProfilePicture"
+        }
+    },
+    {
+        path: "comments",
+        model: "Comment",
+        populate: [
+            { path: "user", model: "User", select: "fullName profilePhoto" },
+            { path: "admin", model: "SugUser", select: "sugFullName" },
+            {
+                path: "replies",
+                model: "Comment",
+                populate: [
+                    { path: "user", model: "User", select: "fullName profilePhoto" },
+                    { path: "admin", model: "SugUser", select: "sugFullName" }
+                ]
             }
-        }));
+        ]
+    }
+])
+.sort({ createdAt: -1 })
+.lean();
 
-        // Fetch student posts with pagination
-        const studentPosts = await UserPost.find({ schoolInfoId })
-            .populate([
-                {
-                    path: "user",
-                    model: "User",
-                    select: "fullName email profilePhoto",
-                    populate: [
-                        { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
-                        { path: "schoolInfoId", model: "SchoolInfo", select: "university" }
-                    ]
-                },
-                {
-                    path: "comments",
-                    model: "Comment",
-                    populate: [
-                        { path: "user", model: "User", select: "fullName profilePhoto" },
-                        { path: "admin", model: "SugUser", select: "sugFullName" },
-                        {
-                            path: "replies",
-                            model: "Comment",
-                            populate: [
-                                { path: "user", model: "User", select: "fullName profilePhoto" },
-                                { path: "admin", model: "SugUser", select: "sugFullName" }
-                            ]
-                        }
-                    ]
-                }
-            ])
-            .sort({ createdAt: -1 })
-            .skip((pageNumber - 1) * limitNumber)
-            .limit(limitNumber)
-            .lean();
+// Format admin posts
+const adminPostsWithDetails = adminPosts.map(post => ({
+...post,
+postType: "admin",
+isAdmin: post.adminId?.role === "admin",
+userId: {
+    id: post.adminId?._id || "",
+    university: post.adminId?.schoolInfo?.university || "",
+    schoolInfo: {
+        id: post.adminId?.schoolInfo?._id || "",
+        university: post.adminId?.schoolInfo?.university || ""
+    },
+    profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
+}
+}));
 
-        // Format student posts
-        const studentPostsWithDetails = studentPosts.map(post => ({
-            ...post,
-            postType: "student",
-            userId: {
-                id: post.user?._id || "",
-                university: post.user?.schoolInfoId?.university || "",
-                schoolInfo: {
-                    id: post.user?.schoolInfoId?._id || "",
-                    university: post.user?.schoolInfoId?.university || ""
-                },
-                profilePicture: post.user?.profilePhoto || ""
-            },
-            faculty: post.user?.studentInfo?.faculty || "",
-            department: post.user?.studentInfo?.department || ""
-        }));
+// Fetch student posts (no pagination applied here)
+const studentPosts = await UserPost.find({ schoolInfoId })
+.populate([
+    {
+        path: "user",
+        model: "User",
+        select: "fullName email profilePhoto",
+        populate: [
+            { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
+            { path: "schoolInfoId", model: "SchoolInfo", select: "university" }
+        ]
+    },
+    {
+        path: "comments",
+        model: "Comment",
+        populate: [
+            { path: "user", model: "User", select: "fullName profilePhoto" },
+            { path: "admin", model: "SugUser", select: "sugFullName" },
+            {
+                path: "replies",
+                model: "Comment",
+                populate: [
+                    { path: "user", model: "User", select: "fullName profilePhoto" },
+                    { path: "admin", model: "SugUser", select: "sugFullName" }
+                ]
+            }
+        ]
+    }
+])
+.sort({ createdAt: -1 })
+.lean();
 
-        // Combine posts first
+// Format student posts
+const studentPostsWithDetails = studentPosts.map(post => ({
+...post,
+postType: "student",
+userId: {
+    id: post.user?._id || "",
+    university: post.user?.schoolInfoId?.university || "",
+    schoolInfo: {
+        id: post.user?.schoolInfoId?._id || "",
+        university: post.user?.schoolInfoId?.university || ""
+    },
+    profilePicture: post.user?.profilePhoto || ""
+},
+faculty: post.user?.studentInfo?.faculty || "",
+department: post.user?.studentInfo?.department || ""
+}));
+
+// Combine posts
 const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails];
 
-// Sort the combined posts
+// Sort combined posts by creation date
 allPosts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
 // Apply pagination on the combined posts
+const pageNumber = parseInt(page, 10);
+const limitNumber = parseInt(limit, 10);
 const paginatedPosts = allPosts.slice((pageNumber - 1) * limitNumber, pageNumber * limitNumber);
 
 // Total post count
 const totalPosts = allPosts.length;
 
-        // Response
-        res.json({
-            schoolInfo,
-            posts: allPosts,
-            totalPosts,
-            currentPage: pageNumber,
-            totalPages: Math.ceil(totalPosts / limitNumber)
-        });
+// Response
+res.json({
+schoolInfo,
+posts: paginatedPosts, // Only send paginated posts
+totalPosts,
+currentPage: pageNumber,
+totalPages: Math.ceil(totalPosts / limitNumber)
+});
+
     } catch (error) {
         console.error("Error fetching school info and posts:", error);
         res.status(500).json({ message: "Error fetching school info and posts", error });

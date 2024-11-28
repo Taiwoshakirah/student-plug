@@ -618,7 +618,7 @@ const fetchPostDetails = async (req, res) => {
 
 const fetchPostsForSchool = async (req, res) => {
     const { schoolInfoId } = req.params;
-    const { page = 1, limit = 6 } = req.query; // Default to page 1, 6 posts per page
+    const { page = 1, limit = 10 } = req.query; // Default to page 1, 6 posts per page
 
     console.log("Received schoolInfoId:", schoolInfoId);
 
@@ -642,8 +642,8 @@ const fetchPostsForSchool = async (req, res) => {
         }
 
         // Convert page and limit to integers
-        const pageNumber = parseInt(page, 6);
-        const limitNumber = parseInt(limit, 6);
+        const pageNumber = parseInt(page, 10);
+        const limitNumber = parseInt(limit, 10);
 
         // Fetch admin posts with pagination
         const adminPosts = await SugPost.find({ schoolInfoId })

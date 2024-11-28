@@ -81,10 +81,12 @@ const studentCreatePost = async (req, res) => {
         const { userId, text } = req.body;
         let imageUrls = [];
 
+        // Validate for restricted words in text if present
         if (text && containsRestrictedWords(text)) {
-                        return res.status(400).json({ message: "Your post contains inappropriate content." });
-                    }
+            return res.status(400).json({ message: "Your post contains inappropriate content." });
+        }
 
+        // Handle image uploads if present
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
             for (const image of images) {
@@ -97,37 +99,33 @@ const studentCreatePost = async (req, res) => {
             }
         }
 
-        if (!text) {
-                        return res.status(400).json({ message: "Please provide text" });
-                    }
-                    if (imageUrls.length === 0) {
-                        return res.status(400).json({ message: "Please provide image" });
-                    }
+        // Validate that there is at least one of text or image
+        if (!text && imageUrls.length === 0) {
+            return res.status(400).json({ message: "Please provide either text or an image" });
+        }
 
-                    const user = await User.findById(userId)
-                                .populate('schoolInfoId')  
-                                .populate({
-                                    path: 'studentInfo',  
-                                    model: 'StudentInfo',  
-                                    select: 'faculty department'  
-                                });
+        // Check if the user exists and fetch the necessary info
+        const user = await User.findById(userId)
+            .populate('schoolInfoId')
+            .populate({
+                path: 'studentInfo',
+                model: 'StudentInfo',
+                select: 'faculty department'
+            });
+        
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Extract hashtags and check for trending hashtags
-        const hashtags = extractHashtags(text);
-        const trendingHashtags = ["#trending", "#viral"];
-        const isTrending = hashtags.some((hashtag) =>
-            trendingHashtags.includes(hashtag.toLowerCase())
-        );
+        // Extract hashtags and check for trending hashtags (only if text is provided)
+        const isTrending = text ? extractHashtags(text).some((hashtag) =>
+            ["#trending", "#viral"].includes(hashtag.toLowerCase())
+        ) : false;
 
         const schoolInfoId = user.schoolInfoId;
-                if (!schoolInfoId) {
-                    return res.status(400).json({ message: "User is not associated with a school" });
-                }
-        
-                console.log("Student Info:", user.studentInfo);
+        if (!schoolInfoId) {
+            return res.status(400).json({ message: "User is not associated with a school" });
+        }
 
         // Create post
         const post = new UserPost({
@@ -135,32 +133,34 @@ const studentCreatePost = async (req, res) => {
             text,
             images: imageUrls,
             schoolInfoId: user.schoolInfoId,
-            trending: text.includes('#'), // Set trending based on hashtags
+            trending: isTrending, // Set trending based on hashtags
         });
         await post.save();
 
         res.status(201).json({
-                        message: "Post created successfully",
-                        post: {
-                            ...post.toObject(),
-                            images: post.images
-                        },
-                        studentInfo: {
-                            faculty: user.studentInfo ? user.studentInfo.faculty : 'N/A',  
-                            department: user.studentInfo ? user.studentInfo.department : 'N/A' 
-                        },
-                        profilePicture: user.profilePhoto || null, 
-                        schoolInfo: {
-                            id: schoolInfoId._id,
-                            university: schoolInfoId.university
-                        }
-                    });
-                    console.log('Post with populated studentInfo:', post);
+            message: "Post created successfully",
+            post: {
+                ...post.toObject(),
+                images: post.images
+            },
+            studentInfo: {
+                faculty: user.studentInfo ? user.studentInfo.faculty : 'N/A',
+                department: user.studentInfo ? user.studentInfo.department : 'N/A'
+            },
+            profilePicture: user.profilePhoto || null,
+            schoolInfo: {
+                id: schoolInfoId._id,
+                university: schoolInfoId.university
+            }
+        });
+        console.log('Post with populated studentInfo:', post);
     } catch (error) {
         console.error("Error creating post:", error);
         res.status(500).json({ message: "Failed to create post", error });
     }
 };
+
+
 
 
 // const studentCreatePost = async (req, res) => {

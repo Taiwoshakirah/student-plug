@@ -20,8 +20,13 @@ const {extractHashtags} = require('./trendingController')
 const createSugPost = async (req, res) => {
     const { adminId, text, schoolInfoId } = req.body;
 
-    if (!adminId || !text || !schoolInfoId) {
-        return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
+    if (!adminId || !schoolInfoId) {
+        return res.status(400).json({ message: "Admin ID, and schoolInfoId are required" });
+    }
+
+    // Ensure either text or image(s) is provided
+    if (!text && !(req.files && req.files.image)) {
+        return res.status(400).json({ message: "You must provide either text, image(s), or both" });
     }
 
     try {
@@ -41,7 +46,8 @@ const createSugPost = async (req, res) => {
         }
 
         // Extract hashtags and check for trending hashtags
-        const hashtags = extractHashtags(text);
+        const processedText = text || ""; // Ensure `text` is a string
+        const hashtags = extractHashtags(processedText);
         const trendingHashtags = ["#trending", "#viral"]; // Define trending hashtags
         const isTrending = hashtags.some((hashtag) =>
             trendingHashtags.includes(hashtag.toLowerCase())
@@ -50,10 +56,10 @@ const createSugPost = async (req, res) => {
         // Create post
         const post = new SugPost({
             adminId,
-            text,
+            text: processedText,
             images: imageUrls,
             schoolInfoId,
-            trending: text.includes('#'), // Set trending based on hashtags
+            trending: processedText.includes("#"), // Set trending based on hashtags
         });
         await post.save();
 
@@ -612,7 +618,7 @@ const fetchPostDetails = async (req, res) => {
 
 const fetchPostsForSchool = async (req, res) => {
     const { schoolInfoId } = req.params;
-    const { page = 1, limit = 10 } = req.query; // Default to page 1, 10 posts per page
+    const { page = 1, limit = 6 } = req.query; // Default to page 1, 6 posts per page
 
     console.log("Received schoolInfoId:", schoolInfoId);
 
@@ -636,8 +642,8 @@ const fetchPostsForSchool = async (req, res) => {
         }
 
         // Convert page and limit to integers
-        const pageNumber = parseInt(page, 10);
-        const limitNumber = parseInt(limit, 10);
+        const pageNumber = parseInt(page, 6);
+        const limitNumber = parseInt(limit, 6);
 
         // Fetch admin posts with pagination
         const adminPosts = await SugPost.find({ schoolInfoId })

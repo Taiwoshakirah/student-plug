@@ -15,19 +15,13 @@ const getTrendingPosts = async (req, res) => {
         }
 
         const timezone = 'UTC'; // You can set this to the user's timezone or keep it as UTC
-        const now = moment().tz(timezone);  // Get current time in the specified timezone
+        const now = moment().tz(timezone); // Get current time in the specified timezone
 
-        const startOfToday = now.clone().startOf('day');  // Get the start of today
-        const endOfToday = now.clone().endOf('day');  // Get the end of today
-
-        // Log the start and end of today for debugging
-        console.log('Start of today:', startOfToday.toISOString());  // Log the start of today
-        console.log('End of today:', endOfToday.toISOString());      // Log the end of today
+        const startOfToday = now.clone().startOf('day'); // Get the start of today
+        const endOfToday = now.clone().endOf('day'); // Get the end of today
 
         // Calculate 7 days ago
-        const sevenDaysAgo = now.clone().subtract(7, 'days');  // 7 days ago
-
-        console.log('Seven days ago:', sevenDaysAgo.toISOString());  // Log the start of the 7-day window
+        const sevenDaysAgo = now.clone().subtract(7, 'days'); // 7 days ago
 
         // Create a query base for posts (fetch posts from the last 7 days including today)
         const query = {
@@ -36,7 +30,7 @@ const getTrendingPosts = async (req, res) => {
         };
 
         // Fetch posts containing hashtags
-        const hashtagPosts = await Promise.all([ 
+        const hashtagPosts = await Promise.all([
             SugPost.find({ ...query, text: { $regex: /#\w+/g } })
                 .populate("adminId", "sugFullName email")
                 .populate("schoolInfoId", "uniProfilePicture")
@@ -74,8 +68,6 @@ const getTrendingPosts = async (req, res) => {
         // Combine all posts
         const allPosts = [...hashtagPosts[0], ...hashtagPosts[1], ...engagementPosts[0], ...engagementPosts[1]];
 
-        console.log('All posts fetched:', allPosts.length);  // Log how many posts were fetched
-
         // Remove duplicates by post ID
         const uniquePosts = allPosts.reduce((acc, post) => {
             const id = post._id.toString();
@@ -85,19 +77,19 @@ const getTrendingPosts = async (req, res) => {
             return acc;
         }, {});
 
-        // Log unique posts
-        console.log('Unique posts:', Object.keys(uniquePosts).length);
-
-        // Map posts to a uniform structure
+        // Map posts to a uniform structure with postType
         const trendingPosts = Object.values(uniquePosts).map((post) => {
             let posterDetails = {};
+            let postType = "unknown";
 
             if (post.adminId) {
+                postType = "admin"; // Assign postType as "admin"
                 posterDetails = {
                     name: post.adminId.sugFullName,
                     profilePicture: post.schoolInfoId?.uniProfilePicture || null,
                 };
             } else if (post.user) {
+                postType = "student"; // Assign postType as "student"
                 posterDetails = {
                     name: post.user.fullName,
                     profilePicture: post.user.profilePhoto || null,
@@ -113,6 +105,7 @@ const getTrendingPosts = async (req, res) => {
                 createdAt: post.createdAt,
                 likes: post.likes?.length || 0,
                 comments: post.comments?.length || 0,
+                postType, // Include postType
                 poster: posterDetails,
             };
         });
@@ -129,6 +122,7 @@ const getTrendingPosts = async (req, res) => {
         res.status(500).json({ message: "Error fetching trending posts", error });
     }
 };
+
 
 
 

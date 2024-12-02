@@ -61,9 +61,17 @@ const studentPaymentDetails = async (req, res) => {
 
 
 
-const addCard = async (req, res) => {
-    const { cardNumber, cvv, expiryMonth, expiryYear, email, feeType, cardPin, bankName } = req.body;
+const addCard = async (req, res) => { 
+    const { cardNumber, cvv, expiryDate, email, feeType, cardPin, bankName } = req.body;
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+  
+    // Check if expiryDate is provided and in the correct format (MM/YY)
+    if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
+      return res.status(400).json({ error: "Invalid expiry date format. It should be MM/YY." });
+    }
+  
+    // Split the expiryDate into month and year
+    const [expiryMonth, expiryYear] = expiryDate.split('/');
   
     try {
       const response = await axios.post(
@@ -74,8 +82,8 @@ const addCard = async (req, res) => {
           card: {
             number: cardNumber,
             cvv,
-            expiry_month: expiryMonth,
-            expiry_year: expiryYear,
+            expiry_month: expiryMonth, // Send expiry month
+            expiry_year: expiryYear,   // Send expiry year
           },
           metadata: { 
             feeType,   // Include the fee type in metadata
@@ -113,6 +121,8 @@ const addCard = async (req, res) => {
       }
     }
   };
+  
+  
   
 
 

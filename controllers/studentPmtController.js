@@ -134,10 +134,10 @@ const addCard = async (req, res) => {
   
   
 const getStudentAndCardDetails = async (req, res) => {
-    const { regNo } = req.query;
+    const { email } = req.query;
 
     try {
-        const studentDetails = await StudentPayment.findOne({ regNo });
+        const studentDetails = await StudentPayment.findOne({ email });
         if (!studentDetails) {
             return res.status(404).json({ error: "Student not found" });
         }

@@ -4,6 +4,7 @@ const StudentPayment = require("../models/studentPayment");
 const axios = require("axios");
 require("dotenv").config();
 const Transaction = require('../models/transaction')
+const CardDetails = require('../models/cardDetails')
 
 
 
@@ -61,68 +62,115 @@ const studentPaymentDetails = async (req, res) => {
 
 
 
-const addCard = async (req, res) => { 
-    const { cardNumber, cvv, expiryDate, email, feeType, cardPin, bankName } = req.body;
+const addCard = async (req, res) => {
+    const { cardNumber, cvv, expiryDate, email, feeType, bankName } = req.body;
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-  
-    // Check if expiryDate is provided and in the correct format (MM/YY)
+
+    // Validate expiryDate format (MM/YY)
     if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
-      return res.status(400).json({ error: "Invalid expiry date format. It should be MM/YY." });
+        return res.status(400).json({ error: "Invalid expiry date format. It should be MM/YY." });
     }
-  
-    // Split the expiryDate into month and year
+
     const [expiryMonth, expiryYear] = expiryDate.split('/');
-  
+
     try {
-      const response = await axios.post(
-        "https://api.paystack.co/charge",
-        {
-          email,
-          amount: 1000, // Amount in kobo (₦1 for test purposes)
-          card: {
-            number: cardNumber,
-            cvv,
-            expiry_month: expiryMonth, // Send expiry month
-            expiry_year: expiryYear,   // Send expiry year
-          },
-          metadata: { 
-            feeType,   // Include the fee type in metadata
-            bankName   // Include the bank name in metadata
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json",
-          },
+        const response = await axios.post(
+            "https://api.paystack.co/charge",
+            {
+                email,
+                amount: 1000, // Amount in kobo (₦1 for test purposes)
+                card: {
+                    number: cardNumber,
+                    cvv,
+                    expiry_month: expiryMonth,
+                    expiry_year: expiryYear,
+                },
+                metadata: {
+                    feeType,
+                    bankName,
+                },
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        if (response.data.status) {
+            const { authorization_code } = response.data.data.authorization;
+
+            // Extract first 3 and last 3 digits
+            const first3 = cardNumber.slice(0, 3);
+            const last3 = cardNumber.slice(-3);
+
+            // Save non-sensitive information and token
+            const cardDetails = new CardDetails({
+                email,
+                bankName,
+                feeType,
+                first3,
+                last3,
+                authorizationCode: authorization_code,
+            });
+
+            await cardDetails.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "Card added successfully",
+                cardToken: authorization_code,
+            });
+        } else {
+            return res.status(400).json({ error: "Card tokenization failed" });
         }
-      );
-  
-      if (response.data.status) {
-        const authorizationCode = response.data.data.authorization.authorization_code;
-  
-        // Now, call chargeCard to actually charge the card
-        return res.status(200).json({
-          success: true,
-          cardToken: authorizationCode,
-        });
-      } else {
-        return res.status(400).json({ error: "Card tokenization failed" });
-      }
     } catch (error) {
-      console.error("Tokenization error:", error.response?.data || error.message);
-  
-      if (error.response) {
-        return res.status(error.response.status).json({ error: error.response.data.message });
-      } else if (error.request) {
-        return res.status(500).json({ error: "No response received from Paystack" });
-      } else {
-        return res.status(500).json({ error: "An unexpected error occurred" });
-      }
+        console.error("Tokenization error:", error.response?.data || error.message);
+        res.status(500).json({ error: "An error occurred during tokenization" });
     }
-  };
+};
+
   
   
+const getStudentAndCardDetails = async (req, res) => {
+    const { regNo } = req.query;
+
+    try {
+        const studentDetails = await StudentPayment.findOne({ regNo });
+        if (!studentDetails) {
+            return res.status(404).json({ error: "Student not found" });
+        }
+
+        const cardDetails = await CardDetails.findOne({ email: studentDetails.email });
+        if (!cardDetails) {
+            return res.status(404).json({ error: "Card details not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            student: {
+                firstName: studentDetails.firstName,
+                lastName: studentDetails.lastName,
+                department: studentDetails.department,
+                regNo: studentDetails.regNo,
+                academicLevel: studentDetails.academicLevel,
+                email: studentDetails.email,
+                feeType: studentDetails.feeType,
+            },
+            card: {
+                cardNumber: `${cardDetails.first3} **** **** ${cardDetails.last3}`, // Return first 3 and last 3 digits
+                bankName: cardDetails.bankName,
+                expiryDate: cardDetails.expiryDate,
+            },
+        });
+    } catch (error) {
+        console.error("Error fetching student or card details:", error.message);
+        res.status(500).json({ error: "An error occurred while fetching details" });
+    }
+};
+
+
   
 
 
@@ -315,4 +363,4 @@ const retrieveStudentDetails = async (req, res) => {
 
 
 
-module.exports = {studentPaymentDetails, addCard, chargeCard, retrieveStudentDetails}
+module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard, retrieveStudentDetails}

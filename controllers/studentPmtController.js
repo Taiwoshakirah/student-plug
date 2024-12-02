@@ -62,54 +62,59 @@ const studentPaymentDetails = async (req, res) => {
 
 
 const addCard = async (req, res) => {
-    const { cardNumber, cvv, expiryMonth, expiryYear, email, feeType } = req.body;
+    const { cardNumber, cvv, expiryMonth, expiryYear, email, feeType, cardPin, bankName } = req.body;
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
+  
     try {
-        const response = await axios.post(
-            "https://api.paystack.co/charge",
-            {
-                email,
-                amount: 100, // Amount in kobo (₦1 for test purposes)
-                card: {
-                    number: cardNumber,
-                    cvv,
-                    expiry_month: expiryMonth,
-                    expiry_year: expiryYear,
-                },
-                metadata: { feeType }, // Include the fee type in metadata
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-
-        if (response.data.status) {
-            const authorizationCode = response.data.data.authorization.authorization_code;
-
-            // Save card token (authorization code) to the database for future transactions
-            return res.status(200).json({
-                success: true,
-                cardToken: authorizationCode,
-            });
-        } else {
-            return res.status(400).json({ error: "Card tokenization failed" });
+      const response = await axios.post(
+        "https://api.paystack.co/charge",
+        {
+          email,
+          amount: 1000, // Amount in kobo (₦1 for test purposes)
+          card: {
+            number: cardNumber,
+            cvv,
+            expiry_month: expiryMonth,
+            expiry_year: expiryYear,
+          },
+          metadata: { 
+            feeType,   // Include the fee type in metadata
+            bankName   // Include the bank name in metadata
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
         }
+      );
+  
+      if (response.data.status) {
+        const authorizationCode = response.data.data.authorization.authorization_code;
+  
+        // Now, call chargeCard to actually charge the card
+        return res.status(200).json({
+          success: true,
+          cardToken: authorizationCode,
+        });
+      } else {
+        return res.status(400).json({ error: "Card tokenization failed" });
+      }
     } catch (error) {
-        console.error("Tokenization error:", error.response?.data || error.message);
-
-        if (error.response) {
-            return res.status(error.response.status).json({ error: error.response.data.message });
-        } else if (error.request) {
-            return res.status(500).json({ error: "No response received from Paystack" });
-        } else {
-            return res.status(500).json({ error: "An unexpected error occurred" });
-        }
+      console.error("Tokenization error:", error.response?.data || error.message);
+  
+      if (error.response) {
+        return res.status(error.response.status).json({ error: error.response.data.message });
+      } else if (error.request) {
+        return res.status(500).json({ error: "No response received from Paystack" });
+      } else {
+        return res.status(500).json({ error: "An unexpected error occurred" });
+      }
     }
-};
+  };
+  
+
 
 // const addCard = async (req, res) => {
 //     const { cardNumber, cvv, expiryMonth, expiryYear, email } = req.body;

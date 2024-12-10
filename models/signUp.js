@@ -49,8 +49,8 @@ const userSchema =new mongoose.Schema({
   studentInfo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "StudentInfo" 
-  }
-  
+  },
+   
   
 });
 

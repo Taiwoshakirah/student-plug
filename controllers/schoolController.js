@@ -113,6 +113,353 @@ const schoolInformation = async (req, res, next) => {
     }
 };
 
+// const uploadStudentsRegNo = async (req, res) => {
+//     let facultyNames = req.body["facultyName[]"];
+//     if (!Array.isArray(facultyNames)) {
+//         facultyNames = facultyNames ? [facultyNames] : [];
+//     }
+
+//     console.log("Incoming faculty names:", facultyNames);
+
+//     if (!facultyNames || facultyNames.length === 0 || facultyNames[0] === undefined) {
+//         return res.status(400).send("At least one faculty must be selected.");
+//     }
+
+//     // Fetching school information and also ensuring selectedFaculties is array
+//     const { schoolInfoId } = req.body;
+//     let selectedFaculties = req.body["selectedFaculties[]"];
+//     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
+//     selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
+//     console.log("Valid Selected Faculties:", selectedFaculties);
+
+//     if (selectedFaculties.length === 0) {
+//         return res.status(400).json({ message: "No valid faculties found for selection." });
+//     }
+
+//     const schoolData = await SchoolInfo.findById(schoolInfoId);
+//     if (!schoolData) {
+//         return res.status(400).json({ message: "School info not found" });
+//     }
+
+//     // Fetching all faculties based on selectedFaculties
+//     const faculties = await Faculty.find({ _id: { $in: selectedFaculties } });
+//     console.log("Selected faculties retrieved:", faculties);
+
+//     if (faculties.length === 0) {
+//         return res.status(400).json({ message: "No valid faculties found for selection" });
+//     }
+
+//     // Proceeding with file upload and processing
+//     if (!req.files || !req.files.file) {
+//         return res.status(400).send("No files were uploaded.");
+//     }
+
+//     const file = req.files.file;
+//     const allowedMimeTypes = ["text/csv", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
+
+//     if (!allowedMimeTypes.includes(file.mimetype)) {
+//         return res.status(400).send("Please upload a valid CSV, PDF, or Excel file.");
+//     }
+
+//     const registrationNumbers = [];
+//     const tempPath = `${process.env.UPLOAD_PATH}/${file.name}`;
+//     await file.mv(tempPath);
+
+//     try {
+//         if (file.mimetype === "text/csv") {
+//             fs.createReadStream(tempPath)
+//                 .pipe(csv())
+//                 .on("data", (data) => {
+//                     const regNum = data.registrationNumber?.trim();
+//                     if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                         registrationNumbers.push(regNum);
+//                     }
+//                 })
+//                 .on("end", () => {
+//                     console.log("Extracted registration numbers:", registrationNumbers);
+//                     handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//                 });
+//         } else if (file.mimetype === "application/pdf") {
+//             const dataBuffer = fs.readFileSync(tempPath);
+//             const pdfData = await pdfParse(dataBuffer);
+//             const lines = pdfData.text.split("\n");
+
+//             const regNoPattern = /ND\/\d{3}\/\d{3}/;
+//             lines.forEach((line) => {
+//                 const match = line.match(regNoPattern);
+//                 if (match) {
+//                     const regNum = match[0].trim();
+//                     if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                         registrationNumbers.push(regNum);
+//                     }
+//                 }
+//             });
+//             console.log("Extracted registration numbers:", registrationNumbers);
+//             handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//         } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
+//             const rows = await readXlsxFile(tempPath);
+//             rows.forEach((row) => {
+//                 const regNum = row[0]?.trim();
+//                 if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                     registrationNumbers.push(regNum);
+//                 }
+//             });
+//             handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//         }
+//     } catch (error) {
+//         console.error("Error processing file:", error);
+//         return res.status(500).send("Error processing file.");
+//     }
+
+//     // Saving of selected faculties with school information
+// try {
+//     const updatedSchoolData = await SchoolInfo.findByIdAndUpdate(
+//         schoolInfoId,
+//         { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } },
+//         { new: true } 
+//     );
+
+//     if (!updatedSchoolData) {
+//         return res.status(500).send("Failed to update school with selected faculties.");
+//     }
+
+//     return res.status(200).json({
+//         message: "Registration numbers processed and faculties updated successfully.",
+//         registrationNumbers,
+//         updatedSchoolData,
+//     });
+// } catch (error) {
+//     console.error("Error updating school data:", error);
+//     return res.status(500).send("Error updating school data.");
+// }
+
+// };
+
+// const isValidRegNumber = (regNum) => {
+//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+//     return regNum && regNumberPattern.test(regNum);
+// };
+
+// const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolInfoId, tempPath, res) => {
+//     try {
+//         console.log("Registration numbers being processed:", registrationNumbers);
+//         const studentsToInsert = [];
+//         const insertedRegNumbers = new Set();
+
+//         for (const faculty of facultyDocs) {
+//             const facultyId = faculty._id;
+
+//             // Retrieve existing students with matching registration numbers
+//             const existingStudents = await Student.find({
+//                 registrationNumber: { $in: registrationNumbers },
+//             });
+//             const existingRegNums = new Set(existingStudents.map(student => student.registrationNumber));
+
+//             for (const regNum of registrationNumbers) {
+//                 if (!existingRegNums.has(regNum) && !insertedRegNumbers.has(regNum)) {
+//                     studentsToInsert.push({
+//                         registrationNumber: regNum,
+//                         faculty: facultyId,
+//                         schoolInfo: schoolInfoId,
+//                     });
+//                     insertedRegNumbers.add(regNum);
+//                 } else {
+//                     console.log(`Duplicate: ${regNum} for faculty ${faculty.facultyName}`);
+//                 }
+//             }
+//         }
+
+//         let insertedStudents = [];
+//         if (studentsToInsert.length > 0) {
+//             try {
+//                 insertedStudents = await Student.insertMany(studentsToInsert, { ordered: false });
+//                 console.log(`Inserted ${insertedStudents.length} students successfully.`);
+//             } catch (error) {
+//                 if (error.code === 11000) {
+//                     console.log("Duplicate registration numbers encountered during insertion.");
+//                 } else {
+//                     throw error;
+//                 }
+//             }
+//         }
+
+//         // Link inserted students to SchoolInfo
+//         if (insertedStudents.length > 0) {
+//             await SchoolInfo.findByIdAndUpdate(
+//                 schoolInfoId,
+//                 { $push: { students: { $each: insertedStudents.map(student => student._id) } } }
+//             );
+//         }
+
+//         // Clean up temporary file
+//         fs.unlink(tempPath, (err) => {
+//             if (err) console.error("Error deleting temp file:", err);
+//         });
+
+//         // Send response only if headers are not sent
+//         if (!res.headersSent) {
+//             return res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
+//         }
+//     } catch (error) {
+//         console.error("Error saving students:", error);
+
+//         if (!res.headersSent) {
+//             return res.status(500).send("Error saving students.");
+//         }
+//     }
+// };
+
+
+
+const isValidRegNumber = (regNum) => {
+    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+    return regNum && regNumberPattern.test(regNum);
+};
+
+const extractFacultyNameFromLine = (line, faculties) => {
+    for (const faculty of faculties) {
+        if (line.toLowerCase().includes(faculty.facultyName.toLowerCase().trim())) {
+            return faculty.facultyName;
+        }
+    }
+    return null;
+};
+
+const processFacultyRegistrationNumbers = async (
+    facultyRegMap,
+    faculties,
+    schoolInfoId,
+    tempPath,
+    res,
+    schoolData
+  ) => {
+    try {
+      // Ensure all faculties are included, even if no registration numbers are found
+      faculties.forEach((faculty) => {
+        facultyRegMap[faculty.facultyName] =
+          facultyRegMap[faculty.facultyName] || [];
+      });
+  
+      // Log results for debugging
+      faculties.forEach((faculty) => {
+        const facultyName = faculty.facultyName;
+        const registrationNumbers = facultyRegMap[facultyName];
+        console.log(
+          `Processed ${registrationNumbers.length} registration numbers for ${facultyName}`
+        );
+      });
+  
+      const addedFaculties = []; // Keep track of faculties added to the school
+  
+      // Create or update students in the database
+      for (const facultyName in facultyRegMap) {
+        const faculty = faculties.find((f) => f.facultyName === facultyName);
+  
+        if (faculty) {
+          const registrationNumbers = facultyRegMap[facultyName];
+  
+          // Add the faculty ID to the school's faculties array if not already present
+          addedFaculties.push(faculty._id);
+  
+          for (const regNum of registrationNumbers) {
+            // Check if the student already exists
+            const existingStudent = await Student.findOne({
+              registrationNumber: regNum,
+            });
+  
+            if (!existingStudent) {
+              // Create a new student document
+              const newStudent = new Student({
+                registrationNumber: regNum,
+                faculty: faculty._id, // Reference to the faculty
+                schoolInfo: schoolInfoId, // Reference to the schoolInfo
+              });
+  
+              const savedStudent = await newStudent.save();
+  
+              // Add the new student to the school's students array
+              await SchoolInfo.findByIdAndUpdate(
+                schoolInfoId,
+                { $push: { students: savedStudent._id } },
+                { new: true } // Return updated document
+              );
+            }
+          }
+  
+          console.log(
+            `Processed ${registrationNumbers.length} registration numbers for ${facultyName}`
+          );
+        }
+      }
+  
+      // Update the school's faculties array with unique faculties
+      await SchoolInfo.findByIdAndUpdate(
+        schoolInfoId,
+        { $addToSet: { faculties: { $each: addedFaculties } } }, // Use $addToSet to avoid duplicates
+        { new: true } // Return the updated document
+      );
+  
+      // Clean up the temporary file
+      fs.unlinkSync(tempPath);
+  
+      // Respond with processed data
+      return res.status(200).json({
+        message: "Registration numbers processed successfully.",
+        school: {
+          ...schoolData.toObject(),
+          students: schoolData.students.filter((student) => student !== null),
+        },
+        faculties: faculties.map((faculty) => ({
+          id: faculty._id,
+          name: faculty.facultyName,
+        })),
+        data: facultyRegMap,
+      });
+    } catch (error) {
+      console.error("Error processing faculty registration numbers:", error);
+  
+      // Handle cleanup in case of an error
+      if (fs.existsSync(tempPath)) {
+        fs.unlinkSync(tempPath);
+      }
+  
+      return res
+        .status(500)
+        .json({ message: "Error processing registration numbers." });
+    }
+  };
+  
+  
+
+const mergeFacultyLines = (lines) => {
+    const mergedLines = [];
+    let tempLine = "";
+
+    // Loop through the parsed lines
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Check if the line contains a faculty name
+        if (line.includes("Faculty of")) {
+            // If there is an accumulated tempLine, push it to the mergedLines
+            if (tempLine) {
+                mergedLines.push(tempLine.trim());
+            }
+            // Start a new faculty line
+            tempLine = line;
+        } else {
+            // Append additional information to the current faculty line
+            tempLine += " " + line;
+        }
+    }
+
+    // Add any remaining text to the result
+    if (tempLine.trim()) {
+        mergedLines.push(tempLine.trim());
+    }
+
+    return mergedLines;
+};
 
 
 const uploadStudentsRegNo = async (req, res) => {
@@ -121,193 +468,368 @@ const uploadStudentsRegNo = async (req, res) => {
         facultyNames = facultyNames ? [facultyNames] : [];
     }
 
-    console.log("Incoming faculty names:", facultyNames);
-
     if (!facultyNames || facultyNames.length === 0 || facultyNames[0] === undefined) {
         return res.status(400).send("At least one faculty must be selected.");
     }
 
-    // Fetching school information and also ensuring selectedFaculties is array
     const { schoolInfoId } = req.body;
     let selectedFaculties = req.body["selectedFaculties[]"];
     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
-    selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
-    console.log("Valid Selected Faculties:", selectedFaculties);
+    selectedFaculties = selectedFaculties.filter((id) => mongoose.Types.ObjectId.isValid(id));
 
     if (selectedFaculties.length === 0) {
         return res.status(400).json({ message: "No valid faculties found for selection." });
     }
 
     const schoolData = await SchoolInfo.findById(schoolInfoId);
+    // Remove null or invalid entries from students array
+schoolData.students = schoolData.students.filter((student) => student !== null);
     if (!schoolData) {
         return res.status(400).json({ message: "School info not found" });
     }
 
-    // Fetching all faculties based on selectedFaculties
     const faculties = await Faculty.find({ _id: { $in: selectedFaculties } });
-    console.log("Selected faculties retrieved:", faculties);
-
     if (faculties.length === 0) {
         return res.status(400).json({ message: "No valid faculties found for selection" });
     }
 
-    // Proceeding with file upload and processing
     if (!req.files || !req.files.file) {
         return res.status(400).send("No files were uploaded.");
     }
 
     const file = req.files.file;
-    const allowedMimeTypes = ["text/csv", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-
+    const allowedMimeTypes = [
+        "text/csv",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ];
     if (!allowedMimeTypes.includes(file.mimetype)) {
         return res.status(400).send("Please upload a valid CSV, PDF, or Excel file.");
     }
 
-    const registrationNumbers = [];
     const tempPath = `${process.env.UPLOAD_PATH}/${file.name}`;
     await file.mv(tempPath);
 
     try {
+        const facultyRegMap = faculties.reduce((acc, faculty) => {
+            acc[faculty.facultyName] = [];
+            return acc;
+        }, {});
+
         if (file.mimetype === "text/csv") {
             fs.createReadStream(tempPath)
                 .pipe(csv())
                 .on("data", (data) => {
+                    console.log("CSV Data Row:", data);
                     const regNum = data.registrationNumber?.trim();
-                    if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
-                        registrationNumbers.push(regNum);
+                    const facultyName = data.facultyName?.trim();
+
+                    if (isValidRegNumber(regNum) && facultyName) {
+                        faculties.forEach((faculty) => {
+                            if (faculty.facultyName.toLowerCase() === facultyName.toLowerCase()) {
+                                facultyRegMap[faculty.facultyName].push(regNum);
+                            }
+                        });
                     }
                 })
-                .on("end", () => {
-                    console.log("Extracted registration numbers:", registrationNumbers);
-                    handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+                .on("end", async () => {
+                    await processFacultyRegistrationNumbers(
+                        facultyRegMap,
+                        faculties,
+                        schoolInfoId,
+                        tempPath,
+                        res,
+                        schoolData
+                    );
                 });
         } else if (file.mimetype === "application/pdf") {
             const dataBuffer = fs.readFileSync(tempPath);
             const pdfData = await pdfParse(dataBuffer);
-            const lines = pdfData.text.split("\n");
+            let lines = pdfData.text.split("\n");
+
+            // Merge faculty lines before processing
+            lines = mergeFacultyLines(lines);
+            console.log("PDF Parsed Lines:", lines);
 
             const regNoPattern = /ND\/\d{3}\/\d{3}/;
             lines.forEach((line) => {
                 const match = line.match(regNoPattern);
                 if (match) {
                     const regNum = match[0].trim();
-                    if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
-                        registrationNumbers.push(regNum);
+                    const facultyName = extractFacultyNameFromLine(line, faculties);
+
+                    if (isValidRegNumber(regNum) && facultyName) {
+                        facultyRegMap[facultyName].push(regNum);
                     }
                 }
             });
-            console.log("Extracted registration numbers:", registrationNumbers);
-            handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+            await processFacultyRegistrationNumbers(
+                facultyRegMap,
+                faculties,
+                schoolInfoId,
+                tempPath,
+                res,
+                schoolData
+            );
         } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
             const rows = await readXlsxFile(tempPath);
+            console.log("Excel Rows:", rows);
             rows.forEach((row) => {
                 const regNum = row[0]?.trim();
-                if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
-                    registrationNumbers.push(regNum);
+                const facultyName = row[1]?.trim();
+
+                if (isValidRegNumber(regNum) && facultyName) {
+                    faculties.forEach((faculty) => {
+                        if (faculty.facultyName.toLowerCase() === facultyName.toLowerCase()) {
+                            facultyRegMap[faculty.facultyName].push(regNum);
+                        }
+                    });
                 }
             });
-            handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+            await processFacultyRegistrationNumbers(
+                facultyRegMap,
+                faculties,
+                schoolInfoId,
+                tempPath,
+                res,
+                schoolData
+            );
         }
     } catch (error) {
         console.error("Error processing file:", error);
+        fs.unlinkSync(tempPath); // Cleanup temp file in case of error
         return res.status(500).send("Error processing file.");
     }
-
-    // Saving of selected faculties with school information
-try {
-    const updatedSchoolData = await SchoolInfo.findByIdAndUpdate(
-        schoolInfoId,
-        { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } },
-        { new: true } 
-    );
-
-    if (!updatedSchoolData) {
-        return res.status(500).send("Failed to update school with selected faculties.");
-    }
-
-    return res.status(200).json({
-        message: "Registration numbers processed and faculties updated successfully.",
-        registrationNumbers,
-        updatedSchoolData,
-    });
-} catch (error) {
-    console.error("Error updating school data:", error);
-    return res.status(500).send("Error updating school data.");
-}
-
 };
 
-const isValidRegNumber = (regNum) => {
-    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
-    return regNum && regNumberPattern.test(regNum);
-};
 
-const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolInfoId, tempPath, res) => {
-    try {
-        console.log("Registration numbers being processed:", registrationNumbers);
-        const studentsToInsert = [];
-        const insertedRegNumbers = new Set(); 
 
-        for (const faculty of facultyDocs) {
-            const facultyId = faculty._id;
 
-            // Retrieving existing students across all faculties with matching reg numbers
-            const existingStudents = await Student.find({
-                registrationNumber: { $in: registrationNumbers },
-            });
-            const existingRegNums = new Set(existingStudents.map(student => student.registrationNumber));
 
-            // Filtering and preparing new students only if the reg number doesn't already exist
-            for (const regNum of registrationNumbers) {
-                if (!existingRegNums.has(regNum) && !insertedRegNumbers.has(regNum)) {
-                    studentsToInsert.push({
-                        registrationNumber: regNum,
-                        faculty: facultyId,
-                        schoolInfo: schoolInfoId,
-                    });
-                    insertedRegNumbers.add(regNum); 
-                } else {
-                    console.log(`Duplicate: ${regNum} for faculty ${faculty.facultyName}`);
-                }
-            }
-        }
 
-        let insertedStudents = [];
-        if (studentsToInsert.length > 0) {
-            try {
-                insertedStudents = await Student.insertMany(studentsToInsert, { ordered: false });
-                console.log(`Inserted ${insertedStudents.length} students successfully.`);
-            } catch (error) {
-                if (error.code === 11000) {
-                    console.log("Duplicate registration numbers encountered during insertion.");
-                } else {
-                    throw error;
-                }
-            }
-        }
 
-        // Linking inserted students to the SchoolInfo
-        if (insertedStudents.length > 0) {
-            await SchoolInfo.findByIdAndUpdate(
-                schoolInfoId,
-                { $push: { students: { $each: insertedStudents.map(student => student._id) } } }
-            );
-        }
 
-        fs.unlink(tempPath, (err) => {
-            if (err) console.error("Error deleting temp file:", err);
-        });
 
-        if (!res.headersSent) {
-            return res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
-        }
-    } catch (error) {
-        console.error("Error saving students:", error);
-        if (!res.headersSent) {
-            return res.status(500).send("Error saving students.");
-        }
-    }
-};
+
+
+
+// Move this function to the top, before usage
+// const isValidRegNumber = (regNum) => {
+//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+//     return regNum && regNumberPattern.test(regNum);
+// };
+
+// const uploadStudentsRegNo = async (req, res) => {
+//     let facultyNames = req.body["facultyName[]"];
+//     if (!Array.isArray(facultyNames)) {
+//         facultyNames = facultyNames ? [facultyNames] : [];
+//     }
+
+//     console.log("Incoming faculty names:", facultyNames);
+
+//     if (!facultyNames || facultyNames.length === 0 || facultyNames[0] === undefined) {
+//         return res.status(400).send("At least one faculty must be selected.");
+//     }
+
+//     // Fetching school information and also ensuring selectedFaculties is array
+//     const { schoolInfoId } = req.body;
+//     let selectedFaculties = req.body["selectedFaculties[]"];
+//     selectedFaculties = Array.isArray(selectedFaculties) ? selectedFaculties : [selectedFaculties];
+//     selectedFaculties = selectedFaculties.filter(id => mongoose.Types.ObjectId.isValid(id));
+//     console.log("Valid Selected Faculties:", selectedFaculties);
+
+//     if (selectedFaculties.length === 0) {
+//         return res.status(400).json({ message: "No valid faculties found for selection." });
+//     }
+
+//     const schoolData = await SchoolInfo.findById(schoolInfoId);
+//     if (!schoolData) {
+//         return res.status(400).json({ message: "School info not found" });
+//     }
+
+//     // Fetching all faculties based on selectedFaculties
+//     const faculties = await Faculty.find({ _id: { $in: selectedFaculties } });
+//     console.log("Selected faculties retrieved:", faculties);
+
+//     if (faculties.length === 0) {
+//         return res.status(400).json({ message: "No valid faculties found for selection" });
+//     }
+
+//     // Proceeding with file upload and processing
+//     if (!req.files || !req.files.file) {
+//         return res.status(400).send("No files were uploaded.");
+//     }
+
+//     const file = req.files.file;
+//     const allowedMimeTypes = ["text/csv", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
+
+//     if (!allowedMimeTypes.includes(file.mimetype)) {
+//         return res.status(400).send("Please upload a valid CSV, PDF, or Excel file.");
+//     }
+
+//     const registrationNumbers = [];
+//     const tempPath = `${process.env.UPLOAD_PATH}/${file.name}`;
+//     await file.mv(tempPath);
+
+//     try {
+//         if (file.mimetype === "text/csv") {
+//             fs.createReadStream(tempPath)
+//                 .pipe(csv())
+//                 .on("data", (data) => {
+//                     const regNum = data.registrationNumber?.trim();
+//                     if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                         registrationNumbers.push(regNum);
+//                     }
+//                 })
+//                 .on("end", () => {
+//                     console.log("Extracted registration numbers:", registrationNumbers);
+//                     handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//                 });
+//         } else if (file.mimetype === "application/pdf") {
+//             const dataBuffer = fs.readFileSync(tempPath);
+//             const pdfData = await pdfParse(dataBuffer);
+//             const lines = pdfData.text.split("\n");
+
+//             const regNoPattern = /ND\/\d{3}\/\d{3}/;
+//             lines.forEach((line) => {
+//                 const match = line.match(regNoPattern);
+//                 if (match) {
+//                     const regNum = match[0].trim();
+//                     if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                         registrationNumbers.push(regNum);
+//                     }
+//                 }
+//             });
+//             console.log("Extracted registration numbers:", registrationNumbers);
+//             handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//         } else if (file.mimetype.includes("spreadsheet") || file.mimetype.includes("excel")) {
+//             const rows = await readXlsxFile(tempPath);
+//             rows.forEach((row) => {
+//                 const regNum = row[0]?.trim();
+//                 if (isValidRegNumber(regNum) && !registrationNumbers.includes(regNum)) {
+//                     registrationNumbers.push(regNum);
+//                 }
+//             });
+//             handleFileProcessingEnd(registrationNumbers, faculties,schoolInfoId, tempPath, res);
+//         }
+//     } catch (error) {
+//         console.error("Error processing file:", error);
+//         return res.status(500).send("Error processing file.");
+//     }
+
+//     // Saving of selected faculties with school information
+// try {
+//     const updatedSchoolData = await SchoolInfo.findByIdAndUpdate(
+//         schoolInfoId,
+//         { $addToSet: { faculties: { $each: faculties.map(faculty => faculty._id) } } },
+//         { new: true } 
+//     );
+
+//     if (!updatedSchoolData) {
+//         return res.status(500).send("Failed to update school with selected faculties.");
+//     }
+
+//     return res.status(200).json({
+//         message: "Registration numbers processed and faculties updated successfully.",
+//         registrationNumbers,
+//         updatedSchoolData,
+//     });
+// } catch (error) {
+//     console.error("Error updating school data:", error);
+//     return res.status(500).send("Error updating school data.");
+// }
+
+// };
+
+// const isValidRegNumber = (regNum) => {
+//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+//     return regNum && regNumberPattern.test(regNum);
+// };
+
+// const handleFileProcessingEnd = async (registrationNumbers, facultyDocs, schoolInfoId, tempPath, res) => {
+//     try {
+//         console.log("Registration numbers being processed:", registrationNumbers);
+//         const studentsToInsert = [];
+//         const insertedRegNumbers = new Set();  // Track inserted registration numbers globally
+
+//         // Retrieve all students with matching registration numbers
+//         const existingStudents = await Student.find({
+//             registrationNumber: { $in: registrationNumbers },
+//         });
+
+//         const existingRegNums = new Set(existingStudents.map(student => student.registrationNumber));
+
+//         // Loop through each registration number and assign students to faculties based on their order in the faculties array
+//         for (let i = 0; i < registrationNumbers.length; i++) {
+//             const regNum = registrationNumbers[i];
+//             if (!existingRegNums.has(regNum) && !insertedRegNumbers.has(regNum)) {
+//                 // Assign student to the correct faculty based on the index
+//                 const facultyIndex = i % facultyDocs.length;  // Wrap around if more registration numbers than faculties
+//                 const faculty = facultyDocs[facultyIndex];
+
+//                 studentsToInsert.push({
+//                     registrationNumber: regNum,
+//                     faculty: faculty._id,  // Assign to the correct faculty
+//                     schoolInfo: schoolInfoId,
+//                 });
+
+//                 insertedRegNumbers.add(regNum);  // Mark this registration number as inserted
+//             } else {
+//                 console.log(`Duplicate: ${regNum} already assigned to faculty ${facultyDocs[facultyIndex]?.facultyName}`);
+//             }
+//         }
+
+//         let insertedStudents = [];
+//         if (studentsToInsert.length > 0) {
+//             try {
+//                 // Insert new students to the database
+//                 insertedStudents = await Student.insertMany(studentsToInsert, { ordered: false });
+//                 console.log(`Inserted ${insertedStudents.length} students successfully.`);
+//             } catch (error) {
+//                 if (error.code === 11000) {
+//                     console.log("Duplicate registration numbers encountered during insertion.");
+//                 } else {
+//                     throw error;
+//                 }
+//             }
+//         }
+
+//         // Ensure the inserted students are linked to the SchoolInfo document
+//         if (insertedStudents.length > 0) {
+//             await SchoolInfo.findByIdAndUpdate(
+//                 schoolInfoId,
+//                 { $push: { students: { $each: insertedStudents.map(student => student._id) } } },
+//                 { new: true } // Ensure the document is updated and returns the latest version
+//             );
+//             console.log("Updated school with inserted students.");
+//         }
+
+//         // Delete the temporary file
+//         fs.unlink(tempPath, (err) => {
+//             if (err) console.error("Error deleting temp file:", err);
+//         });
+
+//         if (!res.headersSent) {
+//             return res.status(200).send("Students registration numbers uploaded successfully for all selected faculties.");
+//         }
+//     } catch (error) {
+//         console.error("Error saving students:", error);
+//         if (!res.headersSent) {
+//             return res.status(500).send("Error saving students.");
+//         }
+//     }
+// };
+
+
+
+
+
+
+
+
+
+
 
 
 

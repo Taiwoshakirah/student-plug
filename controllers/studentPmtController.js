@@ -1,10 +1,16 @@
 // routes/student.js
 const express = require('express')
 const StudentPayment = require("../models/studentPayment");
+const Student = require('../models/studentRegNo')
 const axios = require("axios");
 require("dotenv").config();
 const Transaction = require('../models/transaction')
 const CardDetails = require('../models/cardDetails')
+const SchoolInfo = require('../models/schoolInfo')
+const StudentInfo = require('../models/studentInfo')
+const Faculty = require('../models/faculties')
+const mongoose = require('mongoose')
+const User = require('../models/signUp')
 
 
 
@@ -33,30 +39,104 @@ const CardDetails = require('../models/cardDetails')
 //         res.status(500).json({ error: "An error occurred while saving student details" });
 //     }
 // }
-const studentPaymentDetails = async (req, res) => {
-    const { firstName, lastName, department, regNo, academicLevel, email, feeType } = req.body;
 
-    try {
-        const newStudent = new StudentPayment({
-            firstName,
-            lastName,
-            department,
-            regNo,
-            academicLevel,
-            email,
-            feeType,
-        });
 
-        await newStudent.save();
 
-        res.status(201).json({ success: true, message: "Student added successfully!" });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ error: "Student with this Registration Number or Email already exists" });
-        }
-        res.status(500).json({ error: "An error occurred while saving student details" });
+
+const isValidRegNumber = (regNum) => {
+    // Regular expression for validating regNo in the format 'ND/xxx/xxx'
+    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+    return regNum && regNumberPattern.test(regNum);
+  };
+  
+  const studentPaymentDetails = async (req, res) => {
+    const { userId, firstName, lastName, department, regNo, academicLevel, email, feeType, schoolInfoId } = req.body;
+  
+    // Validate required fields
+    if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !feeType || !schoolInfoId) {
+      return res.status(422).json({ success: false, message: "All fields are required, including schoolInfoId." });
     }
-};
+  
+    // Validate regNo format
+    if (!isValidRegNumber(regNo)) {
+      return res.status(400).json({ success: false, message: "Invalid registration number format." });
+    }
+  
+    try {
+      // Check if the user exists
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" });
+      }
+  
+      // Check if the regNo exists in the students collection
+      const student = await Student.findOne({ registrationNumber: regNo });
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student with the given registration number not found." });
+      }
+  
+      // Check for existing payment with the same regNo or email
+      const existingPayment = await StudentPayment.findOne({ 
+        $or: [{ regNo }, { email }] 
+      });
+      if (existingPayment) {
+        return res.status(400).json({ success: false, message: "Payment details already exist for this Registration Number or Email" });
+      }
+  
+      // Create a new payment record
+      const newStudentPayment = new StudentPayment({
+        userId,
+        firstName,
+        lastName,
+        department,
+        regNo,
+        academicLevel,
+        email,
+        feeType,
+        schoolInfoId,
+      });
+  
+      // Save payment record
+      const savedPayment = await newStudentPayment.save();
+  
+      res.status(201).json({
+        success: true,
+        message: "Payment details saved successfully!",
+        payment: savedPayment,
+      });
+    } catch (error) {
+      console.error("Error in studentPaymentDetails:", error);
+      res.status(500).json({ success: false, message: "An error occurred while saving payment details", error });
+    }
+  };
+  
+  
+
+
+// const studentPaymentDetails = async (req, res) => {
+//     const { firstName, lastName, department, regNo, academicLevel, email, feeType } = req.body;
+
+//     try {
+//         const newStudent = new StudentPayment({
+//             firstName,
+//             lastName,
+//             department,
+//             regNo,
+//             academicLevel,
+//             email,
+//             feeType,
+//         });
+
+//         await newStudent.save();
+
+//         res.status(201).json({ success: true, message: "Student added successfully!" });
+//     } catch (error) {
+//         if (error.code === 11000) {
+//             return res.status(400).json({ error: "Student with this Registration Number or Email already exists" });
+//         }
+//         res.status(500).json({ error: "An error occurred while saving student details" });
+//     }
+// };
 
 
 
@@ -296,6 +376,69 @@ const chargeCard = async (req, res) => {
 };
 
 
+const recordPayment = async (req, res) => {
+    const { email, amount, feeType, reference, status, gatewayResponse } = req.body;
+  
+    try {
+      // Find the student payment by email
+      const studentPayment = await StudentPayment.findOne({ email });
+      if (!studentPayment) {
+        return res.status(404).json({ success: false, message: "Student payment record not found." });
+      }
+  
+      console.log("Student Payment Record:", studentPayment);
+  
+      // Find the student by registration number
+      const registrationNumber = studentPayment.regNo.trim(); // Remove extra spaces
+      const student = await Student.findOne({
+        registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" }
+      });
+  
+      if (!student) {
+        console.log("No student found for regNo:", registrationNumber);
+        return res.status(404).json({ success: false, message: "Student record not found." });
+      }
+  
+      console.log("Student Record Found:", student);
+  
+      // Create a new transaction
+      const transaction = new Transaction({
+        email,
+        amount,
+        feeType,
+        reference,
+        status,
+        gatewayResponse,
+        student: studentPayment._id, // Link to StudentPayment
+      });
+  
+      const savedTransaction = await transaction.save();
+  
+      // Update the StudentPayment transactions array
+      studentPayment.transactions.push(savedTransaction._id);
+      await studentPayment.save();
+  
+      // Update the Student transactions array
+      student.transactions.push(savedTransaction._id);
+      await student.save();
+  
+      return res.status(200).json({
+        success: true,
+        message: "Payment recorded and linked successfully.",
+        data: savedTransaction,
+      });
+    } catch (error) {
+      console.error("Error recording payment:", error.stack || error);
+      return res.status(500).json({
+        success: false,
+        message: "An error occurred while recording the payment.",
+      });
+    }
+  };
+  
+  
+
+
 const retrieveStudentDetails = async (req, res) => {
     const { email } = req.params; // Assume email is passed as a URL parameter
 
@@ -319,6 +462,362 @@ const retrieveStudentDetails = async (req, res) => {
         res.status(500).json({ success: false, error: "An error occurred while retrieving student details" });
     }
 };
+
+
+const schoolPaymentStatus = async (req, res) => {
+    const { schoolInfoId } = req.params;
+    const { page = 1, limit = 1 } = req.query; // Default to page 1 and 1 faculty per page
+
+    try {
+        // Retrieve school information and populate related faculties and students
+        const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+            .populate({
+                path: "faculties",
+                select: "facultyName",
+            })
+            .populate({
+                path: "students",
+                select: "registrationNumber faculty transactions",
+                populate: [
+                    {
+                        path: "faculty",
+                        select: "facultyName",
+                    },
+                    {
+                        path: "transactions",
+                        select: "status",
+                    },
+                ],
+            });
+
+        if (!schoolInfo) {
+            return res.status(404).json({ message: "School information not found." });
+        }
+
+        const totalRegistrations = schoolInfo.students.length;
+        let totalPaid = 0;
+
+        // Create a dictionary to hold data grouped by faculty
+        const facultyWiseData = {};
+
+        schoolInfo.faculties.forEach((faculty) => {
+            facultyWiseData[faculty._id] = {
+                facultyName: faculty.facultyName,
+                totalRegistrations: 0,
+                students: [],
+            };
+        });
+
+        // Categorize students by faculty and payment status
+        schoolInfo.students.forEach((student) => {
+            const hasPaid = student.transactions.some(
+                (transaction) => transaction.status === "success"
+            );
+            const paymentStatus = hasPaid ? "Paid" : "Unpaid";
+            const formattedRegNo = `${student.registrationNumber} (${paymentStatus})`;
+
+            if (student.faculty && facultyWiseData[student.faculty._id]) {
+                facultyWiseData[student.faculty._id].totalRegistrations++;
+                facultyWiseData[student.faculty._id].students.push({
+                    registrationNumber: formattedRegNo,
+                    status: paymentStatus,
+                });
+            }
+
+            if (hasPaid) {
+                totalPaid++;
+            }
+        });
+
+        const totalUnpaid = totalRegistrations - totalPaid;
+
+        // Implement pagination for faculties
+        const facultyEntries = Object.values(facultyWiseData);
+        const totalFaculties = facultyEntries.length;
+
+        const startIndex = (page - 1) * limit; // Start index for pagination
+        const endIndex = startIndex + parseInt(limit, 10); // End index for pagination
+
+        // Slice the faculty entries based on pagination indices
+        const paginatedFaculties = facultyEntries.slice(
+            Math.max(startIndex, 0), 
+            Math.min(endIndex, totalFaculties)
+        );
+
+        // Handle case where no entries exist for the requested page
+        if (paginatedFaculties.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No faculties found for the specified page.",
+            });
+        }
+
+        // Format response
+        const result = {
+            totalRegistrations,
+            totalPaid,
+            totalUnpaid,
+            facultyDetails: paginatedFaculties,
+            pagination: {
+                currentPage: Number(page),
+                totalPages: Math.ceil(totalFaculties / limit),
+                hasNextPage: endIndex < totalFaculties,
+                hasPrevPage: startIndex > 0,
+            },
+        };
+
+        return res.status(200).json({
+            success: true,
+            message: "School payment status retrieved successfully.",
+            data: result,
+        });
+    } catch (error) {
+        console.error("Error retrieving school payment status:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while retrieving school payment status.",
+        });
+    }
+};
+
+
+
+
+// const schoolPaymentStatus = async (req, res) => { 
+//     const { schoolInfoId } = req.params;
+
+//     try {
+//         // Retrieve school information and populate related faculties and students
+//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+//             .populate({
+//                 path: "faculties",
+//                 select: "facultyName",
+//             })
+//             .populate({
+//                 path: "students",
+//                 select: "registrationNumber faculty transactions",
+//                 populate: [
+//                     {
+//                         path: "faculty",
+//                         select: "facultyName",
+//                     },
+//                     {
+//                         path: "transactions",
+//                         select: "status",
+//                     },
+//                 ],
+//             });
+
+//         if (!schoolInfo) {
+//             return res.status(404).json({ message: "School information not found." });
+//         }
+
+//         console.log("School Info:", schoolInfo);
+
+//         const totalRegistrations = schoolInfo.students.length;
+
+//         // Create a dictionary to hold data grouped by faculty
+//         const facultyWiseData = {};
+
+//         // Initialize each faculty entry based on the school info
+//         schoolInfo.faculties.forEach((faculty) => {
+//             facultyWiseData[faculty._id] = {
+//                 facultyName: faculty.facultyName,
+//                 totalRegistrations: 0,
+//                 students: {
+//                     paid: [],
+//                     unpaid: [],
+//                 },
+//             };
+//         });
+
+//         let totalPaid = 0;
+
+//         // Iterate over the students and categorize them by faculty
+//         schoolInfo.students.forEach((student) => {
+//             console.log("Student:", student);
+//             console.log("Transactions:", student.transactions);
+
+//             // Check if the student has paid
+//             const hasPaid = student.transactions.some(
+//                 (transaction) => transaction.status === "success"
+//             );
+//             console.log(`Has Paid (${student.registrationNumber}):`, hasPaid);
+
+//             // Categorize the student as 'paid' or 'unpaid'
+//             const category = hasPaid ? "paid" : "unpaid";
+
+//             // Ensure the student is assigned to the correct faculty using faculty _id
+//             if (student.faculty && facultyWiseData[student.faculty._id]) {
+//                 facultyWiseData[student.faculty._id].totalRegistrations++;
+//                 facultyWiseData[student.faculty._id].students[category].push(
+//                     student.registrationNumber
+//                 );
+//             } else {
+//                 console.warn(
+//                     `Student ${student.registrationNumber} has an invalid or unlinked faculty.`
+//                 );
+//             }
+
+//             if (hasPaid) {
+//                 totalPaid++;
+//             }
+//         });
+
+//         const totalUnpaid = totalRegistrations - totalPaid;
+
+//         // Format response
+//         const result = {
+//             totalRegistrations,
+//             totalPaid,
+//             totalUnpaid,
+//             facultyDetails: Object.values(facultyWiseData),
+//         };
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "School payment status retrieved successfully.",
+//             data: result,
+//         });
+//     } catch (error) {
+//         console.error("Error retrieving school payment status:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "An error occurred while retrieving school payment status.",
+//         });
+//     }
+// };
+
+
+
+
+  
+
+
+
+  
+
+
+// const schoolPaymentStatus = async (req, res) => {
+//     const { schoolInfoId } = req.params;
+
+//     try {
+//         // Retrieve school information and populate related faculties and students
+//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+//             .populate({
+//                 path: "faculties",
+//                 select: "facultyName", // Only fetch faculty name
+//             })
+//             .populate({
+//                 path: "students",
+//                 select: "registrationNumber faculty transactions",
+//                 populate: [
+//                     {
+//                         path: "faculty",
+//                         select: "facultyName",  // Ensure we are populating facultyName
+//                     },
+//                     {
+//                         path: "transactions",
+//                         select: "status", 
+//                     },
+//                 ],
+//             });
+
+//         if (!schoolInfo) {
+//             return res.status(404).json({ message: "School information not found." });
+//         }
+
+//         console.log("School Info:", schoolInfo); // Debugging: Check if school info and students are populated
+//         console.log("Students:", schoolInfo.students); // Debugging: Check students data
+
+//         const totalRegistrations = schoolInfo.students.length;
+//         console.log("Total Registrations:", totalRegistrations); // Debug: Check the count of students
+
+//         const facultyWiseData = {};
+//         schoolInfo.faculties.forEach((faculty) => {
+//             facultyWiseData[faculty._id] = {
+//                 facultyName: faculty.facultyName,
+//                 students: {
+//                     paid: [],
+//                     unpaid: [],
+//                 },
+//             };
+//         });
+
+//         let totalPaid = 0;
+
+//         schoolInfo.students.forEach((student) => {
+//             console.log("Student Registration:", student.registrationNumber);
+//             console.log("Student Faculty:", student.faculty); // Check faculty
+//             console.log("Student Transactions:", student.transactions); // Check transactions
+
+//             // Ensure transactions exist
+//             if (student.transactions && Array.isArray(student.transactions)) {
+//                 student.transactions.forEach((transaction) => {
+//                     console.log(`Transaction status for ${student.registrationNumber}: ${transaction.status}`);
+//                 });
+//             }
+
+//             // Check if the student has paid
+//             const hasPaid = student.transactions.some(
+//                 (transaction) => transaction.status.toLowerCase() === "success" // Ensure case-insensitive match
+//             );
+//             console.log(`Has Paid (${student.registrationNumber}):`, hasPaid); // Debugging if payment status is correct
+
+//             if (hasPaid) {
+//                 totalPaid++;
+//             }
+
+//             // Categorize the student as 'paid' or 'unpaid'
+//             const category = hasPaid ? "paid" : "unpaid";
+
+//             // Make sure that the student has a valid faculty and faculty data exists
+//             if (student.faculty && facultyWiseData[student.faculty._id]) {
+//                 facultyWiseData[student.faculty._id].students[category].push(student.registrationNumber);
+//             } else {
+//                 console.log(`Faculty data missing for student ${student.registrationNumber}`);
+//             }
+//         });
+
+//         const totalUnpaid = totalRegistrations - totalPaid;
+
+//         // Format response
+//         const result = {
+//             totalRegistrations,
+//             totalPaid,
+//             totalUnpaid,
+//             facultyDetails: Object.values(facultyWiseData),
+//         };
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "School payment status retrieved successfully.",
+//             data: result,
+//         });
+//     } catch (error) {
+//         console.error("Error retrieving school payment status:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "An error occurred while retrieving school payment status.",
+//         });
+//     }
+// };
+
+
+
+
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
 
@@ -363,4 +862,4 @@ const retrieveStudentDetails = async (req, res) => {
 
 
 
-module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard, retrieveStudentDetails}
+module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard,recordPayment, retrieveStudentDetails, schoolPaymentStatus}

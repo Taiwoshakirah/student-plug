@@ -391,7 +391,7 @@ const recordPayment = async (req, res) => {
       // Find the student by registration number
       const registrationNumber = studentPayment.regNo.trim(); // Remove extra spaces
       const student = await Student.findOne({
-        registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" }
+        registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" },
       });
   
       if (!student) {
@@ -401,8 +401,31 @@ const recordPayment = async (req, res) => {
   
       console.log("Student Record Found:", student);
   
-      // Create a new transaction
-      const transaction = new Transaction({
+      // Check if the transaction already exists
+      let transaction = await Transaction.findOne({ reference });
+      if (transaction) {
+        console.log("Transaction already exists:", transaction);
+  
+        // Ensure the transaction is linked to the student payment and student
+        if (!studentPayment.transactions.includes(transaction._id)) {
+          studentPayment.transactions.push(transaction._id);
+          await studentPayment.save();
+        }
+  
+        if (!student.transactions.includes(transaction._id)) {
+          student.transactions.push(transaction._id);
+          await student.save();
+        }
+  
+        return res.status(200).json({
+          success: true,
+          message: "Payment already recorded and linked successfully.",
+          data: transaction,
+        });
+      }
+  
+      // Create a new transaction if it doesn't exist
+      transaction = new Transaction({
         email,
         amount,
         feeType,
@@ -435,6 +458,67 @@ const recordPayment = async (req, res) => {
       });
     }
   };
+  
+
+// const recordPayment = async (req, res) => {
+//     const { email, amount, feeType, reference, status, gatewayResponse } = req.body;
+  
+//     try {
+//       // Find the student payment by email
+//       const studentPayment = await StudentPayment.findOne({ email });
+//       if (!studentPayment) {
+//         return res.status(404).json({ success: false, message: "Student payment record not found." });
+//       }
+  
+//       console.log("Student Payment Record:", studentPayment);
+  
+//       // Find the student by registration number
+//       const registrationNumber = studentPayment.regNo.trim(); // Remove extra spaces
+//       const student = await Student.findOne({
+//         registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" }
+//       });
+  
+//       if (!student) {
+//         console.log("No student found for regNo:", registrationNumber);
+//         return res.status(404).json({ success: false, message: "Student record not found." });
+//       }
+  
+//       console.log("Student Record Found:", student);
+  
+//       // Create a new transaction
+//       const transaction = new Transaction({
+//         email,
+//         amount,
+//         feeType,
+//         reference,
+//         status,
+//         gatewayResponse,
+//         student: studentPayment._id, // Link to StudentPayment
+//       });
+  
+//       const savedTransaction = await transaction.save();
+  
+//       // Update the StudentPayment transactions array
+//       studentPayment.transactions.push(savedTransaction._id);
+//       await studentPayment.save();
+  
+//       // Update the Student transactions array
+//       student.transactions.push(savedTransaction._id);
+//       await student.save();
+  
+//       return res.status(200).json({
+//         success: true,
+//         message: "Payment recorded and linked successfully.",
+//         data: savedTransaction,
+//       });
+//     } catch (error) {
+//       console.error("Error recording payment:", error.stack || error);
+//       return res.status(500).json({
+//         success: false,
+//         message: "An error occurred while recording the payment.",
+//       });
+//     }
+//   };
   
   
 

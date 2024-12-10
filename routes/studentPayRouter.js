@@ -9,6 +9,6 @@ router.route('/charge-card').post(chargeCard).all(methodNotAllowed)
 router.route('/payments-details/:email').get(retrieveStudentDetails).all(methodNotAllowed)
 router.route('/card-details').get(getStudentAndCardDetails).all(methodNotAllowed)
 router.route('/payment-status/:schoolInfoId').get(schoolPaymentStatus).all(methodNotAllowed)
-router.route('/payment-record').get(recordPayment).all(methodNotAllowed)
+router.route('/payment-record').post(recordPayment).all(methodNotAllowed)
 
 module.exports = router

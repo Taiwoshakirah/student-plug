@@ -550,7 +550,7 @@ const retrieveStudentDetails = async (req, res) => {
 
 const schoolPaymentStatus = async (req, res) => {
     const { schoolInfoId } = req.params;
-    const { page = 1, limit = 1 } = req.query; // Default to page 1 and 1 faculty per page
+    const { page = 1, limit = 1 } = req.query; 
 
     try {
         // Retrieve school information and populate related faculties and students
@@ -598,7 +598,7 @@ const schoolPaymentStatus = async (req, res) => {
                 (transaction) => transaction.status === "success"
             );
             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
-            const formattedRegNo = `${student.registrationNumber} (${paymentStatus})`;
+            const formattedRegNo = `${student.registrationNumber}`;
 
             if (student.faculty && facultyWiseData[student.faculty._id]) {
                 facultyWiseData[student.faculty._id].totalRegistrations++;
@@ -664,7 +664,67 @@ const schoolPaymentStatus = async (req, res) => {
     }
 };
 
+//this function is not in use at the moment because it's being implemented directly by the frontend guy
+const searchStudentByRegistrationNumber = async (req, res) => {
+    const { schoolInfoId, registrationNumber } = req.params;
 
+    try {
+        // Retrieve the school information and populate related students
+        const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+            .populate({
+                path: "students",
+                select: "registrationNumber faculty transactions",
+                populate: [
+                    {
+                        path: "faculty",
+                        select: "facultyName",
+                    },
+                    {
+                        path: "transactions",
+                        select: "status",
+                    },
+                ],
+            });
+
+        if (!schoolInfo) {
+            return res.status(404).json({ message: "School information not found." });
+        }
+
+        // Find the student with the specified registration number
+        const student = schoolInfo.students.find(
+            (student) => student.registrationNumber === registrationNumber
+        );
+
+        if (!student) {
+            return res.status(404).json({ message: "Student not found." });
+        }
+
+        // Check the payment status of the student
+        const hasPaid = student.transactions.some(
+            (transaction) => transaction.status === "success"
+        );
+        const paymentStatus = hasPaid ? "Paid" : "Unpaid";
+
+        // Format the result
+        const result = {
+            registrationNumber: student.registrationNumber,
+            faculty: student.faculty ? student.faculty.facultyName : "N/A",
+            paymentStatus,
+        };
+
+        return res.status(200).json({
+            success: true,
+            message: "Student found.",
+            data: result,
+        });
+    } catch (error) {
+        console.error("Error searching for student:", error);
+        return res.status(500).json({
+            success: false,
+            message: "An error occurred while searching for the student.",
+        });
+    }
+};
 
 
 // const schoolPaymentStatus = async (req, res) => { 
@@ -946,4 +1006,4 @@ const schoolPaymentStatus = async (req, res) => {
 
 
 
-module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard,recordPayment, retrieveStudentDetails, schoolPaymentStatus}
+module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard,recordPayment, retrieveStudentDetails, schoolPaymentStatus, searchStudentByRegistrationNumber}

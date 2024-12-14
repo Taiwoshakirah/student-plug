@@ -66,7 +66,7 @@ const createUnpaidEvent = async (req, res) => {
         //     return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
         // }
 
-        let imageUrls = [];
+        let flyer = [];
         if (req.files && req.files.image) {
             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
             for (const image of images) {
@@ -74,7 +74,7 @@ const createUnpaidEvent = async (req, res) => {
                 await image.mv(tempPath);
                 const result = await uploadToCloudinary(tempPath);
                 if (result && result.secure_url) {
-                    imageUrls.push(result.secure_url);
+                    flyer.push(result.secure_url);
                 }
                 fs.unlinkSync(tempPath); // Clean up temporary file
             }
@@ -85,7 +85,7 @@ const createUnpaidEvent = async (req, res) => {
             schoolInfoId,
             title,
             description,
-            imageUrls,
+            flyer:flyer,
             // date: parsedDate,
             ticketsAvailable,
             isPaid: false, // Unpaid event

@@ -54,17 +54,17 @@ const axios = require('axios')
 
 const createUnpaidEvent = async (req, res) => {
     try {
-        const { adminId, schoolInfoId, title, description, date, ticketsAvailable } = req.body;
+        const { adminId, schoolInfoId, title, description,ticketsAvailable } = req.body;
 
-        if (!adminId || !schoolInfoId || !title || !date) {
+        if (!adminId || !schoolInfoId || !title) {
             return res.status(400).json({ success: false, message: "Required fields are missing." });
         }
 
-        // Convert date to a valid format
-        const parsedDate = new Date(date.split("-").reverse().join("-"));
-        if (isNaN(parsedDate)) {
-            return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
-        }
+        // // Convert date to a valid format
+        // const parsedDate = new Date(date.split("-").reverse().join("-"));
+        // if (isNaN(parsedDate)) {
+        //     return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
+        // }
 
         let imageUrls = [];
         if (req.files && req.files.image) {
@@ -86,7 +86,7 @@ const createUnpaidEvent = async (req, res) => {
             title,
             description,
             imageUrls,
-            date: parsedDate,
+            // date: parsedDate,
             ticketsAvailable,
             isPaid: false, // Unpaid event
         });
@@ -104,17 +104,17 @@ const createUnpaidEvent = async (req, res) => {
 // Create Paid Event
 const createPaidEvent = async (req, res) => {
     try {
-        const { adminId, schoolInfoId, title, description, date, price, ticketsAvailable } = req.body;
-        if (!adminId || !schoolInfoId || !title || !date || !price) {
+        const { adminId, schoolInfoId, title, description,price, ticketsAvailable } = req.body;
+        if (!adminId || !schoolInfoId || !title || !price) {
             return res.status(400).json({ success: false, message: "Required fields are missing." });
         }
 
-        // Convert date to a valid format
-        const [day, month, year] = date.split("-");
-        const parsedDate = new Date(`${year}-${month}-${day}`); // Convert to yyyy-mm-dd
-        if (isNaN(parsedDate)) {
-            return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
-        }
+        // // Convert date to a valid format
+        // const [day, month, year] = date.split("-");
+        // const parsedDate = new Date(`${year}-${month}-${day}`); // Convert to yyyy-mm-dd
+        // if (isNaN(parsedDate)) {
+        //     return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
+        // }
 
         const flyer = []; // Initialize an empty array for the flyer
 if (req.files && req.files.image) {
@@ -135,7 +135,7 @@ if (req.files && req.files.image) {
             title,
             description,
             flyer:flyer,
-            date: parsedDate, // Use the parsed date
+            // date: parsedDate, // Use the parsed date
             price,
             ticketsAvailable,
             isPaid: true, // Paid event

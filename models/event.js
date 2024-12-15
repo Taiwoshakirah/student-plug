@@ -15,6 +15,7 @@ const eventSchema = new mongoose.Schema({
     ticketsAvailable: { type: Number, default: 0 },
     postedBy: { type: String, enum: Object.values(Roles), required: true }, // Accepts "admin", "user", etc.
     createdAt: { type: Date, default: Date.now },
+    postedByBody: { type: String, enum: ["sug", "faculty", "department"], required: true }, // Body
 });
 
 

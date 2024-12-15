@@ -3,19 +3,20 @@ const Event = require("../models/event");
 const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const axios = require('axios')
 const Roles = require("../middlewares/role");
-// const Paystack = require("paystack-api")(process.env.PAYSTACK_SECRET_KEY);
+const SugUser = require('../models/schoolSug')
+const SchoolInfo = require('../models/schoolInfo')
 
-// Create a new event
-// const createEvent = async (req, res) => {
+
+
+// const createUnpaidEvent = async (req, res) => {
 //     try {
-//         // const { title, description, flyer, date, price, ticketsAvailable } = req.body;
-//         const { adminId, text, schoolInfoId } = req.body;
-//         let imageUrls = [];
+//         const { adminId, schoolInfoId, title, description, ticketsAvailable } = req.body;
 
-//         if (!adminId || !schoolInfoId) {
-//             return res.status(400).json({ message: "Admin ID, and schoolInfoId are required" });
+//         if (!adminId || !schoolInfoId || !title) {
+//             return res.status(400).json({ success: false, message: "Required fields are missing." });
 //         }
 
+//         let flyer = [];
 //         if (req.files && req.files.image) {
 //             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
 //             for (const image of images) {
@@ -23,34 +24,31 @@ const Roles = require("../middlewares/role");
 //                 await image.mv(tempPath);
 //                 const result = await uploadToCloudinary(tempPath);
 //                 if (result && result.secure_url) {
-//                     imageUrls.push(result.secure_url);
+//                     flyer.push(result.secure_url);
 //                 }
-
 //                 fs.unlinkSync(tempPath); // Clean up temporary file
 //             }
 //         }
 
-//         if (!text && imageUrls.length === 0) {
-//             return res.status(400).json({ message: "Please provide either text or an image" });
-//         }
-
-//         // const event = new Event({
-//         //     title,
-//         //     description,
-//         //     flyer,
-//         //     date,
-//         //     price,
-//         //     ticketsAvailable,
-//         // });
+//         const event = new Event({
+//             adminId, // Admin traceability
+//             schoolInfoId,
+//             title,
+//             description,
+//             flyer,
+//             ticketsAvailable,
+//             isPaid: false, // Unpaid event
+//             postedBy: Roles.ADMIN, // Role of the creator
+//         });
 
 //         await event.save();
-
-//         res.status(201).json({ success: true, message: "Event created successfully.", event });
+//         res.status(201).json({ success: true, message: "Unpaid event created successfully.", event });
 //     } catch (error) {
-//         console.error("Error creating event:", error);
-//         res.status(500).json({ success: false, message: "Error creating event." });
+//         console.error("Error creating unpaid event:", error);
+//         res.status(500).json({ success: false, message: "Error creating unpaid event." });
 //     }
 // };
+
 
 
 const createUnpaidEvent = async (req, res) => {
@@ -58,8 +56,38 @@ const createUnpaidEvent = async (req, res) => {
         const { adminId, schoolInfoId, title, description, ticketsAvailable } = req.body;
 
         if (!adminId || !schoolInfoId || !title) {
-            return res.status(400).json({ success: false, message: "Required fields are missing." });
+            return res.status(400).json({ 
+                success: false, 
+                message: "Required fields are missing." 
+            });
         }
+
+        // Determine postedByBody based on adminId
+        let postedByBody = null;
+
+        if (await SugUser.findById(adminId)) {
+            postedByBody = "sug";
+        } else if (await FacultyUser.findById(adminId)) {
+            postedByBody = "faculty";
+        } else if (await DepartmentUser.findById(adminId)) {
+            postedByBody = "department";
+        } else {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Admin ID not found in any user group." 
+            });
+        }
+
+
+        // Fetch uniProfilePicture from SchoolInfo
+        const schoolInfo = await SchoolInfo.findById(schoolInfoId);
+        if (!schoolInfo) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "School information not found." 
+            });
+        }
+        const uniProfilePicture = schoolInfo.uniProfilePicture;
 
         let flyer = [];
         if (req.files && req.files.image) {
@@ -76,25 +104,39 @@ const createUnpaidEvent = async (req, res) => {
         }
 
         const event = new Event({
-            adminId, // Admin traceability
+            adminId, // Traceability
             schoolInfoId,
             title,
             description,
             flyer,
             ticketsAvailable,
             isPaid: false, // Unpaid event
-            postedBy: Roles.ADMIN, // Role of the creator
+            postedBy: Roles.ADMIN, // Role
+            postedByBody, // Automatically determined
         });
 
         await event.save();
-        res.status(201).json({ success: true, message: "Unpaid event created successfully.", event });
+
+        // Attach uniProfilePicture to the event object
+        const eventWithPicture = {
+            ...event.toObject(), // Convert Mongoose object to plain object
+            uniProfilePicture,
+        };
+
+        res.status(201).json({ 
+            success: true, 
+            message: "Unpaid event created successfully.", 
+            event: eventWithPicture,
+             
+        });
     } catch (error) {
         console.error("Error creating unpaid event:", error);
-        res.status(500).json({ success: false, message: "Error creating unpaid event." });
+        res.status(500).json({ 
+            success: false, 
+            message: "Error creating unpaid event." 
+        });
     }
 };
-
-
 
 // Create Paid Event
 const createPaidEvent = async (req, res) => {
@@ -104,12 +146,31 @@ const createPaidEvent = async (req, res) => {
             return res.status(400).json({ success: false, message: "Required fields are missing." });
         }
 
-        // // Convert date to a valid format
-        // const [day, month, year] = date.split("-");
-        // const parsedDate = new Date(`${year}-${month}-${day}`); // Convert to yyyy-mm-dd
-        // if (isNaN(parsedDate)) {
-        //     return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
-        // }
+       // Determine postedByBody based on adminId
+       let postedByBody = null;
+
+       if (await SugUser.findById(adminId)) {
+           postedByBody = "sug";
+       } else if (await FacultyUser.findById(adminId)) {
+           postedByBody = "faculty";
+       } else if (await DepartmentUser.findById(adminId)) {
+           postedByBody = "department";
+       } else {
+           return res.status(404).json({ 
+               success: false, 
+               message: "Admin ID not found in any user group." 
+           });
+       }
+
+       // Fetch uniProfilePicture from SchoolInfo
+       const schoolInfo = await SchoolInfo.findById(schoolInfoId);
+       if (!schoolInfo) {
+           return res.status(404).json({ 
+               success: false, 
+               message: "School information not found." 
+           });
+       }
+       const uniProfilePicture = schoolInfo.uniProfilePicture;
 
         const flyer = []; // Initialize an empty array for the flyer
 if (req.files && req.files.image) {
@@ -135,10 +196,18 @@ if (req.files && req.files.image) {
             ticketsAvailable,
             isPaid: true, // Paid event
             postedBy: Roles.ADMIN, // Role of the creator
+            postedByBody, // Automatically determined
         });
 
         await event.save();
-        res.status(201).json({ success: true, message: "Paid event created successfully.", event });
+
+        const eventWithPicture = {
+            ...event.toObject(), // Convert Mongoose object to plain object
+            uniProfilePicture,
+        };
+
+        
+        res.status(201).json({ success: true, message: "Paid event created successfully.", event: eventWithPicture, });
     } catch (error) {
         console.error("Error creating paid event:", error);
         res.status(500).json({ success: false, message: "Error creating paid event." });
@@ -157,20 +226,34 @@ const getAllEvents = async (req, res) => {
     }
 
     try {
-        // Query events based on schoolInfoId
-        const events = await Event.find({ schoolInfoId });
+        // Query events based on schoolInfoId, sorted by createdAt in descending order
+        const events = await Event.find({ schoolInfoId }).sort({ createdAt: -1 });
 
         // Check if events exist for the given schoolInfoId
         if (!events || events.length === 0) {
             return res.status(404).json({ success: false, message: "No events found for this school." });
         }
 
-        res.status(200).json({ success: true, events });
+        // Fetch the uniProfilePicture for the school
+        const schoolInfo = await SchoolInfo.findById(schoolInfoId);
+        if (!schoolInfo) {
+            return res.status(404).json({ success: false, message: "School information not found." });
+        }
+        const uniProfilePicture = schoolInfo.uniProfilePicture;
+
+        // Attach uniProfilePicture to each event
+        const eventsWithPicture = events.map(event => ({
+            ...event.toObject(), // Convert Mongoose object to plain object
+            uniProfilePicture,
+        }));
+
+        res.status(200).json({ success: true, events: eventsWithPicture });
     } catch (error) {
         console.error("Error fetching events:", error);
         res.status(500).json({ success: false, message: "Error fetching events." });
     }
 };
+
 
 
 // Get a specific event

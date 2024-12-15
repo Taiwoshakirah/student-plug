@@ -2,6 +2,7 @@ const fs = require('fs')
 const Event = require("../models/event");
 const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const axios = require('axios')
+const Roles = require("../middlewares/role");
 // const Paystack = require("paystack-api")(process.env.PAYSTACK_SECRET_KEY);
 
 // Create a new event
@@ -54,17 +55,11 @@ const axios = require('axios')
 
 const createUnpaidEvent = async (req, res) => {
     try {
-        const { adminId, schoolInfoId, title, description,ticketsAvailable } = req.body;
+        const { adminId, schoolInfoId, title, description, ticketsAvailable } = req.body;
 
         if (!adminId || !schoolInfoId || !title) {
             return res.status(400).json({ success: false, message: "Required fields are missing." });
         }
-
-        // // Convert date to a valid format
-        // const parsedDate = new Date(date.split("-").reverse().join("-"));
-        // if (isNaN(parsedDate)) {
-        //     return res.status(400).json({ success: false, message: "Invalid date format. Use dd-mm-yyyy." });
-        // }
 
         let flyer = [];
         if (req.files && req.files.image) {
@@ -81,14 +76,14 @@ const createUnpaidEvent = async (req, res) => {
         }
 
         const event = new Event({
-            adminId,
+            adminId, // Admin traceability
             schoolInfoId,
             title,
             description,
-            flyer:flyer,
-            // date: parsedDate,
+            flyer,
             ticketsAvailable,
             isPaid: false, // Unpaid event
+            postedBy: Roles.ADMIN, // Role of the creator
         });
 
         await event.save();
@@ -139,6 +134,7 @@ if (req.files && req.files.image) {
             price,
             ticketsAvailable,
             isPaid: true, // Paid event
+            postedBy: Roles.ADMIN, // Role of the creator
         });
 
         await event.save();
@@ -154,14 +150,28 @@ if (req.files && req.files.image) {
 
 // Get all events
 const getAllEvents = async (req, res) => {
+    const { schoolInfoId } = req.params; // Extract schoolInfoId from params
+
+    if (!schoolInfoId) {
+        return res.status(400).json({ success: false, message: "schoolInfoId is required." });
+    }
+
     try {
-        const events = await Event.find();
+        // Query events based on schoolInfoId
+        const events = await Event.find({ schoolInfoId });
+
+        // Check if events exist for the given schoolInfoId
+        if (!events || events.length === 0) {
+            return res.status(404).json({ success: false, message: "No events found for this school." });
+        }
+
         res.status(200).json({ success: true, events });
     } catch (error) {
         console.error("Error fetching events:", error);
         res.status(500).json({ success: false, message: "Error fetching events." });
     }
 };
+
 
 // Get a specific event
 const getEventById = async (req, res) => {

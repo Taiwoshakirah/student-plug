@@ -1,5 +1,7 @@
 
 const mongoose = require("mongoose");
+const Roles = require("../middlewares/role");
+
 
 const eventSchema = new mongoose.Schema({
     adminId: { type: String, required: true },
@@ -11,6 +13,7 @@ const eventSchema = new mongoose.Schema({
     isPaid: { type: Boolean, required: true },
     price: { type: Number, default: 0 }, // Only required for paid events
     ticketsAvailable: { type: Number, default: 0 },
+    postedBy: { type: String, enum: Object.values(Roles), required: true }, // Accepts "admin", "user", etc.
     createdAt: { type: Date, default: Date.now },
 });
 

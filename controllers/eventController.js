@@ -260,18 +260,74 @@ const getAllEvents = async (req, res) => {
 const getEventById = async (req, res) => {
     try {
         const { eventId } = req.params;
+
+        // Find the event by eventId
         const event = await Event.findById(eventId);
 
         if (!event) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
 
-        res.status(200).json({ success: true, event });
+        // Fetch the schoolInfo to get the uniProfilePicture
+        const schoolInfo = await SchoolInfo.findById(event.schoolInfoId); // Use event's schoolInfoId
+        if (!schoolInfo) {
+            return res.status(404).json({ success: false, message: "School information not found." });
+        }
+
+        const uniProfilePicture = schoolInfo.uniProfilePicture;
+
+        // Include the uniProfilePicture in the event response
+        const eventWithPicture = {
+            ...event.toObject(), // Convert Mongoose object to plain object
+            uniProfilePicture,  // Add the picture to the response
+        };
+
+        res.status(200).json({ success: true, event: eventWithPicture });
     } catch (error) {
         console.error("Error fetching event:", error);
         res.status(500).json({ success: false, message: "Error fetching event." });
     }
 };
+
+
+const getEventsByAdmin = async (req, res) => {
+    try {
+        const { adminId } = req.params; // Get adminId from request params
+
+        // Find events posted by the specific admin and sort by createdAt in descending order
+        const events = await Event.find({ adminId }).sort({ createdAt: -1 });
+
+        if (!events || events.length === 0) {
+            return res.status(404).json({ success: false, message: `No events found for adminId: ${adminId}` });
+        }
+
+        // Create a Set to store unique schoolInfoIds from events
+        const schoolInfoIds = [...new Set(events.map(event => event.schoolInfoId))];
+
+        // Fetch all related schoolInfo documents
+        const schoolInfos = await SchoolInfo.find({ _id: { $in: schoolInfoIds } });
+
+        // Map schoolInfoIds to their corresponding uniProfilePicture
+        const schoolInfoMap = schoolInfos.reduce((acc, schoolInfo) => {
+            acc[schoolInfo._id] = schoolInfo.uniProfilePicture;
+            return acc;
+        }, {});
+
+        // Attach the uniProfilePicture to each event
+        const eventsWithPictures = events.map(event => ({
+            ...event.toObject(), // Convert Mongoose document to plain object
+            uniProfilePicture: schoolInfoMap[event.schoolInfoId] || null, // Add profile picture or null
+        }));
+
+        res.status(200).json({ success: true, events: eventsWithPictures });
+    } catch (error) {
+        console.error("Error fetching events by admin:", error);
+        res.status(500).json({ success: false, message: "Error fetching events by admin." });
+    }
+};
+
+
+
 
 
 const isValidRegNumber = (regNum) => {
@@ -592,4 +648,4 @@ const chargeCard = async (req, res) => {
 // };
 
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard };

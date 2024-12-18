@@ -1,5 +1,5 @@
 const express = require('express')
-const { createUnpaidEvent, createPaidEvent, getAllEvents, getEventById, saveStudentDetails, saveCardDetails, fetchConfirmationDetails, chargeCard, getEventsByAdmin } = require('../controllers/eventController')
+const { createUnpaidEvent, createPaidEvent, getAllEvents, getEventById, saveStudentDetails, saveCardDetails, fetchConfirmationDetails, chargeCard, getEventsByAdmin, verifyPayment, updatePaymentStatus, handleTransactionVerification } = require('../controllers/eventController')
 const methodNotAllowed = require('../utils/methodNotAllowed')
 const router = express.Router()
 
@@ -13,6 +13,9 @@ router.route('/saveStudent').post(saveStudentDetails).all(methodNotAllowed)
 router.route('/card').post(saveCardDetails).all(methodNotAllowed)
 router.route('/fetch-details').get(fetchConfirmationDetails).all(methodNotAllowed)
 router.route('/charging').post(chargeCard).all(methodNotAllowed)
+router.route('/verify/:reference').get(verifyPayment).all(methodNotAllowed)
+// router.route('/savetransact').post(handleTransactionVerification).all(methodNotAllowed)
+// router.route('/update-payment').post(updatePaymentStatus).all(methodNotAllowed)
 
 
 module.exports = router

@@ -5,49 +5,10 @@ const axios = require('axios')
 const Roles = require("../middlewares/role");
 const SugUser = require('../models/schoolSug')
 const SchoolInfo = require('../models/schoolInfo')
-
-
-
-// const createUnpaidEvent = async (req, res) => {
-//     try {
-//         const { adminId, schoolInfoId, title, description, ticketsAvailable } = req.body;
-
-//         if (!adminId || !schoolInfoId || !title) {
-//             return res.status(400).json({ success: false, message: "Required fields are missing." });
-//         }
-
-//         let flyer = [];
-//         if (req.files && req.files.image) {
-//             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-//             for (const image of images) {
-//                 const tempPath = `./tmp/${image.name}`;
-//                 await image.mv(tempPath);
-//                 const result = await uploadToCloudinary(tempPath);
-//                 if (result && result.secure_url) {
-//                     flyer.push(result.secure_url);
-//                 }
-//                 fs.unlinkSync(tempPath); // Clean up temporary file
-//             }
-//         }
-
-//         const event = new Event({
-//             adminId, // Admin traceability
-//             schoolInfoId,
-//             title,
-//             description,
-//             flyer,
-//             ticketsAvailable,
-//             isPaid: false, // Unpaid event
-//             postedBy: Roles.ADMIN, // Role of the creator
-//         });
-
-//         await event.save();
-//         res.status(201).json({ success: true, message: "Unpaid event created successfully.", event });
-//     } catch (error) {
-//         console.error("Error creating unpaid event:", error);
-//         res.status(500).json({ success: false, message: "Error creating unpaid event." });
-//     }
-// };
+const User = require("../models/signUp"); // Import User model
+const Student = require("../models/studentRegNo"); // Import Student model
+const EventPayment = require('../models/eventpymt')
+require("dotenv").config();
 
 
 
@@ -329,37 +290,92 @@ const getEventsByAdmin = async (req, res) => {
 
 
 
-
 const isValidRegNumber = (regNum) => {
-    // Regular expression for validating regNo in the format 'ND/xxx/xxx'
-    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
-    return regNum && regNumberPattern.test(regNum);
-  };
-  const saveStudentDetails = async (req, res) => {
-    const { firstName, lastName, department, regNo, academicLevel, email } = req.body;
-  
-    // Validate required fields
-    if (!firstName || !lastName || !department || !regNo || !academicLevel || !email) {
-      return res.status(422).json({ success: false, message: "All fields are required." });
+  // Regular expression for validating regNo in the format 'ND/xxx/xxx'
+  const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+  return regNum && regNumberPattern.test(regNum);
+};
+
+const saveStudentDetails = async (req, res) => {
+  const { userId, firstName, lastName, department, regNo, academicLevel, email } = req.body;
+
+  // Validate required fields
+  if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email) {
+    return res.status(422).json({ success: false, message: "All fields are required." });
+  }
+
+  // Validate regNo format
+  if (!isValidRegNumber(regNo)) {
+    return res.status(400).json({ success: false, message: "Invalid registration number format." });
+  }
+
+  try {
+    // Verify if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
     }
-  
-    // Validate regNo format
-    if (!isValidRegNumber(regNo)) {
-      return res.status(400).json({ success: false, message: "Invalid registration number format." });
-    }
-  
-    try {
-      // Temporarily save student details in session or a temporary database
-      req.session.studentDetails = { firstName, lastName, department, regNo, academicLevel, email };
-      return res.status(200).json({
-        success: true,
-        message: "Student details saved successfully. Proceed to payment.",
+
+    // Verify if the student exists using registrationNumber
+    const student = await Student.findOne({ registrationNumber: regNo });
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student with the given registration number not found.",
       });
-    } catch (error) {
-      console.error("Error saving student details:", error.message);
-      return res.status(500).json({ success: false, message: "An error occurred while saving details." });
     }
-  };
+
+    // Save the details (simulate saving temporarily or in session)
+    req.session.studentDetails = { userId, firstName, lastName, department, regNo, academicLevel, email };
+
+    return res.status(200).json({
+      success: true,
+      message: "Student details saved successfully. Proceed to payment.",
+    });
+  } catch (error) {
+    console.error("Error saving student details:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while saving details.",
+    });
+  }
+};
+
+
+
+
+
+
+// const isValidRegNumber = (regNum) => {
+//     // Regular expression for validating regNo in the format 'ND/xxx/xxx'
+//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+//     return regNum && regNumberPattern.test(regNum);
+//   };
+//   const saveStudentDetails = async (req, res) => {
+//     const { firstName, lastName, department, regNo, academicLevel, email } = req.body;
+  
+//     // Validate required fields
+//     if (!firstName || !lastName || !department || !regNo || !academicLevel || !email) {
+//       return res.status(422).json({ success: false, message: "All fields are required." });
+//     }
+  
+//     // Validate regNo format
+//     if (!isValidRegNumber(regNo)) {
+//       return res.status(400).json({ success: false, message: "Invalid registration number format." });
+//     }
+  
+//     try {
+//       // Temporarily save student details in session or a temporary database
+//       req.session.studentDetails = { firstName, lastName, department, regNo, academicLevel, email };
+//       return res.status(200).json({
+//         success: true,
+//         message: "Student details saved successfully. Proceed to payment.",
+//       });
+//     } catch (error) {
+//       console.error("Error saving student details:", error.message);
+//       return res.status(500).json({ success: false, message: "An error occurred while saving details." });
+//     }
+//   };
 
 
   const saveCardDetails = async (req, res) => {
@@ -476,92 +492,31 @@ const fetchConfirmationDetails = async (req, res) => {
   };
   
 
-const chargeCard = async (req, res) => {
-    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-  
-    // Retrieve student details from session
-    const studentDetails = req.session.studentDetails;
-  
-    if (!studentDetails) {
-      return res.status(400).json({ success: false, message: "Missing student details." });
-    }
-  
-    const { amount } = req.body;
-  
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ success: false, message: "Invalid amount." });
-    }
-  
-    try {
-      // Prepare payment data
-      const paymentData = {
-        amount: amount * 100, // Convert to kobo (₦1 = 100 kobo)
-        email: studentDetails.email,
-        metadata: { ...studentDetails },
-      };
-  
-      // Initialize payment via Paystack
-      const response = await axios.post(
-        "https://api.paystack.co/transaction/initialize",
-        paymentData,
-        {
-          headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-  
-      if (response.data.status) {
-        return res.status(200).json({
-          success: true,
-          message: "Payment initiated successfully.",
-          paymentUrl: response.data.data.authorization_url, // URL for the user to complete payment
-        });
-      } else {
-        return res.status(400).json({ success: false, message: "Failed to initiate payment." });
-      }
-    } catch (error) {
-      console.error("Error charging card:", error.response?.data || error.message);
-      return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
-    }
-  };
-  
-  
-  
-//   const purchaseTicket = async (req, res) => {
-//     const { eventId } = req.params;
+// const chargeCard = async (req, res) => {
 //     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
   
-//     // Retrieve saved student details
+//     // Retrieve student details from session
 //     const studentDetails = req.session.studentDetails;
+  
 //     if (!studentDetails) {
-//       return res.status(400).json({ success: false, message: "Student details not found. Please provide them again." });
+//       return res.status(400).json({ success: false, message: "Missing student details." });
+//     }
+  
+//     const { amount } = req.body;
+  
+//     if (!amount || amount <= 0) {
+//       return res.status(400).json({ success: false, message: "Invalid amount." });
 //     }
   
 //     try {
-//       // Find the event by ID
-//       const event = await Event.findById(eventId);
-//       if (!event) {
-//         return res.status(404).json({ success: false, message: "Event not found." });
-//       }
-  
-//       // Check ticket availability
-//       if (event.ticketsAvailable <= 0) {
-//         return res.status(400).json({ success: false, message: "Tickets sold out." });
-//       }
-  
-//       // Initiate Paystack payment
+//       // Prepare payment data
 //       const paymentData = {
-//         amount: event.price * 100, // Convert to kobo (₦1 = 100 kobo)
+//         amount: amount * 100, // Convert to kobo (₦1 = 100 kobo)
 //         email: studentDetails.email,
-//         metadata: {
-//           ...studentDetails,
-//           eventName: event.name,
-//         },
-//         callback_url: `${process.env.BASE_URL}/api/events/${eventId}/payment-callback`,
+//         metadata: { ...studentDetails },
 //       };
   
+//       // Initialize payment via Paystack
 //       const response = await axios.post(
 //         "https://api.paystack.co/transaction/initialize",
 //         paymentData,
@@ -577,75 +532,317 @@ const chargeCard = async (req, res) => {
 //         return res.status(200).json({
 //           success: true,
 //           message: "Payment initiated successfully.",
-//           paymentUrl: response.data.data.authorization_url,
+//           paymentUrl: response.data.data.authorization_url, // URL for the user to complete payment
 //         });
 //       } else {
 //         return res.status(400).json({ success: false, message: "Failed to initiate payment." });
 //       }
 //     } catch (error) {
-//       console.error("Error initiating payment:", error.response?.data || error.message);
-//       res.status(500).json({ success: false, message: "An error occurred while initiating payment." });
+//       console.error("Error charging card:", error.response?.data || error.message);
+//       return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
 //     }
 //   };
   
 
-// // Handle payment callback
-// const handlePaymentCallback = async (req, res) => {
-//     try {
-//         const { reference } = req.query;
-//         const response = await Paystack.transaction.verify(reference);
+const chargeCard = async (req, res) => {
+  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
-//         if (response.data.status === "success") {
-//             // Reduce ticket availability
-//             const eventId = response.data.metadata.eventId;
-//             const event = await Event.findById(eventId);
+  // Retrieve student details from session
+  const studentDetails = req.session.studentDetails;
 
-//             if (!event) {
-//                 return res.status(404).json({ success: false, message: "Event not found." });
-//             }
+  if (!studentDetails) {
+    return res.status(400).json({ success: false, message: "Missing student details." });
+  }
 
-//             event.ticketsAvailable -= 1;
-//             await event.save();
+  const { amount, eventId } = req.body;  // Accept eventId from request body
 
-//             res.status(200).json({ success: true, message: "Payment successful, ticket purchased." });
-//         } else {
-//             res.status(400).json({ success: false, message: "Payment verification failed." });
-//         }
-//     } catch (error) {
-//         console.error("Error handling payment callback:", error);
-//         res.status(500).json({ success: false, message: "Error handling payment callback." });
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ success: false, message: "Invalid amount." });
+  }
+
+  if (!eventId) {
+    return res.status(400).json({ success: false, message: "Event ID is required." });
+  }
+
+  try {
+    // Prepare payment data
+    const paymentData = {
+      amount: amount * 100, // Convert to kobo (₦1 = 100 kobo)
+      email: studentDetails.email,
+      metadata: {
+        ...studentDetails,
+        eventId: eventId, // Include eventId in metadata
+      },
+    };
+
+    // Initialize payment via Paystack
+    const response = await axios.post(
+      "https://api.paystack.co/transaction/initialize",
+      paymentData,
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.data.status) {
+      const transactionReference = response.data.data.reference;  // Store this reference
+      return res.status(200).json({
+        success: true,
+        message: "Payment initiated successfully.",
+        paymentUrl: response.data.data.authorization_url, // URL for the user to complete payment
+        reference: transactionReference,
+      });
+    } else {
+      return res.status(400).json({ success: false, message: "Failed to initiate payment." });
+    }
+  } catch (error) {
+    console.error("Error charging card:", error.response?.data || error.message);
+    return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
+  }
+};
+
+
+const verifyTransaction = async (reference) => {
+  try {
+    // Make the API request to Paystack for transaction verification
+    const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+      },
+    });
+
+    console.log('Paystack verification response:', response.data); // Log the full response
+
+    const data = response.data;
+
+    if (data.status && data.data.status === 'success') {
+      return {
+        success: true,
+        data: data.data,
+        message: 'Verification successful',
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Transaction verification failed.',
+      };
+    }
+  } catch (error) {
+    console.error('Error verifying transaction:', error);
+    return {
+      success: false,
+      message: 'Error verifying transaction.',
+    };
+  }
+};
+
+
+
+
+
+// // Define a route to verify the transaction
+// const verifyPayment = async (req, res) => {
+//   const { reference } = req.params; // Get the reference from URL parameters
+
+//   try {
+//     // Call Paystack API to verify the transaction
+//     const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+//       headers: {
+//         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`, // Use your Paystack secret key
+//       },
+//     });
+
+//     // Check if Paystack returned a successful verification response
+//     if (response.data.status) {
+//       const paymentData = response.data.data;
+
+//       // Check if the payment is already recorded in the database
+//       const existingPayment = await EventPayment.findOne({ transactionId: paymentData.reference });
+//       if (existingPayment) {
+//         console.log('Payment already recorded');
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Payment already recorded for this transaction.',
+//         });
+//       }
+
+//       // Prepare the payment details to save to the database
+//       const paymentDetails = {
+//         studentId: paymentData.metadata.userId,
+//         registrationNumber: paymentData.metadata.regNo,  // Save registration number
+//         amountPaid: paymentData.amount / 100, // Amount is in kobo, divide by 100
+//         paymentStatus: 'completed', // Assuming successful payment
+//         transactionId: paymentData.reference,
+//         paymentDate: paymentData.paid_at,
+//         eventId: paymentData.metadata.eventId,
+//       };
+
+//       // Save the payment details to the database
+//       const newPayment = new EventPayment(paymentDetails);
+//       await newPayment.save();
+
+//       // Respond with success
+//       return res.status(200).json({
+//         success: true,
+//         message: 'Payment verification successful and saved to database.',
+//         data: paymentData,
+//       });
+//     } else {
+//       // If Paystack verification fails
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Transaction verification failed.',
+//       });
 //     }
+//   } catch (error) {
+//     console.error('Error verifying payment:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while verifying the payment.',
+//     });
+//   }
 // };
 
-// const handlePaymentCallback = async (req, res) => {
-//     try {
-//         const { eventId } = req.params;
 
-//         const reference = req.query.reference;
 
-//         // Verify payment
-//         const verificationResponse = await Paystack.transaction.verify(reference);
 
-//         if (verificationResponse.data.status === "success") {
-//             const event = await Event.findById(eventId);
+const savePaymentDetails = async (paymentData) => {
+  try {
+    console.log("Saving payment data:", paymentData); // Log the data to check
+    const newPayment = new EventPayment(paymentData);
+    await newPayment.save();
+    console.log("Payment details saved successfully.");
+  } catch (error) {
+    console.error("Error saving payment details:", error.message);
+  }
+};
 
-//             if (!event) {
-//                 return res.status(404).json({ success: false, message: "Event not found." });
-//             }
 
-//             // Update ticket count
-//             event.ticketsAvailable -= 1;
-//             await event.save();
+// Your handleTransactionVerification function will call savePaymentDetails
+const handleTransactionVerification = async (verificationResponse) => {
+  if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
+    const transaction = verificationResponse.data;
+    const { reference, amount, status, metadata } = transaction;
 
-//             res.status(200).json({ success: true, message: "Payment successful, ticket purchased." });
-//         } else {
-//             res.status(400).json({ success: false, message: "Payment verification failed." });
-//         }
-//     } catch (error) {
-//         console.error("Error handling payment callback:", error);
-//         res.status(500).json({ success: false, message: "Error handling payment callback." });
+    const amountPaid = amount / 100; // Convert from kobo to naira
+
+    // Prepare the payment data to save
+    const paymentData = {
+      transactionId: reference,
+      studentId: metadata.userId, // Assuming the student ID is in metadata
+      registrationNumber: metadata.regNo, // Registration number
+      amountPaid: amountPaid, // Amount in naira
+      paymentStatus: status === 'success' ? 'completed' : 'failed',
+      eventId: metadata.eventId, // Event ID
+      paymentDate: transaction.paid_at, // Payment date
+    };
+
+    try {
+      await savePaymentDetails(paymentData);
+      return {
+        success: true,
+        message: 'Transaction verified and payment saved successfully.',
+        data: transaction,
+      };
+    } catch (error) {
+      console.error('Error in saving payment:', error);
+      return {
+        success: false,
+        message: 'Error saving payment details.',
+      };
+    }
+  } else {
+    console.error('Transaction verification failed:', verificationResponse.message);
+    return {
+      success: false,
+      message: 'Transaction verification failed.',
+    };
+  }
+};
+
+
+const verifyPayment = async (req, res) => {
+  const { reference } = req.params; // Get the reference from URL parameters
+
+  try {
+    // Call Paystack API to verify the transaction
+    const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`, // Use your Paystack secret key
+      },
+    });
+
+    // Check if Paystack returned a successful verification response
+    if (response.data.status) {
+      const paymentData = response.data.data;
+
+      // Check if the payment is already recorded in the database
+      const existingPayment = await EventPayment.findOne({ transactionId: paymentData.reference });
+      if (existingPayment) {
+        console.log('Payment already recorded');
+        return res.status(400).json({
+          success: false,
+          message: 'Payment already recorded for this transaction.',
+        });
+      }
+
+      // Call the function to handle the transaction verification and saving
+      const result = await handleTransactionVerification(response.data);
+
+      // Return the result from the verification function
+      if (result.success) {
+        return res.status(200).json(result); // Success response
+      } else {
+        return res.status(400).json(result); // Failure response
+      }
+    } else {
+      // If Paystack verification fails
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction verification failed.',
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while verifying the payment.',
+    });
+  }
+};
+
+
+// const updatePaymentStatus = async (req, res) => {
+//   const { transactionId, paymentStatus } = req.body;
+
+//   try {
+//     // Find the payment record by transaction ID
+//     const payment = await EventPayment.findOne({ transactionId });
+
+//     if (!payment) {
+//       return res.status(404).json({ success: false, message: "Payment record not found." });
 //     }
+
+//     // Update the payment status
+//     payment.paymentStatus = paymentStatus; // e.g., 'completed' or 'failed'
+//     await payment.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Payment status updated successfully.",
+//     });
+//   } catch (error) {
+//     console.error("Error updating payment status:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "An error occurred while updating the payment status.",
+//     });
+//   }
 // };
 
+  
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };

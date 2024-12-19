@@ -11,7 +11,7 @@ router.route('/eventbyadmin/:adminId').get(getEventsByAdmin).all(methodNotAllowe
 router.route('/saveStudent').post(saveStudentDetails).all(methodNotAllowed)
 // router.route('/purchase/:eventId').post(purchaseTicket).all(methodNotAllowed)
 router.route('/card').post(saveCardDetails).all(methodNotAllowed)
-router.route('/fetch-details').get(fetchConfirmationDetails).all(methodNotAllowed)
+router.route('/fetch-details/:email').get(fetchConfirmationDetails).all(methodNotAllowed)
 router.route('/charging').post(chargeCard).all(methodNotAllowed)
 router.route('/verify/:reference').get(verifyPayment).all(methodNotAllowed)
 // router.route('/savetransact').post(handleTransactionVerification).all(methodNotAllowed)

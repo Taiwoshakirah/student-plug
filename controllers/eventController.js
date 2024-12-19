@@ -9,6 +9,9 @@ const User = require("../models/signUp"); // Import User model
 const Student = require("../models/studentRegNo"); // Import Student model
 const EventPayment = require('../models/eventpymt')
 require("dotenv").config();
+const EventCardDetails = require('../models/eventCardDetails')
+const StudentInfo = require('../models/studentInfo')
+const EventTransaction = require('../models/eventTransaction')
 
 
 
@@ -297,10 +300,10 @@ const isValidRegNumber = (regNum) => {
 };
 
 const saveStudentDetails = async (req, res) => {
-  const { userId, firstName, lastName, department, regNo, academicLevel, email } = req.body;
+  const { userId, firstName, lastName, department, regNo, academicLevel, email, eventId } = req.body;
 
   // Validate required fields
-  if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email) {
+  if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !eventId) {
     return res.status(422).json({ success: false, message: "All fields are required." });
   }
 
@@ -310,36 +313,123 @@ const saveStudentDetails = async (req, res) => {
   }
 
   try {
-    // Verify if the user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
-    }
-
-    // Verify if the student exists using registrationNumber
+    // Verify if the registration number exists in the Student collection
     const student = await Student.findOne({ registrationNumber: regNo });
+
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student with the given registration number not found.",
-      });
+      return res.status(404).json({ success: false, message: "Invalid registration number." });
     }
 
-    // Save the details (simulate saving temporarily or in session)
-    req.session.studentDetails = { userId, firstName, lastName, department, regNo, academicLevel, email };
+    const newPayment = new EventPayment({
+      studentId: student._id, 
+      registrationNumber: regNo,
+      paymentStatus: "pending",
+      eventId,
+      studentInfoId: student._id,
+      amountPaid: 0, // Default value
+      firstName,
+      lastName,
+      department,
+      academicLevel,
+      email,
+      userId // Including userId here to store in the EventPayment collection
+    });
 
-    return res.status(200).json({
+    const savedPayment = await newPayment.save();
+
+    // Return both studentId and userId in the response
+    return res.status(201).json({
       success: true,
-      message: "Student details saved successfully. Proceed to payment.",
+      message: "Student details saved successfully.",
+      eventPayment: savedPayment,
+      studentId: student._id, // Include studentId
+      userId, // Include userId
     });
   } catch (error) {
     console.error("Error saving student details:", error.message);
     return res.status(500).json({
       success: false,
-      message: "An error occurred while saving details.",
+      message: "An error occurred while saving student details.",
     });
   }
 };
+
+
+
+
+// const saveStudentDetails = async (req, res) => {
+//   const { userId, firstName, lastName, department, regNo, academicLevel, email } = req.body;
+
+//   // Validate required fields
+//   if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email) {
+//     return res.status(422).json({ success: false, message: "All fields are required." });
+//   }
+
+//   // Validate regNo format
+//   if (!isValidRegNumber(regNo)) {
+//     return res.status(400).json({ success: false, message: "Invalid registration number format." });
+//   }
+
+//   try {
+//     // Verify if the user exists
+//     const user = await User.findById(userId);
+//     if (!user) {
+//       console.log(`User not found: ${userId}`);
+//       return res.status(404).json({ success: false, message: "User not found." });
+//     }
+
+//     // Log user to check if the correct user is fetched
+//     console.log("User found:", user);
+
+//     // Check if student record already exists
+//     const existingStudent = await Student.findOne({ registrationNumber: regNo });
+//     if (existingStudent) {
+//       // Update student details if record exists
+//       existingStudent.firstName = firstName;
+//       existingStudent.lastName = lastName;
+//       existingStudent.department = department;
+//       existingStudent.academicLevel = academicLevel;
+//       existingStudent.email = email;
+
+//       await existingStudent.save();
+//       console.log("Updated student details:", existingStudent);
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Student details updated successfully.",
+//         student: existingStudent,
+//       });
+//     }
+
+//     // Create new student record if it doesn't exist
+//     const newStudent = new Student({
+//       userId,
+//       firstName,
+//       lastName,
+//       department,
+//       registrationNumber: regNo,
+//       academicLevel,
+//       email,
+//     });
+
+//     const savedStudent = await newStudent.save();
+//     console.log("Saved new student:", savedStudent);
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Student details saved successfully.",
+//       student: savedStudent,
+//     });
+//   } catch (error) {
+//     console.error("Error saving student details:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "An error occurred while saving details.",
+//     });
+//   }
+// };
+
+
 
 
 
@@ -378,118 +468,152 @@ const saveStudentDetails = async (req, res) => {
 //   };
 
 
-  const saveCardDetails = async (req, res) => {
-    const { bankName, cardNumber, cvv, expiryDate, email } = req.body; // Add email
-    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-  
-    // 1. Validate Input Fields
-    if (!bankName || !cardNumber || !cvv || !expiryDate || !email) {
-      return res.status(400).json({ success: false, message: "All fields are required, including email." });
-    }
-  
-    if (!/^\d{16}$/.test(cardNumber)) {
-      return res.status(400).json({ success: false, message: "Card number must be 16 digits." });
-    }
-  
-    if (!/^\d{3}$/.test(cvv)) {
-      return res.status(400).json({ success: false, message: "CVV must be 3 digits." });
-    }
-  
-    if (!/^\d{2}\/\d{2}$/.test(expiryDate)) {
-      return res.status(400).json({ success: false, message: "Expiry date must be in MM/YY format." });
-    }
-  
-    try {
-      // 2. Tokenize Card using Paystack API
-      const response = await axios.post(
-        "https://api.paystack.co/charge/tokenize",
-        {
-          email: email, // Add email
-          card: {
-            number: cardNumber,
-            cvv: cvv,
-            expiry_month: expiryDate.split("/")[0],
-            expiry_year: `20${expiryDate.split("/")[1]}`,
-          },
+const saveCardDetails = async (req, res) => {
+  const { bankName, cardNumber, cvv, expiryDate, email } = req.body; // Add email
+  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+
+  // 1. Validate Input Fields
+  if (!bankName || !cardNumber || !cvv || !expiryDate || !email) {
+    return res.status(400).json({ success: false, message: "All fields are required, including email." });
+  }
+
+  if (!/^\d{16}$/.test(cardNumber)) {
+    return res.status(400).json({ success: false, message: "Card number must be 16 digits." });
+  }
+
+  if (!/^\d{3}$/.test(cvv)) {
+    return res.status(400).json({ success: false, message: "CVV must be 3 digits." });
+  }
+
+  if (!/^\d{2}\/\d{2}$/.test(expiryDate)) {
+    return res.status(400).json({ success: false, message: "Expiry date must be in MM/YY format." });
+  }
+
+  try {
+    // 2. Tokenize Card using Paystack API
+    const response = await axios.post(
+      "https://api.paystack.co/charge/tokenize",
+      {
+        email: email,
+        card: {
+          number: cardNumber,
+          cvv: cvv,
+          expiry_month: expiryDate.split("/")[0],
+          expiry_year: `20${expiryDate.split("/")[1]}`,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-  
-      if (response.data.status) {
-        const { authorization_code } = response.data.data; // Extract the token
-      
-        // Save Tokenized Card in Session
-        req.session.cardDetails = {
-          token: authorization_code, // Use the tokenized code
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (response.data.status) {
+      const { authorization_code } = response.data.data; // Extract the token
+
+      // Save Tokenized Card in the CardDetails collection
+      const newCardDetails = new EventCardDetails({
+        email: email,
+        token: authorization_code,
+        firstThree: cardNumber.slice(0, 3),
+        lastThree: cardNumber.slice(-3),
+        bankName: bankName,
+      });
+
+      await newCardDetails.save(); // Save to the database
+
+      return res.status(200).json({
+        success: true,
+        message: "Card tokenized and saved successfully.",
+        data: {
+          token: authorization_code,
           firstThree: cardNumber.slice(0, 3),
           lastThree: cardNumber.slice(-3),
           bankName: bankName,
-        };
-      
-        return res.status(200).json({
-          success: true,
-          message: "Card tokenized and saved successfully.",
-          data: {
-            token: authorization_code, // Include token in response
-            firstThree: cardNumber.slice(0, 3),
-            lastThree: cardNumber.slice(-3),
-            bankName: bankName,
-          },
-        });
-      }
-       else {
-        return res.status(400).json({
-          success: false,
-          message: "Failed to tokenize the card.",
-          error: response.data.message,
-        });
-      }
-    } catch (error) {
-      console.error("Error tokenizing card:", error.response?.data || error.message);
-      return res.status(500).json({
+        },
+      });
+    } else {
+      return res.status(400).json({
         success: false,
-        message: "An error occurred while tokenizing the card.",
-        error: error.response?.data || error.message,
+        message: "Failed to tokenize the card.",
+        error: response.data.message,
       });
     }
-  };
+  } catch (error) {
+    console.error("Error tokenizing card:", error.response?.data || error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while tokenizing the card.",
+      error: error.response?.data || error.message,
+    });
+  }
+};
+
   
   
 const fetchConfirmationDetails = async (req, res) => {
-    // Retrieve student and card details from session
-    const studentDetails = req.session.studentDetails;
-    const cardDetails = req.session.cardDetails;
-  
-    if (!studentDetails || !cardDetails) {
-      return res.status(400).json({ success: false, message: "Missing student or card details." });
+  const { email } = req.params; // Retrieve the email from URL params
+
+  try {
+    // Ensure email is passed correctly
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
     }
-  
-    try {
-      // Prepare confirmation details
-      const confirmationDetails = {
-        name: `${studentDetails.firstName} ${studentDetails.lastName}`,
-        regNo: studentDetails.regNo,
-        department: studentDetails.department,
-        academicLevel: studentDetails.academicLevel,
-        cardMasked: `${cardDetails.firstThree}******${cardDetails.lastThree}`,
-      };
-  
-      // Send confirmation details to the frontend
-      return res.status(200).json({
-        success: true,
-        message: "Confirmation details fetched successfully.",
-        data: confirmationDetails,
-      });
-    } catch (error) {
-      console.error("Error fetching confirmation details:", error.message);
-      return res.status(500).json({ success: false, message: "An error occurred while fetching confirmation details." });
+
+    // Query user by email in the User collection
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Student not found." });
     }
-  };
+    console.log("User found:", user); // Log user details
+
+    // Fetch student details from EventPayment collection
+    const eventPayment = await EventPayment.findOne({ email });
+    if (!eventPayment) {
+      return res.status(404).json({ success: false, message: "Event payment details not found." });
+    }
+    console.log("Event payment found:", eventPayment); // Log event payment details
+
+    // Fetch card details from EventCardDetails collection
+    const cardDetails = await EventCardDetails.findOne({ email });
+    if (!cardDetails) {
+      return res.status(404).json({ success: false, message: "Card details not found." });
+    }
+    console.log("Card details found:", cardDetails); // Log card details
+
+    // Prepare the confirmation details
+    const confirmationDetails = {
+      firstName: eventPayment.firstName,                     // Return firstName separately
+      lastName: eventPayment.lastName,                       // Return lastName separately
+      regNo: eventPayment.registrationNumber,                // Use regNo from EventPayment
+      department: eventPayment.department,                   // Use department from EventPayment
+      academicLevel: eventPayment.academicLevel,             // Use academicLevel from EventPayment
+      cardMasked: `${cardDetails.firstThree}******${cardDetails.lastThree}`, // Masked card details
+      bankName: cardDetails.bankName,                        // Fetch bank name from EventCardDetails
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Card details added successfully. Here are the confirmation details.",
+      data: confirmationDetails,
+    });
+  } catch (error) {
+    console.error("Error handling card addition:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while processing card addition.",
+    });
+  }
+};
+
+
+
+
+
+
+
   
 
 // const chargeCard = async (req, res) => {
@@ -709,50 +833,212 @@ const verifyTransaction = async (reference) => {
 
 
 
+// const savePaymentDetails = async (paymentData) => {
+//   try {
+//     console.log("Saving payment data:", paymentData); // Log the data to check
+//     const newPayment = new EventPayment(paymentData);
+//     await newPayment.save();
+//     console.log("Payment details saved successfully.");
+//   } catch (error) {
+//     console.error("Error saving payment details:", error.message);
+//   }
+// };
+
+// const savePaymentDetails = async (paymentData) => {
+//   const {
+//     studentId,
+//     registrationNumber,
+//     amountPaid,
+//     paymentStatus,
+//     transactionId,
+//     paymentDate,
+//     eventId,
+//     email,
+//   } = paymentData;
+
+//   // Create and save the transaction
+//   const eventTransaction = new EventTransaction({
+//     email,
+//     amount: amountPaid,
+//     reference: transactionId,
+//     status: paymentStatus,
+//     gatewayResponse: "Successful",
+//     createdAt: paymentDate,
+//   });
+
+//   await eventTransaction.save();
+
+//   // Find and update the payment document
+//   const eventPayment = await EventPayment.findOneAndUpdate(
+//     { studentId, eventId }, // Match the specific student and event
+//     {
+//       $set: {
+//         paymentStatus,
+//         transactionId,
+//         paymentDate,
+//         amountPaid,
+//       },
+//       $push: { transactions: eventTransaction._id }, // Append the transaction ID
+//     },
+//     { new: true, upsert: true } // Create the document if it doesn’t exist
+//   );
+
+//   if (!eventPayment) {
+//     throw new Error("Failed to update EventPayment document.");
+//   }
+
+//   return eventPayment;
+// };
 const savePaymentDetails = async (paymentData) => {
-  try {
-    console.log("Saving payment data:", paymentData); // Log the data to check
+  const { studentId, eventId, transactionId } = paymentData;
+
+  // Check if an existing record exists for the same student and event
+  const existingPayment = await EventPayment.findOne({ studentId, eventId });
+
+  if (existingPayment) {
+    // Update the existing record with new payment details
+    existingPayment.transactionId = transactionId;
+    existingPayment.paymentStatus = paymentData.paymentStatus;
+    existingPayment.amountPaid = paymentData.amountPaid;
+    existingPayment.paymentDate = paymentData.paymentDate;
+    await existingPayment.save();
+    return existingPayment;
+  } else {
+    // Create a new payment record if none exists
     const newPayment = new EventPayment(paymentData);
     await newPayment.save();
-    console.log("Payment details saved successfully.");
-  } catch (error) {
-    console.error("Error saving payment details:", error.message);
+    return newPayment;
   }
 };
 
 
-// Your handleTransactionVerification function will call savePaymentDetails
 const handleTransactionVerification = async (verificationResponse) => {
   if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
     const transaction = verificationResponse.data;
     const { reference, amount, status, metadata } = transaction;
 
+    console.log('Transaction Metadata:', metadata);
+
+    // Validate metadata fields
+    const requiredFields = ['userId', 'regNo', 'eventId', 'firstName', 'lastName', 'department', 'academicLevel', 'email'];
+    for (const field of requiredFields) {
+      if (!metadata[field]) {
+        console.error(`Missing field in metadata: ${field}`);
+        throw new Error(`Missing required metadata field: ${field}`);
+      }
+    }
+
     const amountPaid = amount / 100; // Convert from kobo to naira
 
-    // Prepare the payment data to save
-    const paymentData = {
-      transactionId: reference,
-      studentId: metadata.userId, // Assuming the student ID is in metadata
-      registrationNumber: metadata.regNo, // Registration number
-      amountPaid: amountPaid, // Amount in naira
-      paymentStatus: status === 'success' ? 'completed' : 'failed',
-      eventId: metadata.eventId, // Event ID
-      paymentDate: transaction.paid_at, // Payment date
-    };
+    // Find the existing payment document using studentId and eventId
+    let paymentData = await EventPayment.findOne({
+      studentId: metadata.userId, // Use userId here
+      eventId: metadata.eventId,
+    });
 
-    try {
-      await savePaymentDetails(paymentData);
-      return {
-        success: true,
-        message: 'Transaction verified and payment saved successfully.',
-        data: transaction,
-      };
-    } catch (error) {
-      console.error('Error in saving payment:', error);
-      return {
-        success: false,
-        message: 'Error saving payment details.',
-      };
+    if (paymentData) {
+      // If paymentData exists, update it
+      if (paymentData.paymentStatus === 'pending') {
+        // Only update if it's still pending
+        paymentData.paymentStatus = 'completed';
+        paymentData.transactionId = reference;
+        paymentData.amountPaid = amountPaid;
+        paymentData.paymentDate = transaction.paid_at;
+
+        // Create a new EventTransaction document
+        const newTransaction = new EventTransaction({
+          transactionId: reference,
+          amountPaid,
+          paymentStatus: 'completed',
+          paymentDate: transaction.paid_at,
+          studentId: metadata.userId,
+          eventId: metadata.eventId,
+        });
+
+        try {
+          // Save the new transaction
+          const savedTransaction = await newTransaction.save();
+
+          // Push the new transaction's ObjectId to the transactions array
+          paymentData.transactions.push(savedTransaction._id);
+
+          // Save the updated payment document
+          const updatedPayment = await paymentData.save();
+
+          return {
+            success: true,
+            message: 'Transaction verified and payment details updated successfully.',
+            data: updatedPayment,
+          };
+        } catch (error) {
+          console.error('Error saving transaction or payment:', error);
+          return {
+            success: false,
+            message: 'Error saving payment details or transaction.',
+            error: error.message,
+          };
+        }
+      } else {
+        // If paymentStatus is already 'completed', don't update it
+        return {
+          success: false,
+          message: 'Payment has already been processed.',
+        };
+      }
+    } else {
+      // If no payment record exists, create a new payment document
+      paymentData = new EventPayment({
+        studentId: metadata.userId, // Ensure this is correct
+        registrationNumber: metadata.regNo,
+        paymentStatus: 'completed',
+        amountPaid: amountPaid,
+        firstName: metadata.firstName,
+        lastName: metadata.lastName,
+        department: metadata.department,
+        academicLevel: metadata.academicLevel,
+        email: metadata.email,
+        eventId: metadata.eventId,
+        paymentDate: transaction.paid_at,
+        transactions: [], // Start with an empty transactions array
+        userId: metadata.userId, // Pass userId here
+      });
+
+      try {
+        // Save the payment document first
+        const savedPayment = await paymentData.save();
+
+        // Create a new EventTransaction document
+        const newTransaction = new EventTransaction({
+          transactionId: reference,
+          amountPaid,
+          paymentStatus: 'completed',
+          paymentDate: transaction.paid_at,
+          studentId: metadata.userId,
+          eventId: metadata.eventId,
+        });
+
+        // Save the new transaction
+        const savedTransaction = await newTransaction.save();
+
+        // Add the transaction ObjectId to the payment document's transactions array
+        savedPayment.transactions.push(savedTransaction._id);
+
+        // Save the updated payment document with the new transaction
+        const finalPayment = await savedPayment.save();
+
+        return {
+          success: true,
+          message: 'Transaction verified and payment saved successfully.',
+          data: finalPayment,
+        };
+      } catch (error) {
+        console.error('Error saving payment or transaction:', error);
+        return {
+          success: false,
+          message: 'Error saving payment details or transaction.',
+          error: error.message,
+        };
+      }
     }
   } else {
     console.error('Transaction verification failed:', verificationResponse.message);
@@ -764,55 +1050,90 @@ const handleTransactionVerification = async (verificationResponse) => {
 };
 
 
+
+
+
+
+
+
+
+
+// Your handleTransactionVerification function will call savePaymentDetails
+// const handleTransactionVerification = async (verificationResponse) => {
+//   if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
+//     const transaction = verificationResponse.data;
+//     const { reference, amount, status, metadata } = transaction;
+
+//     const amountPaid = amount / 100; // Convert from kobo to naira
+
+//     // Prepare the payment data to save
+//     const paymentData = {
+//       transactionId: reference,
+//       studentId: metadata.userId, // Assuming the student ID is in metadata
+//       registrationNumber: metadata.regNo, // Registration number
+//       amountPaid: amountPaid, // Amount in naira
+//       paymentStatus: status === 'success' ? 'completed' : 'failed',
+//       eventId: metadata.eventId, // Event ID
+//       paymentDate: transaction.paid_at, // Payment date
+//     };
+
+//     try {
+//       await savePaymentDetails(paymentData);
+//       return {
+//         success: true,
+//         message: 'Transaction verified and payment saved successfully.',
+//         data: transaction,
+//       };
+//     } catch (error) {
+//       console.error('Error in saving payment:', error);
+//       return {
+//         success: false,
+//         message: 'Error saving payment details.',
+//       };
+//     }
+//   } else {
+//     console.error('Transaction verification failed:', verificationResponse.message);
+//     return {
+//       success: false,
+//       message: 'Transaction verification failed.',
+//     };
+//   }
+// };
+
+
 const verifyPayment = async (req, res) => {
-  const { reference } = req.params; // Get the reference from URL parameters
+  const { reference } = req.params;
 
   try {
-    // Call Paystack API to verify the transaction
     const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`, // Use your Paystack secret key
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
       },
     });
 
-    // Check if Paystack returned a successful verification response
     if (response.data.status) {
-      const paymentData = response.data.data;
-
-      // Check if the payment is already recorded in the database
-      const existingPayment = await EventPayment.findOne({ transactionId: paymentData.reference });
-      if (existingPayment) {
-        console.log('Payment already recorded');
-        return res.status(400).json({
-          success: false,
-          message: 'Payment already recorded for this transaction.',
-        });
-      }
-
-      // Call the function to handle the transaction verification and saving
+      // Pass the verification response to handleTransactionVerification
       const result = await handleTransactionVerification(response.data);
 
-      // Return the result from the verification function
-      if (result.success) {
-        return res.status(200).json(result); // Success response
-      } else {
-        return res.status(400).json(result); // Failure response
-      }
+      // Return the result from handleTransactionVerification
+      return res.status(result.success ? 200 : 400).json(result);
     } else {
-      // If Paystack verification fails
       return res.status(400).json({
         success: false,
         message: 'Transaction verification failed.',
       });
     }
   } catch (error) {
-    console.error('Error verifying payment:', error);
+    console.error('Error verifying payment:', error.message);
     return res.status(500).json({
       success: false,
       message: 'An error occurred while verifying the payment.',
+      error: error.message,
     });
   }
 };
+
+
 
 
 // const updatePaymentStatus = async (req, res) => {

@@ -670,15 +670,7 @@ const fetchConfirmationDetails = async (req, res) => {
 
 const chargeCard = async (req, res) => {
   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-  // Retrieve student details from session
-  const studentDetails = req.session.studentDetails;
-
-  if (!studentDetails) {
-    return res.status(400).json({ success: false, message: "Missing student details." });
-  }
-
-  const { amount, eventId } = req.body;  // Accept eventId from request body
+  const { amount, eventId, email } = req.body;
 
   if (!amount || amount <= 0) {
     return res.status(400).json({ success: false, message: "Invalid amount." });
@@ -689,17 +681,30 @@ const chargeCard = async (req, res) => {
   }
 
   try {
-    // Prepare payment data
+    // Fetch student details from EventPayment collection
+    const eventPayment = await EventPayment.findOne({ email, eventId });
+
+    if (!eventPayment) {
+      return res.status(404).json({ success: false, message: "Student details not found." });
+    }
+
     const paymentData = {
-      amount: amount * 100, // Convert to kobo (₦1 = 100 kobo)
-      email: studentDetails.email,
+      amount: amount * 100, // Convert to kobo
+      email: eventPayment.email,
       metadata: {
-        ...studentDetails,
-        eventId: eventId, // Include eventId in metadata
+        email: eventPayment.email,
+        userId: eventPayment.userId, // Include userId in metadata
+        firstName: eventPayment.firstName,
+        lastName: eventPayment.lastName,
+        department: eventPayment.department,
+        academicLevel: eventPayment.academicLevel,
+        regNo: eventPayment.registrationNumber,
+        eventId: eventId,
       },
     };
 
-    // Initialize payment via Paystack
+    console.log("Payment Metadata:", paymentData.metadata);
+
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       paymentData,
@@ -712,12 +717,11 @@ const chargeCard = async (req, res) => {
     );
 
     if (response.data.status) {
-      const transactionReference = response.data.data.reference;  // Store this reference
       return res.status(200).json({
         success: true,
         message: "Payment initiated successfully.",
-        paymentUrl: response.data.data.authorization_url, // URL for the user to complete payment
-        reference: transactionReference,
+        paymentUrl: response.data.data.authorization_url,
+        reference: response.data.data.reference,
       });
     } else {
       return res.status(400).json({ success: false, message: "Failed to initiate payment." });
@@ -727,6 +731,7 @@ const chargeCard = async (req, res) => {
     return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
   }
 };
+
 
 
 const verifyTransaction = async (reference) => {
@@ -930,9 +935,9 @@ const handleTransactionVerification = async (verificationResponse) => {
 
     const amountPaid = amount / 100; // Convert from kobo to naira
 
-    // Find the existing payment document using studentId and eventId
+    // Find the existing payment document using userId and eventId
     let paymentData = await EventPayment.findOne({
-      studentId: metadata.userId, // Use userId here
+      userId: metadata.userId, // Use userId here
       eventId: metadata.eventId,
     });
 
@@ -988,7 +993,7 @@ const handleTransactionVerification = async (verificationResponse) => {
     } else {
       // If no payment record exists, create a new payment document
       paymentData = new EventPayment({
-        studentId: metadata.userId, // Ensure this is correct
+        userId: metadata.userId, // Ensure this is correct
         registrationNumber: metadata.regNo,
         paymentStatus: 'completed',
         amountPaid: amountPaid,
@@ -1000,7 +1005,7 @@ const handleTransactionVerification = async (verificationResponse) => {
         eventId: metadata.eventId,
         paymentDate: transaction.paid_at,
         transactions: [], // Start with an empty transactions array
-        userId: metadata.userId, // Pass userId here
+        studentId: metadata.userId, // Pass studentId here
       });
 
       try {
@@ -1048,7 +1053,6 @@ const handleTransactionVerification = async (verificationResponse) => {
     };
   }
 };
-
 
 
 

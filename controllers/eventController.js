@@ -709,7 +709,8 @@ const chargeCard = async (req, res) => {
         regNo: eventPayment.registrationNumber,
         eventId: eventId,
       },
-      callback_url: "https://school-plug.vercel.app/home/eventreceipt", // Add your callback URL
+      callback_url: "http://localhost:5173/home/eventreceipt", // Add your callback URL
+      // callback_url: "https://school-plug.vercel.app/home/eventreceipt", // Add your callback URL
     };
 
     console.log("Payment Metadata:", paymentData.metadata);

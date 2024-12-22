@@ -34,7 +34,7 @@ const eventPaymentSchema = new mongoose.Schema({
   // Use only ObjectId references to EventTransaction here
   transactions: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: "EventTransaction", // This will reference EventTransaction collection
+    ref: "EventTransaction", 
   }],
   studentInfoId: { type: mongoose.Schema.Types.ObjectId, ref: "StudentInfo" },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Add userId here

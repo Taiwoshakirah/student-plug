@@ -609,64 +609,72 @@ const fetchConfirmationDetails = async (req, res) => {
 };
 
 
-
-
-
-
-
   
 
 // const chargeCard = async (req, res) => {
-//     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-  
-//     // Retrieve student details from session
-//     const studentDetails = req.session.studentDetails;
-  
-//     if (!studentDetails) {
-//       return res.status(400).json({ success: false, message: "Missing student details." });
+//   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+//   const { amount, eventId, email } = req.body;
+
+//   if (!amount || amount <= 0) {
+//     return res.status(400).json({ success: false, message: "Invalid amount." });
+//   }
+
+//   if (!eventId) {
+//     return res.status(400).json({ success: false, message: "Event ID is required." });
+//   }
+
+//   try {
+//     // Fetch student details from EventPayment collection
+//     const eventPayment = await EventPayment.findOne({ email, eventId });
+
+//     if (!eventPayment) {
+//       return res.status(404).json({ success: false, message: "Student details not found." });
 //     }
-  
-//     const { amount } = req.body;
-  
-//     if (!amount || amount <= 0) {
-//       return res.status(400).json({ success: false, message: "Invalid amount." });
-//     }
-  
-//     try {
-//       // Prepare payment data
-//       const paymentData = {
-//         amount: amount * 100, // Convert to kobo (₦1 = 100 kobo)
-//         email: studentDetails.email,
-//         metadata: { ...studentDetails },
-//       };
-  
-//       // Initialize payment via Paystack
-//       const response = await axios.post(
-//         "https://api.paystack.co/transaction/initialize",
-//         paymentData,
-//         {
-//           headers: {
-//             Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-//             "Content-Type": "application/json",
-//           },
-//         }
-//       );
-  
-//       if (response.data.status) {
-//         return res.status(200).json({
-//           success: true,
-//           message: "Payment initiated successfully.",
-//           paymentUrl: response.data.data.authorization_url, // URL for the user to complete payment
-//         });
-//       } else {
-//         return res.status(400).json({ success: false, message: "Failed to initiate payment." });
+
+//     const paymentData = {
+//       amount: amount * 100, // Convert to kobo
+//       email: eventPayment.email,
+//       metadata: {
+//         email: eventPayment.email,
+//         userId: eventPayment.userId, // Include userId in metadata
+//         firstName: eventPayment.firstName,
+//         lastName: eventPayment.lastName,
+//         department: eventPayment.department,
+//         academicLevel: eventPayment.academicLevel,
+//         regNo: eventPayment.registrationNumber,
+//         eventId: eventId,
+//       },
+//     };
+
+//     console.log("Payment Metadata:", paymentData.metadata);
+
+//     const response = await axios.post(
+//       "https://api.paystack.co/transaction/initialize",
+//       paymentData,
+//       {
+//         headers: {
+//           Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+//           "Content-Type": "application/json",
+//         },
 //       }
-//     } catch (error) {
-//       console.error("Error charging card:", error.response?.data || error.message);
-//       return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
+//     );
+
+//     if (response.data.status) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "Payment initiated successfully.",
+//         paymentUrl: response.data.data.authorization_url,
+//         reference: response.data.data.reference,
+//       });
+//     } else {
+//       return res.status(400).json({ success: false, message: "Failed to initiate payment." });
 //     }
-//   };
-  
+//   } catch (error) {
+//     console.error("Error charging card:", error.response?.data || error.message);
+//     return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
+//   }
+// };
+
 
 const chargeCard = async (req, res) => {
   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -693,7 +701,7 @@ const chargeCard = async (req, res) => {
       email: eventPayment.email,
       metadata: {
         email: eventPayment.email,
-        userId: eventPayment.userId, // Include userId in metadata
+        userId: eventPayment.userId,
         firstName: eventPayment.firstName,
         lastName: eventPayment.lastName,
         department: eventPayment.department,
@@ -701,6 +709,7 @@ const chargeCard = async (req, res) => {
         regNo: eventPayment.registrationNumber,
         eventId: eventId,
       },
+      callback_url: "https://school-plug.vercel.app/home/eventreceipt", // Add your callback URL
     };
 
     console.log("Payment Metadata:", paymentData.metadata);
@@ -717,6 +726,7 @@ const chargeCard = async (req, res) => {
     );
 
     if (response.data.status) {
+      // Return the payment URL to the client for redirection
       return res.status(200).json({
         success: true,
         message: "Payment initiated successfully.",
@@ -733,40 +743,102 @@ const chargeCard = async (req, res) => {
 };
 
 
+// const axios = require("axios");
 
-const verifyTransaction = async (reference) => {
-  try {
-    // Make the API request to Paystack for transaction verification
-    const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-      },
-    });
+// const chargeCard = async (req, res) => {
+//   const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+//   const { amount, email, authorizationCode } = req.body;
 
-    console.log('Paystack verification response:', response.data); // Log the full response
+//   // Validate input fields
+//   if (!amount || amount <= 0) {
+//       return res.status(400).json({ success: false, message: "Invalid amount." });
+//   }
 
-    const data = response.data;
+//   if (!email || !authorizationCode) {
+//       return res.status(400).json({ success: false, message: "Email and Authorization code are required." });
+//   }
 
-    if (data.status && data.data.status === 'success') {
-      return {
-        success: true,
-        data: data.data,
-        message: 'Verification successful',
-      };
-    } else {
-      return {
-        success: false,
-        message: 'Transaction verification failed.',
-      };
-    }
-  } catch (error) {
-    console.error('Error verifying transaction:', error);
-    return {
-      success: false,
-      message: 'Error verifying transaction.',
-    };
-  }
-};
+//   try {
+//       // Prepare payment data
+//       const paymentData = {
+//           amount: amount * 100, // Convert to kobo
+//           email,
+//           authorization_code: authorizationCode,
+//       };
+
+//       // Call Paystack's charge authorization endpoint
+//       const response = await axios.post(
+//           "https://api.paystack.co/transaction/charge_authorization",
+//           paymentData,
+//           {
+//               headers: {
+//                   Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+//                   "Content-Type": "application/json",
+//               },
+//           }
+//       );
+
+//       // Handle Paystack response
+//       if (response.data.status) {
+//           return res.status(200).json({
+//               success: true,
+//               message: "Payment charged successfully.",
+//               reference: response.data.data.reference,
+//           });
+//       } else {
+//           return res.status(400).json({
+//               success: false,
+//               message: response.data.message || "Failed to charge payment.",
+//           });
+//       }
+//   } catch (error) {
+//       console.error("Error charging card:", error.response?.data || error.message);
+//       return res.status(400).json({
+//           success: false,
+//           message: error.response?.data?.message || "An unexpected error occurred.",
+//           nextStep: error.response?.data?.meta?.nextStep || "Verify email and authorization code.",
+//       });
+//   }
+// };
+
+
+
+
+
+
+// const verifyTransaction = async (reference) => {
+//   try {
+//     // Make the API request to Paystack for transaction verification
+//     const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+//       headers: {
+//         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+//       },
+//     });
+
+//     console.log('Paystack verification response:', response.data); // Log the full response
+
+//     const data = response.data;
+
+//     if (data.status && data.data.status === 'success') {
+//       return {
+//         success: true,
+//         data: data.data,
+//         message: 'Verification successful',
+//       };
+//     } else {
+//       return {
+//         success: false,
+//         message: 'Transaction verification failed.',
+//       };
+//     }
+//   } catch (error) {
+//     console.error('Error verifying transaction:', error);
+//     return {
+//       success: false,
+//       message: 'Error verifying transaction.',
+//     };
+//   }
+// };
 
 
 
@@ -894,27 +966,27 @@ const verifyTransaction = async (reference) => {
 
 //   return eventPayment;
 // };
-const savePaymentDetails = async (paymentData) => {
-  const { studentId, eventId, transactionId } = paymentData;
+// const savePaymentDetails = async (paymentData) => {
+//   const { studentId, eventId, transactionId } = paymentData;
 
-  // Check if an existing record exists for the same student and event
-  const existingPayment = await EventPayment.findOne({ studentId, eventId });
+//   // Check if an existing record exists for the same student and event
+//   const existingPayment = await EventPayment.findOne({ studentId, eventId });
 
-  if (existingPayment) {
-    // Update the existing record with new payment details
-    existingPayment.transactionId = transactionId;
-    existingPayment.paymentStatus = paymentData.paymentStatus;
-    existingPayment.amountPaid = paymentData.amountPaid;
-    existingPayment.paymentDate = paymentData.paymentDate;
-    await existingPayment.save();
-    return existingPayment;
-  } else {
-    // Create a new payment record if none exists
-    const newPayment = new EventPayment(paymentData);
-    await newPayment.save();
-    return newPayment;
-  }
-};
+//   if (existingPayment) {
+//     // Update the existing record with new payment details
+//     existingPayment.transactionId = transactionId;
+//     existingPayment.paymentStatus = paymentData.paymentStatus;
+//     existingPayment.amountPaid = paymentData.amountPaid;
+//     existingPayment.paymentDate = paymentData.paymentDate;
+//     await existingPayment.save();
+//     return existingPayment;
+//   } else {
+//     // Create a new payment record if none exists
+//     const newPayment = new EventPayment(paymentData);
+//     await newPayment.save();
+//     return newPayment;
+//   }
+// };
 
 
 const handleTransactionVerification = async (verificationResponse) => {
@@ -1138,6 +1210,46 @@ const verifyPayment = async (req, res) => {
 };
 
 
+// Endpoint to Fetch Receipt by Reference
+const receipt = async (req, res) => {
+  const { reference } = req.params;
+
+  try {
+    // Fetch payment by reference
+    const payment = await EventPayment.findOne({ "transactions.transactionId": reference });
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "Payment not found." });
+    }
+
+    // Find the specific transaction within the transactions array
+    const transaction = payment.transactions.find(t => t.transactionId === reference);
+
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: "Transaction not found." });
+    }
+
+    // Format response data
+    const receiptData = {
+      message: "Payment success",
+      amount: `₦${payment.amountPaid}`,
+      studentInfo: {
+        name: `${payment.firstName} ${payment.lastName}`,
+        registrationNumber: payment.registrationNumber,
+        department: payment.department,
+        academicLevel: payment.academicLevel,
+      },
+      paymentDate: new Date(transaction.paymentDate).toLocaleString(), // Format as needed
+      reference,
+    };
+
+    return res.status(200).json({ success: true, receipt: receiptData });
+  } catch (error) {
+    console.error("Error fetching payment:", error.message);
+    return res.status(500).json({ success: false, message: "An error occurred." });
+  }
+};
+
 
 
 // const updatePaymentStatus = async (req, res) => {
@@ -1170,4 +1282,4 @@ const verifyPayment = async (req, res) => {
 
   
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment,receipt };

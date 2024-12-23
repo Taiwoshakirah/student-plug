@@ -14,7 +14,8 @@ const SchoolInfo = require('../models/schoolInfo')
 const admin = require('firebase-admin');
 
 const signUp = async (req, res, next) => {
-  const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
+  const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms, fcmToken  } = req.body;
+  console.log("FCM Token Received:", fcmToken); // Log to check
   
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
@@ -25,6 +26,8 @@ const signUp = async (req, res, next) => {
   if (!agreedToTermsBool) {
     return res.status(400).json({ success: false, message: "You must agree to the terms and conditions" });
   }
+
+  
 
   if (idToken) {
     try {
@@ -46,6 +49,7 @@ const signUp = async (req, res, next) => {
         googleId: uid,
         profilePicture: picture || null,
         agreedToTerms: agreedToTermsBool,
+        fcmToken,
       });
 
       const token = jwt.sign({ userId: newUser._id, schoolId: newUser.schoolInfoId }, process.env.JWT_SECRET, { expiresIn: "3d" });
@@ -75,6 +79,7 @@ const signUp = async (req, res, next) => {
         phoneNumber,
         password,
         agreedToTerms: agreedToTermsBool,
+        fcmToken,
       });
       
       const redirectUrl = `/dashboard/school/${newUser.schoolInfoId}`;
@@ -260,12 +265,18 @@ const getSchoolDashboard = async (req, res) => {
 
 
 const signin = async (req, res) => {
-  const { email, phoneNumber, password } = req.body;
+  const { email, phoneNumber, password,fcmToken } = req.body;
 
   if ((!email && !phoneNumber) || !password) {
     return res
       .status(422)
       .json({ message: "Email or phone number and password are required" });
+  }
+
+  // Update the user's FCM token
+  if (fcmToken) {
+    user.fcmToken = fcmToken;
+    await user.save();
   }
 
   let user;
@@ -319,6 +330,8 @@ const googleSignIn = async (req, res) => {
     return res.status(400).json({ message: "ID token is required" });
   }
 
+ 
+
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
@@ -338,6 +351,12 @@ const googleSignIn = async (req, res) => {
       // Re-query to populate schoolInfoId for the new user
       user = await User.findOne({ googleId: uid }).populate("schoolInfoId");
     }
+
+     // Update the user's FCM token
+  if (fcmToken) {
+    user.fcmToken = fcmToken;
+    await user.save();
+  }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
   const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;

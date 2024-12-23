@@ -50,7 +50,8 @@ const userSchema =new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "StudentInfo" 
   },
-   
+  fcmToken: { type: String, default: null },
+
   
 });
 

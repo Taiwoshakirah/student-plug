@@ -1211,45 +1211,6 @@ const verifyPayment = async (req, res) => {
 };
 
 
-// Endpoint to Fetch Receipt by Reference
-const receipt = async (req, res) => {
-  const { reference } = req.params;
-
-  try {
-    // Fetch payment by reference
-    const payment = await EventPayment.findOne({ "transactions.transactionId": reference });
-
-    if (!payment) {
-      return res.status(404).json({ success: false, message: "Payment not found." });
-    }
-
-    // Find the specific transaction within the transactions array
-    const transaction = payment.transactions.find(t => t.transactionId === reference);
-
-    if (!transaction) {
-      return res.status(404).json({ success: false, message: "Transaction not found." });
-    }
-
-    // Format response data
-    const receiptData = {
-      message: "Payment success",
-      amount: `₦${payment.amountPaid}`,
-      studentInfo: {
-        name: `${payment.firstName} ${payment.lastName}`,
-        registrationNumber: payment.registrationNumber,
-        department: payment.department,
-        academicLevel: payment.academicLevel,
-      },
-      paymentDate: new Date(transaction.paymentDate).toLocaleString(), // Format as needed
-      reference,
-    };
-
-    return res.status(200).json({ success: true, receipt: receiptData });
-  } catch (error) {
-    console.error("Error fetching payment:", error.message);
-    return res.status(500).json({ success: false, message: "An error occurred." });
-  }
-};
 
 
 
@@ -1283,4 +1244,4 @@ const receipt = async (req, res) => {
 
   
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment,receipt };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };

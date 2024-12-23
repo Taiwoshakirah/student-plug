@@ -14,7 +14,6 @@ router.route('/card').post(saveCardDetails).all(methodNotAllowed)
 router.route('/fetch-details/:email').get(fetchConfirmationDetails).all(methodNotAllowed)
 router.route('/charging').post(chargeCard).all(methodNotAllowed)
 router.route('/verify/:reference').get(verifyPayment).all(methodNotAllowed)
-router.route("/receipt/:reference").get(receipt).all(methodNotAllowed)
 // router.route('/savetransact').post(handleTransactionVerification).all(methodNotAllowed)
 // router.route('/update-payment').post(updatePaymentStatus).all(methodNotAllowed)
 

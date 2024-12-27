@@ -60,8 +60,32 @@
 // module.exports = { onPostLiked };
 
 const WebSocket = require("ws");
+const { Notification } = require('../models/notification'); // Notification model
 
 const clients = new Map(); // Map of userId (string) to WebSocket connection
+
+// Function to send unread notifications to the user
+const sendUnreadNotifications = async (userId, ws) => {
+  try {
+    const notifications = await Notification.find({ userId, read: false });
+
+    if (notifications.length > 0) {
+      notifications.forEach(notification => {
+        ws.send(JSON.stringify(notification)); // Send via WebSocket
+        console.log(`Sent unread notification to ${userId}:`, notification);
+      });
+
+      // Mark notifications as read once sent
+      await Notification.updateMany(
+        { userId, read: false },
+        { $set: { read: true } }
+      );
+      console.log(`Marked notifications as read for ${userId}`);
+    }
+  } catch (error) {
+    console.error('Error sending unread notifications:', error);
+  }
+};
 
 // Function to initialize WebSocket server
 const setupWebSocket = (server) => {
@@ -71,7 +95,7 @@ const setupWebSocket = (server) => {
     console.log("New WebSocket client connected!");
 
     // Handle initial message to map userId to WebSocket
-    ws.on("message", (message) => {
+    ws.on("message", async (message) => {
       try {
         const parsedMessage = JSON.parse(message);
         const userId = parsedMessage.userId; // Extract userId from client message
@@ -79,6 +103,9 @@ const setupWebSocket = (server) => {
         if (userId) {
           clients.set(userId, ws); // Map userId to WebSocket
           console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
+
+          // Send unread notifications if available
+          await sendUnreadNotifications(userId, ws);
         }
       } catch (error) {
         console.error("Error parsing message:", error.message);
@@ -114,7 +141,8 @@ const sendNotificationToPostOwner = (postOwnerId, notification) => {
   }
 };
 
-module.exports = { setupWebSocket, sendNotificationToPostOwner };
+module.exports = { setupWebSocket, sendNotificationToPostOwner, clients };
+
 
 
 

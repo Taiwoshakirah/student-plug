@@ -14,8 +14,8 @@ const SchoolInfo = require('../models/schoolInfo')
 const admin = require('firebase-admin');
 
 const signUp = async (req, res, next) => {
-  const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms, fcmToken  } = req.body;
-  console.log("FCM Token Received:", fcmToken); // Log to check
+  const { idToken, fullName, email, phoneNumber, password, confirmPassword, agreedToTerms } = req.body;
+  
   
   const agreedToTermsBool = agreedToTerms === "true" || agreedToTerms === true;
 
@@ -79,7 +79,7 @@ const signUp = async (req, res, next) => {
         phoneNumber,
         password,
         agreedToTerms: agreedToTermsBool,
-        fcmToken,
+        // fcmToken,
       });
       
       const redirectUrl = `/dashboard/school/${newUser.schoolInfoId}`;

@@ -1,3 +1,4 @@
+const http = require("http")
 const express = require("express");
 const { mongoose } = require("mongoose");
 const cors = require('cors');
@@ -8,9 +9,7 @@ require("dotenv").config();
 const admin = require('firebase-admin');
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
-// const http = require("http"); 
-// const { Server } = require("socket.io");
-// const { initWebSocketServer } = require('./utils/websocket');
+// const  setupWebSocket  = require('./utils/websocket');
 
 
 
@@ -27,11 +26,20 @@ const corsOptions = {
 
 const tempDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
+  fs.mkdirSync(tempDir);
 }
 
 
 const app = express();
+// const server = http.createServer(app);
+const server = http.createServer(app)
+
+console.log("HTTP Server:", server);
+// Attach WebSocket to the HTTP server
+// const {wss, sendNotification} = setupWebSocket(server)
+// const { wss, sendNotification } = setupWebSocket(server);
+
+
 const port = process.env.PORT || 5000;
 const serviceAccount = {
   type: "service_account",
@@ -95,14 +103,7 @@ const fcmRouter = require('./routes/fcmRouter')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
 
-// Initialize WebSocket server once
 
-
-// Attach io to the request object as a middleware (This should be before your routes)
-// app.use((req, res, next) => {
-//   req.io = io; // Make `io` available throughout the app
-//   next(); // Proceed to the next middleware or route handler
-// });
 
 app.use("/api/auth", signUpRouter);
 app.use('/api/school',schoolRouter)
@@ -117,17 +118,14 @@ app.use(notFound);
 app.use(methodNotAllowed);
 
 
-// HTTP server and initialize WebSocket
-// const server = http.createServer(app); 
 
-// const { io } = initWebSocketServer(server);
 
 
 const start = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log("DB Connected");
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`Server is listening on port: ${port}`);
     });
   } catch (error) {

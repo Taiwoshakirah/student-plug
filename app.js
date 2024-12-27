@@ -9,7 +9,7 @@ require("dotenv").config();
 const admin = require('firebase-admin');
 const session = require("express-session");
 const MongoStore = require("connect-mongo");
-// const  setupWebSocket  = require('./utils/websocket');
+const  {setupWebSocket}  = require('./utils/websocket');
 
 
 
@@ -33,6 +33,7 @@ if (!fs.existsSync(tempDir)) {
 const app = express();
 // const server = http.createServer(app);
 const server = http.createServer(app)
+setupWebSocket(server);
 
 console.log("HTTP Server:", server);
 // Attach WebSocket to the HTTP server

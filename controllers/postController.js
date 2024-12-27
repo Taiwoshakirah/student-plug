@@ -11,7 +11,7 @@ const SugUser = require('../models/schoolSug')
 const  sendNotification  = require('../utils/websocket');
 const {extractHashtags} = require('./trendingController')
 const admin = require('../app')
-const {onPostLiked} = require('../utils/websocket')
+const {sendNotificationToPostOwner} = require('../utils/websocket')
 const restrictedWords = [
     "abuse",
     "idiot",
@@ -682,27 +682,28 @@ const likePost = async (req, res) => {
   
       console.log(`User ${userId} liked the post`);
   
-      if (postOwnerId.toString() !== userId) {
-        const postOwner = await User.findById(postOwnerId);
       
-        if (postOwner) {
-          const title = "Your post was liked!";
-          const body = `${liker.fullName} liked your post.`;
-      
-          console.log("Sending WebSocket notification with title and body:", { title, body });
-      
-          const notification = {
-            title,
-            body,
-          };
-      
-          // Ensure postOwnerId is sent as a string
-          onPostLiked(postOwnerId.toString(), notification);
-          console.log("WebSocket notification sent successfully");
-        } else {
-          console.error("Post owner not found for post owner ID:", postOwnerId);
-        }
+    if (postOwnerId.toString() !== userId) {
+      const postOwner = await User.findById(postOwnerId);
+
+      if (postOwner) {
+        const title = "Your post was liked!";
+        const body = `${liker.fullName} liked your post.`;
+
+        console.log("Sending WebSocket notification with title and body:", { title, body });
+
+        const notification = {
+          title,
+          body,
+        };
+
+        // Send WebSocket notification to post owner
+        sendNotificationToPostOwner(postOwnerId.toString(), notification);
+        console.log("WebSocket notification sent successfully");
+      } else {
+        console.error("Post owner not found for post owner ID:", postOwnerId);
       }
+    }
       
       
   

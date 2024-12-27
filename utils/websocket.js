@@ -1,40 +1,104 @@
+// const WebSocket = require("ws");
+
+// // Create a WebSocket server on port 8080
+// const wss = new WebSocket.Server({ port: 8080 });
+// const clients = new Map(); // Map of userId (string) to WebSocket connection
+
+// // Handle incoming WebSocket connections
+// wss.on("connection", (ws) => {
+//   console.log("New client connected!");
+
+//   // Handle initial message to map userId to WebSocket
+//   ws.on("message", (message) => {
+//     try {
+//       const parsedMessage = JSON.parse(message);
+//       const userId = parsedMessage.userId; // Extract userId from client message
+  
+//       if (userId) {
+//         clients.set(userId, ws); // Map userId to WebSocket
+//         console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
+//       }
+//     } catch (error) {
+//       console.error("Error parsing message:", error.message);
+//     }
+//   });
+  
+
+//   // Handle WebSocket disconnection
+//   ws.on("close", () => {
+//     for (const [userId, client] of clients.entries()) {
+//       if (client === ws) {
+//         clients.delete(userId); // Remove userId from Map on disconnection
+//         console.log(`Client ${userId} disconnected.`);
+//         break;
+//       }
+//     }
+//   });
+// });
+
+// // Function to send a notification to the post owner
+// const sendNotificationToPostOwner = (postOwnerId, notification) => {
+//   const client = clients.get(postOwnerId.toString()); // Convert postOwnerId to string
+//   if (client && client.readyState === WebSocket.OPEN) {
+//     client.send(JSON.stringify(notification)); // Send notification
+//     console.log(`Notification sent to post owner ${postOwnerId}:`, notification);
+//   } else {
+//     console.warn(
+//       `Post owner ${postOwnerId} is not connected. Current clients:`,
+//       [...clients.keys()]
+//     );
+//   }
+// };
+
+// // Example usage: Call this when a post is liked
+// const onPostLiked = (postOwnerId, notification) => {
+//   sendNotificationToPostOwner(postOwnerId, notification);
+// };
+
+// console.log("WebSocket server is running on ws://localhost:8080");
+
+// module.exports = { onPostLiked };
+
 const WebSocket = require("ws");
 
-// Create a WebSocket server on port 8080
-const wss = new WebSocket.Server({ port: 8080 });
 const clients = new Map(); // Map of userId (string) to WebSocket connection
 
-// Handle incoming WebSocket connections
-wss.on("connection", (ws) => {
-  console.log("New client connected!");
+// Function to initialize WebSocket server
+const setupWebSocket = (server) => {
+  const wss = new WebSocket.Server({ server }); // Attach WebSocket server to existing HTTP server
 
-  // Handle initial message to map userId to WebSocket
-  ws.on("message", (message) => {
-    try {
-      const parsedMessage = JSON.parse(message);
-      const userId = parsedMessage.userId; // Extract userId from client message
-  
-      if (userId) {
-        clients.set(userId, ws); // Map userId to WebSocket
-        console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
-      }
-    } catch (error) {
-      console.error("Error parsing message:", error.message);
-    }
-  });
-  
+  wss.on("connection", (ws) => {
+    console.log("New WebSocket client connected!");
 
-  // Handle WebSocket disconnection
-  ws.on("close", () => {
-    for (const [userId, client] of clients.entries()) {
-      if (client === ws) {
-        clients.delete(userId); // Remove userId from Map on disconnection
-        console.log(`Client ${userId} disconnected.`);
-        break;
+    // Handle initial message to map userId to WebSocket
+    ws.on("message", (message) => {
+      try {
+        const parsedMessage = JSON.parse(message);
+        const userId = parsedMessage.userId; // Extract userId from client message
+
+        if (userId) {
+          clients.set(userId, ws); // Map userId to WebSocket
+          console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
+        }
+      } catch (error) {
+        console.error("Error parsing message:", error.message);
       }
-    }
+    });
+
+    // Handle WebSocket disconnection
+    ws.on("close", () => {
+      for (const [userId, client] of clients.entries()) {
+        if (client === ws) {
+          clients.delete(userId); // Remove userId from Map on disconnection
+          console.log(`Client ${userId} disconnected.`);
+          break;
+        }
+      }
+    });
   });
-});
+
+  console.log("WebSocket server is running.");
+};
 
 // Function to send a notification to the post owner
 const sendNotificationToPostOwner = (postOwnerId, notification) => {
@@ -50,14 +114,8 @@ const sendNotificationToPostOwner = (postOwnerId, notification) => {
   }
 };
 
-// Example usage: Call this when a post is liked
-const onPostLiked = (postOwnerId, notification) => {
-  sendNotificationToPostOwner(postOwnerId, notification);
-};
+module.exports = { setupWebSocket, sendNotificationToPostOwner };
 
-console.log("WebSocket server is running on ws://localhost:8080");
-
-module.exports = { onPostLiked };
 
 
 

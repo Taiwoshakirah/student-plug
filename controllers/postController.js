@@ -699,7 +699,7 @@ const likePost = async (req, res) => {
 
       if (postOwner) {
         const title = "Your post was liked!";
-        const body = `${liker.fullName} liked your post: "${post.text}"`;
+        const body = `${liker.fullName} liked your post`;
 
         // Check if a notification for this post and liker already exists
         const existingNotification = await Notification.findOne({

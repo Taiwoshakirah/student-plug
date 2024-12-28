@@ -1,5 +1,7 @@
 // const mongoose = require("mongoose");
 const { Notification } = require("../models/notification");
+const UserPost = require('../models/post')
+const SugPost = require('../models/sugPost')
 
 // const fetchNotification = async (req, res) => {
 //   try {
@@ -72,6 +74,27 @@ const fetchNotification = async (req, res) => {
         return res.status(200).json({ message: "No notifications found" });
       }
   
+      // Fetch related posts to include the text
+      const postIds = notifications.map((notification) => notification.postId);
+  
+      // Fetch posts from UserPost
+      const userPosts = await UserPost.find({ _id: { $in: postIds } }).select("text");
+      const userPostTextMap = userPosts.reduce((acc, post) => {
+        acc[post._id.toString()] = post.text;
+        return acc;
+      }, {});
+  
+      // Identify missing postIds and fetch from SugPost
+      const missingPostIds = postIds.filter((postId) => !userPostTextMap[postId]);
+      const sugPosts = await SugPost.find({ _id: { $in: missingPostIds } }).select("text");
+      const sugPostTextMap = sugPosts.reduce((acc, post) => {
+        acc[post._id.toString()] = post.text;
+        return acc;
+      }, {});
+  
+      // Combine the post text maps
+      const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
+  
       // Group notifications by postId
       const groupedNotifications = notifications.reduce((acc, notification) => {
         if (!notification.postId) {
@@ -86,7 +109,8 @@ const fetchNotification = async (req, res) => {
           acc[postId] = {
             postId: notification.postId,
             title: notification.title,
-            body: notification.body,
+            body: notification.body, // Keep the notification body as it is
+            text: postTextMap[postId] || "", // Use the post's text from UserPost or SugPost
             createdAt: notification.createdAt,
             likers: [], // Array to store liker details
           };
@@ -122,7 +146,8 @@ const fetchNotification = async (req, res) => {
           return {
             postId: group.postId,
             title: group.title,
-            body: group.body,
+            text: group.text, // Post's text
+            body: group.body, // Keep only the notification body
             likersCount, // Total number of likers
             likersPhotos, // Photos of the first two likers
             extraCount, // Number of additional likers
@@ -139,7 +164,10 @@ const fetchNotification = async (req, res) => {
     }
   };
   
-  module.exports = fetchNotification;
+  
+  
+  
+  
   
   
   

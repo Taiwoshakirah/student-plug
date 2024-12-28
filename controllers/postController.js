@@ -12,6 +12,8 @@ const  sendNotification  = require('../utils/websocket');
 const {extractHashtags} = require('./trendingController')
 const admin = require('../app')
 const {sendNotificationToPostOwner} = require('../utils/websocket')
+const { Notification } = require('../models/notification');
+const { clients } = require('../utils/websocket');
 const restrictedWords = [
     "abuse",
     "idiot",
@@ -626,8 +628,7 @@ const sharePost = async (req, res) => {
     }
 };
 
-const { Notification } = require('../models/notification');
-const { clients } = require('../utils/websocket');
+
 
 const likePost = async (req, res) => {
   try {
@@ -642,8 +643,8 @@ const likePost = async (req, res) => {
     }
 
     if (!post) {
-      console.error('Post not found for postId:', postId);
-      return res.status(404).json({ message: 'Post not found' });
+      console.error("Post not found for postId:", postId);
+      return res.status(404).json({ message: "Post not found" });
     }
 
     if (!post.likes) post.likes = [];
@@ -651,8 +652,8 @@ const likePost = async (req, res) => {
 
     const postOwnerId = isAdminPost ? post.adminId : post.user;
     if (!postOwnerId) {
-      console.error('Post owner not found for post:', post);
-      return res.status(400).json({ message: 'Post owner not found' });
+      console.error("Post owner not found for post:", post);
+      return res.status(400).json({ message: "Post owner not found" });
     }
 
     const existingLikeIndex = post.likes.findIndex(
@@ -664,66 +665,76 @@ const likePost = async (req, res) => {
       await post.save();
 
       console.log(`User ${userId} unliked the post`);
-      return res.status(200).json({ message: 'Post unliked', post });
+      return res.status(200).json({ message: "Post unliked", post });
     }
 
     const liker = await User.findById(userId);
-    if (!liker) {
-      console.error('Liker not found for userId:', userId);
-      return res.status(404).json({ message: 'User not found' });
-    }
+if (!liker) {
+  console.error("Liker not found for userId:", userId);
+  return res.status(404).json({ message: "User not found" });
+}
 
-    post.likes.push({
-      _id: liker._id.toString(),
-      fullName: liker.fullName,
-      createdAt: new Date(),
-    });
-    post.likeCount += 1;
-    await post.save();
+console.log("Liker data:", liker);
+console.log("Liker photo URL:", liker.profilePhoto);
 
-    console.log(`User ${userId} liked the post`);
+post.likes.push({
+  _id: liker._id.toString(),
+  fullName: liker.fullName,
+  likerPhoto: liker.profilePhoto, // Ensure this is set correctly
+  createdAt: new Date(),
+});
 
-    if (postOwnerId.toString() !== userId) {
-      const postOwner = await User.findById(postOwnerId);
+await post.save();
 
-      if (postOwner) {
-        const title = 'Your post was liked!';
-        const body = `${liker.fullName} liked your post.`;
+console.log("Post likes array after like:", post.likes);
 
-        // Store the notification for later if the post owner is offline
-        const notification = {
-          userId: postOwnerId,
-          title,
-          body,
-          read: false, // Mark as unread
-        };
+if (postOwnerId.toString() !== userId) {
+  const postOwner = await User.findById(postOwnerId);
+
+  if (postOwner) {
+    const title = "Your post was liked!";
+    const body = `${liker.fullName} liked your post.`;
+
+    // Create notification
+    const notification = {
+      userId: postOwnerId,
+      title,
+      body,
+      likerPhoto: liker.profilePhoto, // Ensure liker photo is assigned
+      likerName: liker.fullName,
+      read: false, // Mark as unread
+    };
+
+    console.log("Notification data:", notification);
 
         const client = clients.get(postOwnerId.toString());
         if (client && client.readyState === WebSocket.OPEN) {
           // Send notification immediately via WebSocket
           client.send(JSON.stringify(notification));
-          console.log('Notification sent to post owner:', notification);
+          console.log("Notification sent to post owner:", notification);
         } else {
-          // Save the notification for later
+          // Save the notification in the database
           const newNotification = new Notification(notification);
           await newNotification.save();
-          console.log('Notification stored for post owner:', postOwnerId);
+          console.log("Notification stored for post owner:", postOwnerId);
         }
       } else {
-        console.error('Post owner not found for post owner ID:', postOwnerId);
+        console.error("Post owner not found for post owner ID:", postOwnerId);
       }
     }
 
     res.status(200).json({
-      message: 'Post liked',
+      message: "Post liked",
       post: {
         ...post.toObject(),
-        likes: post.likes,
+        likes: post.likes, // Include liker details in the response
       },
     });
   } catch (error) {
-    console.error('Error liking/unliking post:', error);
-    res.status(500).json({ message: 'Failed to like/unlike post', error: error.message });
+    console.error("Error liking/unliking post:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to like/unlike post", error: error.message });
   }
 };
 

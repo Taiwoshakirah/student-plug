@@ -83,6 +83,7 @@ const { Notification } = require('../models/notification'); // Notification mode
 // };
 
 
+const jwt = require("jsonwebtoken"); // For token verification
 const clients = new Map(); // Map of userId to WebSocket connection
 
 const sendUnreadNotifications = async (userId, ws) => {
@@ -116,24 +117,49 @@ const setupWebSocket = (server) => {
     ws.on("message", async (message) => {
       try {
         const parsedMessage = JSON.parse(message);
-        const userId = parsedMessage.userId;
+        const { userId, token } = parsedMessage;
 
-        if (userId) {
-          if (clients.has(userId)) {
-            const existingClient = clients.get(userId);
-            if (existingClient.readyState === WebSocket.OPEN) {
-              existingClient.close();
-            }
-            clients.delete(userId);
-          }
-
-          clients.set(userId, ws);
-          console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
-
-          await sendUnreadNotifications(userId, ws);
+        // Ensure userId and token are present
+        if (!userId || !token) {
+          ws.close(4000, "Missing credentials");
+          console.warn("Connection closed: Missing credentials");
+          return;
         }
+
+        // Verify the token
+        let decoded;
+        try {
+          decoded = jwt.verify(token, process.env.JWT_SECRET); // Replace with your secret key
+        } catch (error) {
+          ws.close(4001, "Invalid token");
+          console.warn("Connection closed: Invalid token");
+          return;
+        }
+
+        // Check if the userId in the token matches the one sent
+        if (decoded.userId !== userId) {
+          ws.close(4002, "Token mismatch");
+          console.warn("Connection closed: Token mismatch");
+          return;
+        }
+
+        // Remove any existing connection for this userId
+        if (clients.has(userId)) {
+          const existingClient = clients.get(userId);
+          if (existingClient.readyState === WebSocket.OPEN) {
+            existingClient.close();
+          }
+          clients.delete(userId);
+        }
+
+        // Map the userId to the WebSocket connection
+        clients.set(userId, ws);
+        console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
+
+        // Send unread notifications
+        await sendUnreadNotifications(userId, ws);
       } catch (error) {
-        console.error("Error parsing message:", error.message);
+        console.error("Error handling message:", error.message);
       }
     });
 
@@ -175,9 +201,6 @@ const sendNotificationToPostOwner = (postOwnerId, notification) => {
     console.warn(`Post owner ${postOwnerId} is not connected.`);
   }
 };
-
-module.exports = { setupWebSocket, sendNotificationToPostOwner };
-
 
 module.exports = { setupWebSocket, sendNotificationToPostOwner, clients };
 

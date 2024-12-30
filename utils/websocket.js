@@ -117,12 +117,12 @@ const setupWebSocket = (server) => {
     // Send a periodic ping to keep the connection alive
     const interval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.ping(); // Send ping to the client
+        ws.ping();
       }
-    }, 30000); // 30 seconds interval
+    }, 30000);
 
     ws.on("pong", () => {
-      console.log("Pong received from client"); // Optional logging
+      console.log("Pong received from client");
     });
 
     ws.on("message", async (message) => {
@@ -130,41 +130,36 @@ const setupWebSocket = (server) => {
         const parsedMessage = JSON.parse(message);
         const { userId, token } = parsedMessage;
 
-        // Ensure userId and token are present
         if (!userId || !token) {
           ws.close(4000, "Missing credentials");
           console.warn("Connection closed: Missing credentials");
           return;
         }
 
-        // Verify the token
         let decoded;
         try {
-          decoded = jwt.verify(token, process.env.JWT_SECRET); // Replace with your secret key
+          decoded = jwt.verify(token, process.env.JWT_SECRET);
         } catch (error) {
           ws.close(4001, "Invalid token");
           console.warn("Connection closed: Invalid token");
           return;
         }
 
-        // Check if the userId in the token matches the one sent
         if (decoded.userId !== userId) {
           ws.close(4002, "Token mismatch");
           console.warn("Connection closed: Token mismatch");
           return;
         }
 
-        // Remove any existing connection for this userId
-        if (clients.has(userId)) {
-          const existingClient = clients.get(userId);
-          if (existingClient.readyState === WebSocket.OPEN) {
-            existingClient.close();
-          }
-          clients.delete(userId);
+        // Add or update the client mapping without closing existing WebSocket
+        const existingClient = clients.get(userId);
+        if (existingClient && existingClient !== ws) {
+          console.log(`User ${userId} already connected. Updating connection.`);
+          clients.set(userId, ws); // Update to new WebSocket
+        } else if (!existingClient) {
+          clients.set(userId, ws);
         }
 
-        // Map the userId to the WebSocket connection
-        clients.set(userId, ws);
         console.log(`Mapped userId ${userId} to WebSocket. Current clients:`, [...clients.keys()]);
 
         // Send unread notifications
@@ -175,7 +170,7 @@ const setupWebSocket = (server) => {
     });
 
     ws.on("close", () => {
-      clearInterval(interval); // Stop the ping-pong on connection close
+      clearInterval(interval);
       for (const [userId, client] of clients.entries()) {
         if (client === ws) {
           clients.delete(userId);
@@ -186,7 +181,7 @@ const setupWebSocket = (server) => {
     });
 
     ws.on("error", (error) => {
-      clearInterval(interval); // Stop the ping-pong on error
+      clearInterval(interval);
       console.error("WebSocket error:", error.message);
       for (const [userId, client] of clients.entries()) {
         if (client === ws) {
@@ -214,6 +209,7 @@ const sendNotificationToPostOwner = (postOwnerId, notification) => {
     console.warn(`Post owner ${postOwnerId} is not connected.`);
   }
 };
+
 
 module.exports = { setupWebSocket, sendNotificationToPostOwner, clients };
 

@@ -1,7 +1,6 @@
 
 
-const WebSocket = require("ws");
-const { Notification } = require('../models/notification'); // Notification model
+
 
 // const clients = new Map(); // Map of userId (string) to WebSocket connection
 
@@ -82,9 +81,10 @@ const { Notification } = require('../models/notification'); // Notification mode
 //   }
 // };
 
-
-const jwt = require("jsonwebtoken"); // For token verification
-const clients = new Map(); // Map of userId to WebSocket connection
+const WebSocket = require("ws");
+const { Notification } = require('../models/notification'); 
+const jwt = require("jsonwebtoken"); 
+const clients = new Map(); 
 
 const sendUnreadNotifications = async (userId, ws) => {
   try {

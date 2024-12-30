@@ -14,6 +14,7 @@ const admin = require('../app')
 const {sendNotificationToPostOwner} = require('../utils/websocket')
 const { Notification } = require('../models/notification');
 const { clients } = require('../utils/websocket');
+const websocket = require('ws')
 const restrictedWords = [
     "abuse",
     "idiot",
@@ -629,7 +630,6 @@ const sharePost = async (req, res) => {
 };
 
 
-
 const likePost = async (req, res) => {
   try {
     const { userId, isAdminPost } = req.body;
@@ -722,7 +722,7 @@ const likePost = async (req, res) => {
           console.log("Notification data:", notification);
 
           const client = clients.get(postOwnerId.toString());
-          if (client && client.readyState === WebSocket.OPEN) {
+          if (client && client.readyState === websocket.OPEN) {
             client.send(JSON.stringify(notification));
             console.log("Notification sent to post owner:", notification);
           } else {

@@ -114,6 +114,17 @@ const setupWebSocket = (server) => {
   wss.on("connection", (ws) => {
     console.log("New WebSocket client connected!");
 
+    // Send a periodic ping to keep the connection alive
+    const interval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping(); // Send ping to the client
+      }
+    }, 30000); // 30 seconds interval
+
+    ws.on("pong", () => {
+      console.log("Pong received from client"); // Optional logging
+    });
+
     ws.on("message", async (message) => {
       try {
         const parsedMessage = JSON.parse(message);
@@ -164,6 +175,7 @@ const setupWebSocket = (server) => {
     });
 
     ws.on("close", () => {
+      clearInterval(interval); // Stop the ping-pong on connection close
       for (const [userId, client] of clients.entries()) {
         if (client === ws) {
           clients.delete(userId);
@@ -174,6 +186,7 @@ const setupWebSocket = (server) => {
     });
 
     ws.on("error", (error) => {
+      clearInterval(interval); // Stop the ping-pong on error
       console.error("WebSocket error:", error.message);
       for (const [userId, client] of clients.entries()) {
         if (client === ws) {
@@ -203,6 +216,7 @@ const sendNotificationToPostOwner = (postOwnerId, notification) => {
 };
 
 module.exports = { setupWebSocket, sendNotificationToPostOwner, clients };
+
 
 
 

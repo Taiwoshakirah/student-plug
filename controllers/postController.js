@@ -827,10 +827,29 @@ const fetchUserPost = async (req, res) => {
     }
   };
   
+  const postNotify =  (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    const sendEvent = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    // Save the connection to notify later
+    req.on("close", () => {
+        console.log("Client disconnected");
+    });
+
+    // Example of sending a notification when a post is created
+    setTimeout(() => {
+        sendEvent({ message: "New post available!" });
+    }, 5000);
+}
   
   
 
 
 
-    module.exports = {studentCreatePost,likePost,sharePost,fetchUserPost,}
+    module.exports = {studentCreatePost,likePost,sharePost,fetchUserPost,postNotify}
     

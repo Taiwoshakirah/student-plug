@@ -63,9 +63,25 @@ const createSugPost = async (req, res) => {
         });
         await post.save();
 
-        const populatedPost = await SugPost.findById(post._id)
-            .populate("schoolInfoId", "university uniProfilePicture")
-            .populate("adminId", "sugFullName email");
+const populatedPost = await SugPost.findById(post._id)
+    .populate("schoolInfoId", "university uniProfilePicture")
+    .populate("adminId", "sugFullName email");
+
+// Emit an event for new SUG posts
+postEventEmitter.emit("newPost", {
+    message: "New SUG post available!",
+    post: {
+        text: populatedPost.text,
+        images: populatedPost.images,
+        schoolInfo: populatedPost.schoolInfoId,
+        admin: populatedPost.adminId,
+    }
+});
+
+
+        // const populatedPost = await SugPost.findById(post._id)
+        //     .populate("schoolInfoId", "university uniProfilePicture")
+        //     .populate("adminId", "sugFullName email");
 
         res.status(201).json({ message: "Post created", post: populatedPost });
     } catch (error) {

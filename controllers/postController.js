@@ -142,6 +142,18 @@ const studentCreatePost = async (req, res) => {
         });
         await post.save();
 
+// Emit an event for new posts
+postEventEmitter.emit("newPost", {
+    message: "New student post available!",
+    post: {
+        text: post.text,
+        images: post.images,
+        user: userId,
+        schoolInfoId: user.schoolInfoId,
+    }
+});
+
+
         res.status(201).json({
             message: "Post created successfully",
             post: {
@@ -830,35 +842,56 @@ const fetchUserPost = async (req, res) => {
   const EventEmitter = require("events");
 const postEventEmitter = new EventEmitter();
 
+// const postNotify = (req, res) => {
+//     res.setHeader("Content-Type", "text/event-stream");
+//     res.setHeader("Cache-Control", "no-cache");
+//     res.setHeader("Connection", "keep-alive");
+
+//     const sendEvent = (data) => {
+//         res.write(`data: ${JSON.stringify(data)}\n\n`);
+//     };
+
+//     // Listen for new post events
+//     const notifyPost = (data) => {
+//         sendEvent(data);
+//     };
+
+//     postEventEmitter.on("newPost", notifyPost);
+
+//     req.on("close", () => {
+//         console.log("Client disconnected");
+//         postEventEmitter.off("newPost", notifyPost);
+//     });
+// };
+
+// // Example of emitting a new post event
+// const createPost = (post) => {
+//     console.log("New post created:", post);
+//     postEventEmitter.emit("newPost", { message: "New post available!", post });
+// };
 const postNotify = (req, res) => {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
 
-    const sendEvent = (data) => {
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
+  const sendEvent = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
 
-    // Listen for new post events
-    const notifyPost = (data) => {
-        sendEvent(data);
-    };
+  const notifyPost = (data) => {
+      sendEvent(data); // Send the event to the client
+  };
 
-    postEventEmitter.on("newPost", notifyPost);
+  postEventEmitter.on("newPost", notifyPost);
 
-    req.on("close", () => {
-        console.log("Client disconnected");
-        postEventEmitter.off("newPost", notifyPost);
-    });
+  req.on("close", () => {
+      console.log("Client disconnected");
+      postEventEmitter.off("newPost", notifyPost);
+  });
 };
 
-// Example of emitting a new post event
-const createPost = (post) => {
-    console.log("New post created:", post);
-    postEventEmitter.emit("newPost", { message: "New post available!", post });
-};
 
-module.exports = { postNotify, createPost };
+module.exports = { postNotify };
 
   
   

@@ -720,6 +720,32 @@ const likePost = async (req, res) => {
           "likerName": liker.fullName,
         });
 
+        // if (!existingNotification) {
+        //   const notification = {
+        //     userId: postOwnerId,
+        //     title,
+        //     body,
+        //     postId,
+        //     likerPhoto: liker.profilePhoto,
+        //     likerName: liker.fullName,
+        //     read: false,
+        //     type: "like"
+        //   };
+
+        //   console.log("Notification data:", notification);
+
+        //   const client = clients.get(postOwnerId.toString());
+        //   if (client && client.readyState === websocket.OPEN) {
+        //     client.send(JSON.stringify(notification));
+        //     console.log("Notification sent to post owner:", notification);
+        //   } else {
+        //     const newNotification = new Notification(notification);
+        //     await newNotification.save();
+        //     console.log("Notification stored for post owner:", postOwnerId);
+        //   }
+        // } else {
+        //   console.log("Notification for this like already exists.");
+        // }
         if (!existingNotification) {
           const notification = {
             userId: postOwnerId,
@@ -729,23 +755,32 @@ const likePost = async (req, res) => {
             likerPhoto: liker.profilePhoto,
             likerName: liker.fullName,
             read: false,
-            type: "like"
+            type: "like",
           };
-
+        
           console.log("Notification data:", notification);
-
+        
+          // Save the notification in the database first
+          const newNotification = new Notification(notification);
+          await newNotification.save();
+          console.log("Notification stored for post owner:", postOwnerId);
+        
+          // Send the notification via WebSocket if the client is connected
           const client = clients.get(postOwnerId.toString());
-          if (client && client.readyState === websocket.OPEN) {
-            client.send(JSON.stringify(notification));
-            console.log("Notification sent to post owner:", notification);
+          if (client && client.readyState === WebSocket.OPEN) {
+            try {
+              client.send(JSON.stringify(notification));
+              console.log("Notification sent to post owner:", notification);
+            } catch (error) {
+              console.error("Failed to send notification via WebSocket:", error.message);
+            }
           } else {
-            const newNotification = new Notification(notification);
-            await newNotification.save();
-            console.log("Notification stored for post owner:", postOwnerId);
+            console.warn("WebSocket client not connected for post owner:", postOwnerId);
           }
         } else {
           console.log("Notification for this like already exists.");
         }
+        
       } else {
         console.error("Post owner not found for post owner ID:", postOwnerId);
       }

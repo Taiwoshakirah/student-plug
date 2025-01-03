@@ -612,24 +612,87 @@ const addComment = async (req, res) => {
             });
         }
 
-        const populatedComment = await newComment.populate([
-            {
-                path: "user",
-                model: "User",
-                select: "fullName profilePhoto",
-            },
-            {
-                path: "admin",
-                model: "SugUser",
-                populate: {
-                    path: "schoolInfo", // Populate schoolInfo from SchoolInfo collection
-                    model: "SchoolInfo",
-                    select: "uniProfilePicture", // Select only uniProfilePicture
+        // Determine if the post is a UserPost or SugPost
+        let post;
+        let populatedComment;
+        if (isAdminFlag) {
+            // Fetch SugPost
+            post = await SugPost.findById(postId).populate("admin", "fullName profilePhoto").populate("schoolInfoId", "uniProfilePicture");
+            populatedComment = await newComment.populate([
+                {
+                    path: "user",
+                    model: "User",
+                    select: "fullName profilePhoto",
                 },
-                select: "sugFullName schoolInfo", // Ensure schoolInfo is included
-            },
-        ]);
-        
+                {
+                    path: "admin",
+                    model: "SugUser",
+                    populate: {
+                        path: "schoolInfo",
+                        model: "SchoolInfo",
+                        select: "uniProfilePicture",
+                    },
+                    select: "sugFullName schoolInfo",
+                },
+            ]);
+        } else {
+            // Fetch UserPost
+            post = await UserPost.findById(postId).populate("user", "fullName profilePhoto").populate("schoolInfoId", "uniProfilePicture");
+            populatedComment = await newComment.populate([
+                {
+                    path: "user",
+                    model: "User",
+                    select: "fullName profilePhoto",
+                },
+            ]);
+        }
+
+        if (!post) {
+            return res.status(404).json({ message: "Post not found." });
+        }
+
+        // Store the comment notification in the Notification collection
+        const commentNotification = {
+            userId: post.user || post.adminId,  // Send notification to post owner
+            postId,
+            title: "New Comment",
+            body: `${populatedComment.user.fullName || "Someone"} commented on your post.`,
+            likerName: populatedComment.user.fullName || "Someone",
+            likerPhoto: populatedComment.user.profilePhoto || "",  // Add commenter's photo
+            type: "comment",  // Set the type as "comment"
+            commentId: newComment._id,  // Store the comment's ObjectId
+            createdAt: new Date(),
+        };
+
+        const newCommentNotification = await Notification.create(commentNotification);
+
+        // Send WebSocket notification to the post owner
+        if (post.user) {
+            sendNotificationToPostOwner(post.user, newCommentNotification);
+        }
+
+        // Send WebSocket notification to the parent comment owner (if applicable)
+        if (parentCommentId) {
+            const parentComment = await Comment.findById(parentCommentId).select("user admin");
+            const ownerId = parentComment.admin || parentComment.user;
+
+            if (ownerId && ownerId.toString() !== userId) {
+                const replyNotification = {
+                    userId: ownerId,
+                    postId,
+                    title: "New Reply",
+                    body: `${populatedComment.user.fullName || "Someone"} replied to your comment.`,
+                    likerName: populatedComment.user.fullName || "Someone",
+                    likerPhoto: populatedComment.user.profilePhoto || "",  // Add commenter's photo
+                    type: "comment",  // Set the type as "comment"
+                    commentId: newComment._id,  // Store the comment's ObjectId
+                    createdAt: new Date(),
+                };
+
+                await Notification.create(replyNotification);  // Store the reply notification in the Notification collection
+                sendNotificationToPostOwner(ownerId, replyNotification);
+            }
+        }
 
         res.status(201).json({
             message: "Comment added successfully",
@@ -643,6 +706,67 @@ const addComment = async (req, res) => {
         });
     }
 };
+
+
+
+
+// const addComment = async (req, res) => {
+//     const { postId } = req.params;
+//     const { text, userId, isAdmin, parentCommentId } = req.body;
+
+//     try {
+//         if (!postId || !userId || !text) {
+//             return res.status(400).json({ message: "postId, userId, and text are required." });
+//         }
+
+//         const isAdminFlag = isAdmin === true || isAdmin === "true"; // Handle different types
+//         const commentData = {
+//             post: postId,
+//             text,
+//             parentComment: parentCommentId || null,
+//             isAdmin: isAdminFlag,
+//             ...(isAdminFlag ? { admin: userId } : { user: userId }),
+//         };
+
+//         const newComment = await Comment.create(commentData);
+
+//         if (parentCommentId) {
+//             await Comment.findByIdAndUpdate(parentCommentId, {
+//                 $push: { replies: newComment._id },
+//             });
+//         }
+
+//         const populatedComment = await newComment.populate([
+//             {
+//                 path: "user",
+//                 model: "User",
+//                 select: "fullName profilePhoto",
+//             },
+//             {
+//                 path: "admin",
+//                 model: "SugUser",
+//                 populate: {
+//                     path: "schoolInfo", // Populate schoolInfo from SchoolInfo collection
+//                     model: "SchoolInfo",
+//                     select: "uniProfilePicture", // Select only uniProfilePicture
+//                 },
+//                 select: "sugFullName schoolInfo", // Ensure schoolInfo is included
+//             },
+//         ]);
+        
+
+//         res.status(201).json({
+//             message: "Comment added successfully",
+//             comment: populatedComment,
+//         });
+//     } catch (error) {
+//         console.error("Error adding comment:", error.message || error);
+//         res.status(500).json({
+//             message: "Error adding comment",
+//             error: error.message || error,
+//         });
+//     }
+// };
 
 
 

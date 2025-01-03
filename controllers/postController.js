@@ -827,7 +827,10 @@ const fetchUserPost = async (req, res) => {
     }
   };
   
-  const postNotify =  (req, res) => {
+  const EventEmitter = require("events");
+const postEventEmitter = new EventEmitter();
+
+const postNotify = (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -836,16 +839,27 @@ const fetchUserPost = async (req, res) => {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
-    // Save the connection to notify later
+    // Listen for new post events
+    const notifyPost = (data) => {
+        sendEvent(data);
+    };
+
+    postEventEmitter.on("newPost", notifyPost);
+
     req.on("close", () => {
         console.log("Client disconnected");
+        postEventEmitter.off("newPost", notifyPost);
     });
+};
 
-    // Example of sending a notification when a post is created
-    setTimeout(() => {
-        sendEvent({ message: "New post available!" });
-    }, 5000);
-}
+// Example of emitting a new post event
+const createPost = (post) => {
+    console.log("New post created:", post);
+    postEventEmitter.emit("newPost", { message: "New post available!", post });
+};
+
+module.exports = { postNotify, createPost };
+
   
   
 

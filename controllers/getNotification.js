@@ -185,39 +185,53 @@ const fetchNotification = async (req, res) => {
       const formattedNotifications = Object.values(groupedNotifications).map((group) => {
         const likersCount = group.likers.length;
         const commentersCount = group.commenters.length;
-  
+      
         let likeMessage = "";
         if (likersCount === 1) {
           likeMessage = `${group.likers[0].name} liked your post`;
         } else if (likersCount === 2) {
           likeMessage = `${group.likers[0].name} and ${group.likers[1].name} liked your post`;
         } else if (likersCount > 2) {
-          likeMessage = `${group.likers[0].name}, ${group.likers[1].name} and ${
-            likersCount - 2
-          } others liked your post`;
+          likeMessage = `${group.likers[0].name}, ${group.likers[1].name} and ${likersCount - 2} others liked your post`;
         }
-  
+      
         let commentMessage = "";
         if (commentersCount === 1) {
           commentMessage = `${group.commenters[0].name} commented on your post`;
         } else if (commentersCount > 1) {
           commentMessage = `${commentersCount} people commented on your post`;
         }
-  
-        return {
+      
+        // Filter fields based on type
+        const notification = {
           postId: group.postId,
           title: group.title,
           text: group.text,
           body: group.body,
-          likersCount,
-          commentersCount,
-          likersPhotos: group.likers.slice(0, 2).map((liker) => liker.photo),
-          commentersPhotos: group.commenters.slice(0, 2).map((commenter) => commenter.photo),
-          likeMessage,
-          commentMessage,
           createdAt: group.createdAt,
         };
+      
+        if (type === "like") {
+          notification.likersCount = likersCount;
+          notification.likersPhotos = group.likers.slice(0, 2).map((liker) => liker.photo);
+          notification.likeMessage = likeMessage;
+        } else if (type === "comment") {
+          notification.commentersCount = commentersCount;
+          notification.commentersPhotos = group.commenters.slice(0, 2).map((commenter) => commenter.photo);
+          notification.commentMessage = commentMessage;
+        } else {
+          // Include all fields for type=all or no type specified
+          notification.likersCount = likersCount;
+          notification.commentersCount = commentersCount;
+          notification.likersPhotos = group.likers.slice(0, 2).map((liker) => liker.photo);
+          notification.commentersPhotos = group.commenters.slice(0, 2).map((commenter) => commenter.photo);
+          notification.likeMessage = likeMessage;
+          notification.commentMessage = commentMessage;
+        }
+      
+        return notification;
       });
+      
   
       res.status(200).json(formattedNotifications);
     } catch (error) {

@@ -765,7 +765,7 @@ const likePost = async (req, res) => {
           await newNotification.save();
           console.log("Notification stored for post owner:", postOwnerId);
         
-          // Send the notification via WebSocket if the client is connected, this is for testing
+          // Send the notification via WebSocket if the client is connected,this is for testing
           const client = clients.get(postOwnerId.toString());
           if (client && client.readyState === WebSocket.OPEN) {
             try {

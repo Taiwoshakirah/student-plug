@@ -729,6 +729,7 @@ const likePost = async (req, res) => {
             likerPhoto: liker.profilePhoto,
             likerName: liker.fullName,
             read: false,
+            type: "like"
           };
 
           console.log("Notification data:", notification);
@@ -889,6 +890,7 @@ const postNotify = (req, res) => {
       postEventEmitter.off("newPost", notifyPost);
   });
 };
+
 
 
 module.exports = { postNotify };

@@ -419,6 +419,7 @@ const toggleLike = async (req, res) => {
                 likerName,
                 likerPhoto,
                 read: false, // Mark as unread
+                type: "like" 
             };
 
             // Send notification immediately via WebSocket

@@ -109,179 +109,150 @@ const SugPost = require('../models/sugPost')
 //   };
 
 const fetchNotification = async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const { type } = req.query; // `type` can be 'likes', 'comments', or 'all'
-  
-      console.log("Fetching notifications for user:", userId);
-      console.log("Notification type:", type);
-  
-      const query = { userId };
-      if (type && type !== "all") {
-        query.type = type;
-      }
-  
-      const notifications = await Notification.find(query).sort({ createdAt: -1 });
-      console.log("Fetched notifications:", notifications);
-  
-      if (!notifications || notifications.length === 0) {
-        return res.status(200).json({ message: "No notifications found" });
-      }
-  
-      const postIds = notifications.map((notification) => notification.postId);
-      const userPosts = await UserPost.find({ _id: { $in: postIds } }).select("text");
-      const userPostTextMap = userPosts.reduce((acc, post) => {
-        acc[post._id.toString()] = post.text;
-        return acc;
-      }, {});
-  
-      const missingPostIds = postIds.filter((postId) => !userPostTextMap[postId]);
-      const sugPosts = await SugPost.find({ _id: { $in: missingPostIds } }).select("text");
-      const sugPostTextMap = sugPosts.reduce((acc, post) => {
-        acc[post._id.toString()] = post.text;
-        return acc;
-      }, {});
-  
-      const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
-  
-    //   const groupedNotifications = notifications.reduce((acc, notification) => {
-    //     if (!notification.postId) return acc;
-      
-    //     const postId = notification.postId.toString();
-    //     if (!acc[postId]) {
-    //       acc[postId] = {
-    //         postId: notification.postId,
-    //         title: notification.title,
-    //         body: notification.body,
-    //         text: postTextMap[postId] || "",
-    //         createdAt: notification.createdAt,
-    //         likes: [],
-    //         comments: [],
-    //       };
-    //     }
-      
-    //     if (notification.type === "like") {
-    //       acc[postId].likes.push({
-    //         name: notification.likerName,
-    //         photo: notification.likerPhoto,
-    //       });
-    //     } else if (notification.type === "comment") {
-    //       acc[postId].comments.push({
-    //         name: notification.likerName,
-    //         photo: notification.likerPhoto,
-    //         comment: notification.body,
-    //       });
-    //     }
-      
-    //     return acc;
-    //   }, {});
+  try {
+    const { userId } = req.params;
+    const { type } = req.query; // `type` can be 'likes', 'comments', or 'all'
+
+    console.log("Fetching notifications for user:", userId);
+    console.log("Notification type:", type);
+
+    const query = { userId };
+    if (type && type !== "all") {
+      query.type = type;
+    }
+
+    const notifications = await Notification.find(query).sort({ createdAt: -1 });
+    console.log("Fetched notifications:", notifications);
+
+    if (!notifications || notifications.length === 0) {
+      return res.status(200).json({ message: "No notifications found" });
+    }
+
+    const postIds = notifications.map((notification) => notification.postId);
+    const userPosts = await UserPost.find({ _id: { $in: postIds } }).select("text");
+    const userPostTextMap = userPosts.reduce((acc, post) => {
+      acc[post._id.toString()] = post.text;
+      return acc;
+    }, {});
+
+    const missingPostIds = postIds.filter((postId) => !userPostTextMap[postId]);
+    const sugPosts = await SugPost.find({ _id: { $in: missingPostIds } }).select("text");
+    const sugPostTextMap = sugPosts.reduce((acc, post) => {
+      acc[post._id.toString()] = post.text;
+      return acc;
+    }, {});
+
+    const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
+
     const groupedNotifications = notifications.reduce((acc, notification) => {
-        if (!notification.postId) return acc;
-      
-        const postId = notification.postId.toString();
-        
-        // Initialize a new group for this post if it doesn't exist
-        if (!acc[postId]) {
-          acc[postId] = {
-            postId: notification.postId,
-            title: notification.title,
-            body: notification.body,
-            text: postTextMap[postId] || "",
-            createdAt: notification.createdAt,
-            likes: [],
-            comments: [],
-          };
+      if (!notification.postId) return acc;
+
+      const postId = notification.postId.toString();
+
+      // Initialize a new group for this post if it doesn't exist
+      if (!acc[postId]) {
+        acc[postId] = {
+          postId: notification.postId,
+          title: notification.title,
+          body: notification.body,
+          text: postTextMap[postId] || "",
+          createdAt: notification.createdAt,
+          likes: [],
+          comments: [],
+        };
+      }
+
+      // Handle "like" notifications
+      if (notification.type === "like") {
+        // Avoid duplicate likes for the same user
+        const likeExists = acc[postId].likes.some(
+          (like) => like.name === notification.likerName
+        );
+        if (!likeExists) {
+          acc[postId].likes.push({
+            name: notification.likerName,
+            photo: notification.likerPhoto,
+          });
         }
-      
-        // Handle "like" notifications
-        if (notification.type === "like") {
-          // Avoid duplicate likes for the same user
-          const likeExists = acc[postId].likes.some(
-            (like) => like.name === notification.likerName
-          );
-          if (!likeExists) {
-            acc[postId].likes.push({
-              name: notification.likerName,
-              photo: notification.likerPhoto,
-            });
-          }
+      }
+
+      // Handle "comment" notifications
+      if (notification.type === "comment") {
+        // Avoid duplicate comments based on `commentId`
+        const commentExists = acc[postId].comments.some(
+          (comment) => comment.commentId === notification.commentId
+        );
+        if (!commentExists) {
+          acc[postId].comments.push({
+            name: notification.likerName,
+            photo: notification.likerPhoto,
+            comment: notification.body,
+            commentId: notification.commentId, // Include the `commentId` for uniqueness
+          });
         }
-      
-        // Handle "comment" notifications
-        if (notification.type === "comment") {
-          // Avoid duplicate comments based on `commentId`
-          const commentExists = acc[postId].comments.some(
-            (comment) => comment.commentId === notification.commentId
-          );
-          if (!commentExists) {
-            acc[postId].comments.push({
-              name: notification.likerName,
-              photo: notification.likerPhoto,
-              comment: notification.body,
-              commentId: notification.commentId, // Include the `commentId` for uniqueness
-            });
-          }
-        }
-      
-        return acc;
-      }, {});
-      
-      
-      
-      
-      const formattedNotifications = Object.values(groupedNotifications).map((group) => {
-        const likersCount = group.likes.length;
-        const commentersCount = group.comments.length;
-      
-        // Create separate like and comment messages
-        let likeMessage = "";
-        if (likersCount === 1) {
-          likeMessage = `${group.likes[0].name} liked your post`;
-        } else if (likersCount === 2) {
-          likeMessage = `${group.likes[0].name} and ${group.likes[1].name} liked your post`;
-        } else if (likersCount > 2) {
-          likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
-        }
-      
-        let commentMessage = "";
-        if (commentersCount === 1) {
-          commentMessage = `${group.comments[0].name} commented on your post`;
-        } else if (commentersCount === 2) {
-          commentMessage = `${group.comments[0].name} and ${group.comments[1].name} commented on your post`;
-        } else if (commentersCount > 2) {
-          commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
-        }
-      
-        return {
+      }
+
+      return acc;
+    }, {});
+
+    const formattedNotifications = Object.values(groupedNotifications).map((group) => {
+      const likersCount = group.likes.length;
+      const commentersCount = group.comments.length;
+
+      // Create separate like and comment messages
+      let likeMessage = "";
+      if (likersCount === 1) {
+        likeMessage = `${group.likes[0].name} liked your post`;
+      } else if (likersCount === 2) {
+        likeMessage = `${group.likes[0].name} and ${group.likes[1].name} liked your post`;
+      } else if (likersCount > 2) {
+        likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
+      }
+
+      let commentMessage = "";
+      if (commentersCount === 1) {
+        commentMessage = `${group.comments[0].name} commented on your post`;
+      } else if (commentersCount === 2) {
+        commentMessage = `${group.comments[0].name} and ${group.comments[1].name} commented on your post`;
+      } else if (commentersCount > 2) {
+        commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
+      }
+
+      return [
+        {
           postId: group.postId,
           title: group.title,
           text: group.text,
           body: group.body,
           createdAt: group.createdAt,
-          likes: {
-            likersCount,
-            message: likeMessage,
-            photo: group.likes.slice(0, 2).map((liker) => liker.photo).concat(
-              likersCount > 2 ? [`+${likersCount - 2} others`] : []
-            ),
-          },
-          comments: {
-            commentersCount,
-            message: commentMessage,
-            photo: group.comments.slice(0, 2).map((commenter) => commenter.photo).concat(
-              commentersCount > 2 ? [`+${commentersCount - 2} others`] : []
-            ),
-          },
-        };
-      });
-      
-  
-      res.status(200).json(formattedNotifications);
-    } catch (error) {
-      console.error("Error fetching notifications:", error.message);
-      res.status(500).json({ message: "Failed to fetch notifications" });
-    }
-  };
+          count: likersCount,
+          message: likeMessage,
+          photo: group.likes.slice(0, 2).map((liker) => liker.photo).concat(
+            likersCount > 2 ? [`+${likersCount - 2} others`] : []
+          ),
+        },
+        {
+          postId: group.postId,
+          title: group.title,
+          text: group.text,
+          body: group.body,
+          createdAt: group.createdAt,
+          count: commentersCount,
+          message: commentMessage,
+          photo: group.comments.slice(0, 2).map((commenter) => commenter.photo).concat(
+            commentersCount > 2 ? [`+${commentersCount - 2} others`] : []
+          ),
+        }
+      ];      
+    });
+
+    res.status(200).json(formattedNotifications);
+  } catch (error) {
+    console.error("Error fetching notifications:", error.message);
+    res.status(500).json({ message: "Failed to fetch notifications" });
+  }
+};
+
   
   
   

@@ -116,22 +116,18 @@ const fetchNotification = async (req, res) => {
       console.log("Fetching notifications for user:", userId);
       console.log("Notification type:", type);
   
-      // Build the query to filter by userId and type
       const query = { userId };
       if (type && type !== "all") {
-        query.type = type; // Only add the type condition if it's 'likes' or 'comments'
+        query.type = type;
       }
   
-      // Fetch notifications based on the query, sorted by creation date
       const notifications = await Notification.find(query).sort({ createdAt: -1 });
-  
       console.log("Fetched notifications:", notifications);
   
       if (!notifications || notifications.length === 0) {
         return res.status(200).json({ message: "No notifications found" });
       }
   
-      // Continue with the rest of your code...
       const postIds = notifications.map((notification) => notification.postId);
       const userPosts = await UserPost.find({ _id: { $in: postIds } }).select("text");
       const userPostTextMap = userPosts.reduce((acc, post) => {
@@ -148,7 +144,6 @@ const fetchNotification = async (req, res) => {
   
       const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
   
-      // Group notifications by postId
       const groupedNotifications = notifications.reduce((acc, notification) => {
         if (!notification.postId) return acc;
   
@@ -160,18 +155,18 @@ const fetchNotification = async (req, res) => {
             body: notification.body,
             text: postTextMap[postId] || "",
             createdAt: notification.createdAt,
-            likers: [],
-            commenters: [],
+            likes: [],
+            comments: [],
           };
         }
   
         if (notification.type === "like") {
-          acc[postId].likers.push({
+          acc[postId].likes.push({
             name: notification.likerName,
             photo: notification.likerPhoto,
           });
         } else if (notification.type === "comment") {
-          acc[postId].commenters.push({
+          acc[postId].comments.push({
             name: notification.likerName,
             photo: notification.likerPhoto,
             comment: notification.body,
@@ -181,81 +176,49 @@ const fetchNotification = async (req, res) => {
         return acc;
       }, {});
   
-      // Format grouped notifications
       const formattedNotifications = Object.values(groupedNotifications).map((group) => {
-        const likersCount = group.likers.length;
-        const commentersCount = group.commenters.length;
+        const likersCount = group.likes.length;
+        const commentersCount = group.comments.length;
   
         let likeMessage = "";
         if (likersCount === 1) {
-          likeMessage = `${group.likers[0].name} liked your post`;
+          likeMessage = `${group.likes[0].name} liked your post`;
         } else if (likersCount === 2) {
-          likeMessage = `${group.likers[0].name} and ${group.likers[1].name} liked your post`;
+          likeMessage = `${group.likes[0].name} and ${group.likes[1].name} liked your post`;
         } else if (likersCount > 2) {
-          likeMessage = `${group.likers[0].name}, ${group.likers[1].name} and ${likersCount - 2} others liked your post`;
+          likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
         }
   
         let commentMessage = "";
         if (commentersCount === 1) {
-          commentMessage = `${group.commenters[0].name} commented on your post`;
+          commentMessage = `${group.comments[0].name} commented on your post`;
         } else if (commentersCount === 2) {
-          commentMessage = `${group.commenters[0].name} and ${group.commenters[1].name} commented on your post`;
+          commentMessage = `${group.comments[0].name} and ${group.comments[1].name} commented on your post`;
         } else if (commentersCount > 2) {
-          commentMessage = `${group.commenters[0].name}, ${group.commenters[1].name} and ${commentersCount - 2} others commented on your post`;
+          commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
         }
   
-        // Filter fields based on type
-        const notification = {
+        return {
           postId: group.postId,
           title: group.title,
           text: group.text,
           body: group.body,
           createdAt: group.createdAt,
-          likersCount, // Added likers count
-          commentersCount, // Added commenters count
+          likes: {
+            likersCount,
+            message: likeMessage,
+            photo: group.likes.slice(0, 2).map((liker) => liker.photo).concat(
+              likersCount > 2 ? [`+${likersCount - 2} others`] : []
+            ),
+          },
+          comments: {
+            commentersCount,
+            message: commentMessage,
+            photo: group.comments.slice(0, 2).map((commenter) => commenter.photo).concat(
+              commentersCount > 2 ? [`+${commentersCount - 2} others`] : []
+            ),
+          },
         };
-  
-        // If type is 'like' or 'comment', only include the relevant photos
-        if (type === "like") {
-          notification.message = likeMessage;
-          notification.photo = {
-            likePhotos: group.likers.slice(0, 2).map((liker) => liker.photo), // Separated likes
-          };
-          if (likersCount > 2) {
-            notification.photo.likePhotos.push(`+${likersCount - 2} others`); // Add the remaining count if more than 2
-          }
-        } else if (type === "comment") {
-          notification.message = commentMessage;
-          notification.photo = {
-            commentPhotos: group.commenters.slice(0, 2).map((commenter) => commenter.photo), // Separated comments
-          };
-          if (commentersCount > 2) {
-            notification.photo.commentPhotos.push(`+${commentersCount - 2} others`); // Add the remaining count if more than 2
-          }
-        } else {
-          // Include all fields for type=all or no type specified
-          notification.message = {
-            likeMessage,
-            commentMessage,
-          };
-          notification.photo = {
-            likePhotos: [
-              ...group.likers.slice(0, 2).map((liker) => liker.photo),
-            ],
-          };
-          if (likersCount > 2) {
-            notification.photo.likePhotos.push(`+${likersCount - 2} others`);
-          }
-          
-          notification.photo.commentPhotos = [
-            ...group.commenters.slice(0, 2).map((commenter) => commenter.photo),
-          ];
-          if (commentersCount > 2) {
-            notification.photo.commentPhotos.push(`+${commentersCount - 2} others`);
-          }
-        }
-  
-        return notification;
       });
   
       res.status(200).json(formattedNotifications);
@@ -264,7 +227,6 @@ const fetchNotification = async (req, res) => {
       res.status(500).json({ message: "Failed to fetch notifications" });
     }
   };
-  
   
   
   

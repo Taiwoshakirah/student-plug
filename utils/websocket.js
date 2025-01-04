@@ -195,21 +195,6 @@ const setupWebSocket = (server) => {
 
   console.log("WebSocket server is running.");
 };
-
-// const sendNotificationToPostOwner = (postOwnerId, notification) => {
-//   const client = clients.get(postOwnerId.toString());
-//   if (client && client.readyState === WebSocket.OPEN) {
-//     try {
-//       client.send(JSON.stringify(notification));
-//       console.log(`Notification sent to post owner ${postOwnerId}:`, notification);
-//     } catch (error) {
-//       console.error(`Failed to send notification to ${postOwnerId}:`, error.message);
-//     }
-//   } else {
-//     console.warn(`Post owner ${postOwnerId} is not connected.`);
-//   }
-// };
-// Track likes sent for each user and post
 const userLikeTracking = new Map();
 
 const sendNotificationToPostOwner = (postOwnerId, notification) => {

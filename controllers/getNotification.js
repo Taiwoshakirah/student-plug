@@ -179,6 +179,8 @@ const fetchNotification = async (req, res) => {
         if (!notification.postId) return acc;
       
         const postId = notification.postId.toString();
+        
+        // Initialize a new group for this post if it doesn't exist
         if (!acc[postId]) {
           acc[postId] = {
             postId: notification.postId,
@@ -191,8 +193,9 @@ const fetchNotification = async (req, res) => {
           };
         }
       
-        // Ensure "likes" and "comments" are handled separately
+        // Handle "like" notifications
         if (notification.type === "like") {
+          // Avoid duplicate likes for the same user
           const likeExists = acc[postId].likes.some(
             (like) => like.name === notification.likerName
           );
@@ -202,16 +205,28 @@ const fetchNotification = async (req, res) => {
               photo: notification.likerPhoto,
             });
           }
-        } else if (notification.type === "comment") {
+        }
+      
+        // Handle "comment" notifications
+        if (notification.type === "comment") {
+          // Avoid duplicate comments based on `commentId`
+          const commentExists = acc[postId].comments.some(
+            (comment) => comment.commentId === notification.commentId
+          );
+          if (!commentExists) {
             acc[postId].comments.push({
               name: notification.likerName,
               photo: notification.likerPhoto,
               comment: notification.body,
+              commentId: notification.commentId, // Include the `commentId` for uniqueness
             });
+          }
         }
       
         return acc;
       }, {});
+      
+      
       
       
       const formattedNotifications = Object.values(groupedNotifications).map((group) => {

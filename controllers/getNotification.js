@@ -144,7 +144,38 @@ const fetchNotification = async (req, res) => {
   
       const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
   
-      const groupedNotifications = notifications.reduce((acc, notification) => {
+    //   const groupedNotifications = notifications.reduce((acc, notification) => {
+    //     if (!notification.postId) return acc;
+      
+    //     const postId = notification.postId.toString();
+    //     if (!acc[postId]) {
+    //       acc[postId] = {
+    //         postId: notification.postId,
+    //         title: notification.title,
+    //         body: notification.body,
+    //         text: postTextMap[postId] || "",
+    //         createdAt: notification.createdAt,
+    //         likes: [],
+    //         comments: [],
+    //       };
+    //     }
+      
+    //     if (notification.type === "like") {
+    //       acc[postId].likes.push({
+    //         name: notification.likerName,
+    //         photo: notification.likerPhoto,
+    //       });
+    //     } else if (notification.type === "comment") {
+    //       acc[postId].comments.push({
+    //         name: notification.likerName,
+    //         photo: notification.likerPhoto,
+    //         comment: notification.body,
+    //       });
+    //     }
+      
+    //     return acc;
+    //   }, {});
+    const groupedNotifications = notifications.reduce((acc, notification) => {
         if (!notification.postId) return acc;
       
         const postId = notification.postId.toString();
@@ -160,21 +191,28 @@ const fetchNotification = async (req, res) => {
           };
         }
       
+        // Ensure "likes" and "comments" are handled separately
         if (notification.type === "like") {
-          acc[postId].likes.push({
-            name: notification.likerName,
-            photo: notification.likerPhoto,
-          });
+          const likeExists = acc[postId].likes.some(
+            (like) => like.name === notification.likerName
+          );
+          if (!likeExists) {
+            acc[postId].likes.push({
+              name: notification.likerName,
+              photo: notification.likerPhoto,
+            });
+          }
         } else if (notification.type === "comment") {
-          acc[postId].comments.push({
-            name: notification.likerName,
-            photo: notification.likerPhoto,
-            comment: notification.body,
-          });
+            acc[postId].comments.push({
+              name: notification.likerName,
+              photo: notification.likerPhoto,
+              comment: notification.body,
+            });
         }
       
         return acc;
       }, {});
+      
       
       const formattedNotifications = Object.values(groupedNotifications).map((group) => {
         const likersCount = group.likes.length;

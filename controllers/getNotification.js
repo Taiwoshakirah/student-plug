@@ -196,57 +196,58 @@ const fetchNotification = async (req, res) => {
     }, {});
 
     const formattedNotifications = Object.values(groupedNotifications).map((group) => {
-      const likersCount = group.likes.length;
-      const commentersCount = group.comments.length;
-
-      // Create separate like and comment messages
-      let likeMessage = "";
-      if (likersCount === 1) {
-        likeMessage = `${group.likes[0].name} liked your post`;
-      } else if (likersCount === 2) {
-        likeMessage = `${group.likes[0].name} and ${group.likes[1].name} liked your post`;
-      } else if (likersCount > 2) {
-        likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
-      }
-
-      let commentMessage = "";
-      if (commentersCount === 1) {
-        commentMessage = `${group.comments[0].name} commented on your post`;
-      } else if (commentersCount === 2) {
-        commentMessage = `${group.comments[0].name} and ${group.comments[1].name} commented on your post`;
-      } else if (commentersCount > 2) {
-        commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
-      }
-
-      return [
-        {
-          postId: group.postId,
-          title: group.title,
-          text: group.text,
-          body: group.body,
-          createdAt: group.createdAt,
-          count: likersCount,
-          message: likeMessage,
-          photo: group.likes.slice(0, 2).map((liker) => liker.photo).concat(
-            likersCount > 2 ? [`+${likersCount - 2} others`] : []
-          ),
-        },
-        {
-          postId: group.postId,
-          title: group.title,
-          text: group.text,
-          body: group.body,
-          createdAt: group.createdAt,
-          count: commentersCount,
-          message: commentMessage,
-          photo: group.comments.slice(0, 2).map((commenter) => commenter.photo).concat(
-            commentersCount > 2 ? [`+${commentersCount - 2} others`] : []
-          ),
+        const likersCount = group.likes.length;
+        const commentersCount = group.comments.length;
+      
+        // Create separate like and comment messages
+        let likeMessage = "";
+        if (likersCount === 1) {
+          likeMessage = `${group.likes[0].name} liked your post`;
+        } else if (likersCount === 2) {
+          likeMessage = `${group.likes[0].name} and ${group.likes[1].name} liked your post`;
+        } else if (likersCount > 2) {
+          likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
         }
-      ];      
-    });
-
-    res.status(200).json(formattedNotifications);
+      
+        let commentMessage = "";
+        if (commentersCount === 1) {
+          commentMessage = `${group.comments[0].name} commented on your post`;
+        } else if (commentersCount === 2) {
+          commentMessage = `${group.comments[0].name} and ${group.comments[1].name} commented on your post`;
+        } else if (commentersCount > 2) {
+          commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
+        }
+      
+        return [
+          {
+            postId: group.postId,
+            title: group.title,
+            text: group.text,
+            body: group.body,
+            createdAt: group.createdAt,
+            count: likersCount,
+            message: likeMessage,
+            photo: group.likes.slice(0, 2).map((liker) => liker.photo).concat(
+              likersCount > 2 ? [`+${likersCount - 2} others`] : []
+            ),
+          },
+          {
+            postId: group.postId,
+            title: group.title,
+            text: group.text,
+            body: group.body,
+            createdAt: group.createdAt,
+            count: commentersCount,
+            message: commentMessage,
+            photo: group.comments.slice(0, 2).map((commenter) => commenter.photo).concat(
+              commentersCount > 2 ? [`+${commentersCount - 2} others`] : []
+            ),
+          }
+        ];
+      }).flat(); // Use .flat() to flatten the array into a single array
+      
+      res.status(200).json(formattedNotifications);
+      
   } catch (error) {
     console.error("Error fetching notifications:", error.message);
     res.status(500).json({ message: "Failed to fetch notifications" });

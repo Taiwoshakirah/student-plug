@@ -146,7 +146,7 @@ const fetchNotification = async (req, res) => {
   
       const groupedNotifications = notifications.reduce((acc, notification) => {
         if (!notification.postId) return acc;
-  
+      
         const postId = notification.postId.toString();
         if (!acc[postId]) {
           acc[postId] = {
@@ -159,7 +159,7 @@ const fetchNotification = async (req, res) => {
             comments: [],
           };
         }
-  
+      
         if (notification.type === "like") {
           acc[postId].likes.push({
             name: notification.likerName,
@@ -172,14 +172,15 @@ const fetchNotification = async (req, res) => {
             comment: notification.body,
           });
         }
-  
+      
         return acc;
       }, {});
-  
+      
       const formattedNotifications = Object.values(groupedNotifications).map((group) => {
         const likersCount = group.likes.length;
         const commentersCount = group.comments.length;
-  
+      
+        // Create separate like and comment messages
         let likeMessage = "";
         if (likersCount === 1) {
           likeMessage = `${group.likes[0].name} liked your post`;
@@ -188,7 +189,7 @@ const fetchNotification = async (req, res) => {
         } else if (likersCount > 2) {
           likeMessage = `${group.likes[0].name}, ${group.likes[1].name} and ${likersCount - 2} others liked your post`;
         }
-  
+      
         let commentMessage = "";
         if (commentersCount === 1) {
           commentMessage = `${group.comments[0].name} commented on your post`;
@@ -197,7 +198,7 @@ const fetchNotification = async (req, res) => {
         } else if (commentersCount > 2) {
           commentMessage = `${group.comments[0].name}, ${group.comments[1].name} and ${commentersCount - 2} others commented on your post`;
         }
-  
+      
         return {
           postId: group.postId,
           title: group.title,
@@ -220,6 +221,7 @@ const fetchNotification = async (req, res) => {
           },
         };
       });
+      
   
       res.status(200).json(formattedNotifications);
     } catch (error) {

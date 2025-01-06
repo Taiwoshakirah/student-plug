@@ -15,6 +15,7 @@ const {sendNotificationToPostOwner} = require('../utils/websocket')
 const { Notification } = require('../models/notification');
 const { clients } = require('../utils/websocket');
 const websocket = require('ws')
+const SchoolInfo = require('../models/schoolInfo')
 const restrictedWords = [
     "abuse",
     "idiot",
@@ -686,46 +687,74 @@ const likePost = async (req, res) => {
     }
 
     // Like the post
-    const liker = await User.findById(userId);
+    const liker = await User.findById(userId) ||await SugUser.findById(userId);
+
     if (!liker) {
       console.error("Liker not found for userId:", userId);
       return res.status(404).json({ message: "User not found" });
     }
+    
+    // Check if the liker is an admin by looking up in SugUser collection
+    // Check if the liker is an admin by looking up in SugUser collection
+let fullName = liker.fullName || liker.sugFullName;
+let likerPhoto = liker.profilePhoto;
 
+if (!fullName || !likerPhoto) {
+  console.log("User details not found, checking admin details...");
+
+  const adminDetails = await SugUser.findById(userId);
+  const adminSchoolInfo = await SchoolInfo.findOne({ userId: new mongoose.Types.ObjectId(userId) });
+
+  if (adminDetails) {
+    fullName = fullName || adminDetails.sugFullName;
+  }
+
+  if (adminSchoolInfo) {
+    likerPhoto = likerPhoto || adminSchoolInfo.uniProfilePicture;
+  }
+
+  if (!fullName || !likerPhoto) {
+    console.error("Unable to retrieve fullName or photo for liker:", userId);
+    return res.status(404).json({ message: "Failed to retrieve liker details" });
+  }
+}
+
+
+    
     post.likes.push({
       _id: liker._id.toString(),
-      fullName: liker.fullName,
-      likerPhoto: liker.profilePhoto,
+      fullName,
+      likerPhoto,
       createdAt: new Date(),
     });
-
+    
     post.likeCount = post.likes.length; // Update likeCount to match likes array
     await post.save();
-
+    
     console.log("Post likes array after like:", post.likes);
-
+    
     // Check if the same user already has a like notification for this post
     const existingLikeNotification = await Notification.findOne({
       userId: postOwnerId,
       postId: postId,
       type: "like",
-      likerName: liker.fullName, // Match the same liker
+      likerName: fullName, // Match the same liker
     });
-
+    
     if (!existingLikeNotification && postOwnerId.toString() !== userId) {
       const notification = {
         userId: postOwnerId,
         title: "Your post was liked",
-        body: `${liker.fullName} liked your post`,
+        body: `${fullName} liked your post`,
         postId,
-        likerPhoto: liker.profilePhoto,
-        likerName: liker.fullName,
+        likerPhoto,
+        likerName: fullName,
         read: false,
         type: "like", // This is for like notifications
       };
-
+    
       sendNotificationToPostOwner(postOwnerId, notification);
-
+    
       // Save the notification in the database
       const newNotification = new Notification(notification);
       await newNotification.save();
@@ -733,6 +762,7 @@ const likePost = async (req, res) => {
     } else {
       console.log("No new notification needed for this user and post.");
     }
+    
 
     res.status(200).json({
       message: "Post liked",
@@ -1077,10 +1107,112 @@ const postNotify = (req, res) => {
 
 
 
-module.exports = { postNotify };
+// module.exports = { postNotify };
 
   
-  
+// const likePost = async (req, res) => {
+//   try {
+//     const { userId, isAdminPost } = req.body;
+//     const { postId } = req.params;
+
+//     let post;
+//     if (isAdminPost) {
+//       post = await SugPost.findById(postId);
+//     } else {
+//       post = await UserPost.findById(postId);
+//     }
+
+//     if (!post) {
+//       console.error("Post not found for postId:", postId);
+//       return res.status(404).json({ message: "Post not found" });
+//     }
+
+//     if (!post.likes) post.likes = [];
+//     if (!post.likeCount && post.likeCount !== 0) post.likeCount = 0;
+
+//     const postOwnerId = isAdminPost ? post.adminId : post.user;
+//     if (!postOwnerId) {
+//       console.error("Post owner not found for post:", post);
+//       return res.status(400).json({ message: "Post owner not found" });
+//     }
+
+//     // Check if the user already liked the post
+//     const existingLikeIndex = post.likes.findIndex(
+//       (like) => like._id && like._id.toString() === userId
+//     );
+
+//     if (existingLikeIndex !== -1) {
+//       // Unlike the post
+//       post.likes.splice(existingLikeIndex, 1);
+//       post.likeCount = Math.max(0, post.likes.length); // Update likeCount to match likes array
+//       await post.save();
+
+//       console.log(`User ${userId} unliked the post`);
+//       return res.status(200).json({
+//         message: "Post unliked",
+//         post: { ...post.toObject(), likes: post.likes },
+//       });
+//     }
+
+//     // Like the post
+//     const liker = await User.findById(userId);
+//     if (!liker) {
+//       console.error("Liker not found for userId:", userId);
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     post.likes.push({
+//       _id: liker._id.toString(),
+//       fullName: liker.fullName,
+//       likerPhoto: liker.profilePhoto,
+//       createdAt: new Date(),
+//     });
+
+//     post.likeCount = post.likes.length; // Update likeCount to match likes array
+//     await post.save();
+
+//     console.log("Post likes array after like:", post.likes);
+
+//     // Check if the same user already has a like notification for this post
+//     const existingLikeNotification = await Notification.findOne({
+//       userId: postOwnerId,
+//       postId: postId,
+//       type: "like",
+//       likerName: liker.fullName, // Match the same liker
+//     });
+
+//     if (!existingLikeNotification && postOwnerId.toString() !== userId) {
+//       const notification = {
+//         userId: postOwnerId,
+//         title: "Your post was liked",
+//         body: `${liker.fullName} liked your post`,
+//         postId,
+//         likerPhoto: liker.profilePhoto,
+//         likerName: liker.fullName,
+//         read: false,
+//         type: "like", // This is for like notifications
+//       };
+
+//       sendNotificationToPostOwner(postOwnerId, notification);
+
+//       // Save the notification in the database
+//       const newNotification = new Notification(notification);
+//       await newNotification.save();
+//       console.log("Notification stored for post owner:", postOwnerId);
+//     } else {
+//       console.log("No new notification needed for this user and post.");
+//     }
+
+//     res.status(200).json({
+//       message: "Post liked",
+//       post: { ...post.toObject(), likes: post.likes },
+//     });
+//   } catch (error) {
+//     console.error("Error liking/unliking post:", error);
+//     res.status(500).json({ message: "Failed to like/unlike post", error: error.message });
+//   }
+// };
+
 
 
 

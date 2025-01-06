@@ -1110,111 +1110,33 @@ const postNotify = (req, res) => {
 // module.exports = { postNotify };
 
   
-// const likePost = async (req, res) => {
-//   try {
-//     const { userId, isAdminPost } = req.body;
-//     const { postId } = req.params;
+const markNotificationAsRead = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    console.log("Notification ID from request:", notificationId);
 
-//     let post;
-//     if (isAdminPost) {
-//       post = await SugPost.findById(postId);
-//     } else {
-//       post = await UserPost.findById(postId);
-//     }
+    const result = await Notification.updateOne(
+      { _id: notificationId }, // Match the notification by its ID
+      { $set: { read: true } } // Set 'read' to true
+    );
 
-//     if (!post) {
-//       console.error("Post not found for postId:", postId);
-//       return res.status(404).json({ message: "Post not found" });
-//     }
+    console.log("Update Result:", result);
 
-//     if (!post.likes) post.likes = [];
-//     if (!post.likeCount && post.likeCount !== 0) post.likeCount = 0;
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Notification not found or already read" });
+    }
 
-//     const postOwnerId = isAdminPost ? post.adminId : post.user;
-//     if (!postOwnerId) {
-//       console.error("Post owner not found for post:", post);
-//       return res.status(400).json({ message: "Post owner not found" });
-//     }
-
-//     // Check if the user already liked the post
-//     const existingLikeIndex = post.likes.findIndex(
-//       (like) => like._id && like._id.toString() === userId
-//     );
-
-//     if (existingLikeIndex !== -1) {
-//       // Unlike the post
-//       post.likes.splice(existingLikeIndex, 1);
-//       post.likeCount = Math.max(0, post.likes.length); // Update likeCount to match likes array
-//       await post.save();
-
-//       console.log(`User ${userId} unliked the post`);
-//       return res.status(200).json({
-//         message: "Post unliked",
-//         post: { ...post.toObject(), likes: post.likes },
-//       });
-//     }
-
-//     // Like the post
-//     const liker = await User.findById(userId);
-//     if (!liker) {
-//       console.error("Liker not found for userId:", userId);
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     post.likes.push({
-//       _id: liker._id.toString(),
-//       fullName: liker.fullName,
-//       likerPhoto: liker.profilePhoto,
-//       createdAt: new Date(),
-//     });
-
-//     post.likeCount = post.likes.length; // Update likeCount to match likes array
-//     await post.save();
-
-//     console.log("Post likes array after like:", post.likes);
-
-//     // Check if the same user already has a like notification for this post
-//     const existingLikeNotification = await Notification.findOne({
-//       userId: postOwnerId,
-//       postId: postId,
-//       type: "like",
-//       likerName: liker.fullName, // Match the same liker
-//     });
-
-//     if (!existingLikeNotification && postOwnerId.toString() !== userId) {
-//       const notification = {
-//         userId: postOwnerId,
-//         title: "Your post was liked",
-//         body: `${liker.fullName} liked your post`,
-//         postId,
-//         likerPhoto: liker.profilePhoto,
-//         likerName: liker.fullName,
-//         read: false,
-//         type: "like", // This is for like notifications
-//       };
-
-//       sendNotificationToPostOwner(postOwnerId, notification);
-
-//       // Save the notification in the database
-//       const newNotification = new Notification(notification);
-//       await newNotification.save();
-//       console.log("Notification stored for post owner:", postOwnerId);
-//     } else {
-//       console.log("No new notification needed for this user and post.");
-//     }
-
-//     res.status(200).json({
-//       message: "Post liked",
-//       post: { ...post.toObject(), likes: post.likes },
-//     });
-//   } catch (error) {
-//     console.error("Error liking/unliking post:", error);
-//     res.status(500).json({ message: "Failed to like/unlike post", error: error.message });
-//   }
-// };
+    res.status(200).json({ message: "Notification marked as read" });
+  } catch (error) {
+    console.error("Error marking notification as read:", error.message);
+    res.status(500).json({ message: "Failed to mark notification as read" });
+  }
+};
 
 
 
 
-    module.exports = {studentCreatePost,likePost,sharePost,fetchUserPost,postNotify}
+
+
+    module.exports = {studentCreatePost,likePost,sharePost,fetchUserPost,postNotify,markNotificationAsRead}
     

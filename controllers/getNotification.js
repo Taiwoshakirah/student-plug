@@ -40,19 +40,6 @@ const fetchNotification = async (req, res) => {
       }, {});
   
       const postTextMap = { ...userPostTextMap, ...sugPostTextMap };
-
-      // After fetching notifications and before grouping them
-const unreadNotificationIds = notifications
-.filter((notification) => !notification.read) // Get only unread notifications
-.map((notification) => notification._id); // Extract their IDs
-
-if (unreadNotificationIds.length > 0) {
-await Notification.updateMany(
-  { _id: { $in: unreadNotificationIds } },
-  { $set: { read: true } }
-);
-console.log(`Marked ${unreadNotificationIds.length} notifications as read.`);
-}
   
       const groupedNotifications = notifications.reduce((acc, notification) => {
         if (!notification.postId) return acc;

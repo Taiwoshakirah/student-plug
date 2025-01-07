@@ -1110,10 +1110,16 @@ const postNotify = (req, res) => {
 // module.exports = { postNotify };
 
   
-const markNotificationAsRead = async (req, res) => {
+const markNotificationAsRead = async (req, res) => { 
   try {
     const { notificationId } = req.params;
     console.log("Notification ID from request:", notificationId);
+
+    // Check if the ID is a valid ObjectID
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      console.error("Invalid Notification ID format");
+      return res.status(400).json({ message: "Invalid notification ID format" });
+    }
 
     const result = await Notification.updateOne(
       { _id: notificationId }, // Match the notification by its ID
@@ -1122,7 +1128,9 @@ const markNotificationAsRead = async (req, res) => {
 
     console.log("Update Result:", result);
 
+    // Check if the update was successful
     if (result.modifiedCount === 0) {
+      console.warn("No document was updated. It might not exist or already be read.");
       return res.status(404).json({ message: "Notification not found or already read" });
     }
 
@@ -1132,6 +1140,7 @@ const markNotificationAsRead = async (req, res) => {
     res.status(500).json({ message: "Failed to mark notification as read" });
   }
 };
+
 
 
 

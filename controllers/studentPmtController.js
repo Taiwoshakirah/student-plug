@@ -76,34 +76,60 @@ const isValidRegNumber = (regNum) => {
       }
   
       // Check for existing payment with the same regNo or email
-      const existingPayment = await StudentPayment.findOne({ 
-        $or: [{ regNo }, { email }] 
-      });
-      if (existingPayment) {
-        return res.status(400).json({ success: false, message: "Payment details already exist for this Registration Number or Email" });
-      }
+    //   const existingPayment = await StudentPayment.findOne({ 
+    //     $or: [{ regNo }, { email }] 
+    //   });
+    //   if (existingPayment) {
+    //     return res.status(400).json({ success: false, message: "Payment details already exist for this Registration Number or Email" });
+    //   }
   
-      // Create a new payment record
-      const newStudentPayment = new StudentPayment({
-        userId,
-        firstName,
-        lastName,
-        department,
-        regNo,
-        academicLevel,
-        email,
-        feeType,
-        schoolInfoId,
-      });
+    //   // Create a new payment record
+    //   const newStudentPayment = new StudentPayment({
+    //     userId,
+    //     firstName,
+    //     lastName,
+    //     department,
+    //     regNo,
+    //     academicLevel,
+    //     email,
+    //     feeType,
+    //     schoolInfoId,
+    //   });
   
-      // Save payment record
+    //   // Save payment record
+    //   const savedPayment = await newStudentPayment.save();
+  
+    //   res.status(201).json({
+    //     success: true,
+    //     message: "Payment details saved successfully!",
+    //     payment: savedPayment,
+    //   });
+    // Replace or create payment details for the same regNo or email
+const newStudentPayment = await StudentPayment.findOneAndUpdate(
+    { $or: [{ regNo }, { email }] }, // Match by regNo or email
+    {
+      userId,
+      firstName,
+      lastName,
+      department,
+      regNo,
+      academicLevel,
+      email,
+      feeType,
+      schoolInfoId,
+    },
+    { new: true, upsert: true } // Update if exists, create if not
+  );
+   // Save payment record
       const savedPayment = await newStudentPayment.save();
   
-      res.status(201).json({
-        success: true,
-        message: "Payment details saved successfully!",
-        payment: savedPayment,
-      });
+  // Respond with success
+  res.status(201).json({
+    success: true,
+    message: "Payment details saved or updated successfully!",
+    payment: savedPayment,
+  });
+  
     } catch (error) {
       console.error("Error in studentPaymentDetails:", error);
       res.status(500).json({ success: false, message: "An error occurred while saving payment details", error });
@@ -194,6 +220,20 @@ const addCard = async (req, res) => {
                 last3,
                 authorizationCode: authorization_code,
             });
+            // Update or create card details for the same email and feeType
+// const cardDetails = await CardDetails.findOneAndUpdate(
+//     { email, feeType }, // Match by email and feeType
+//     {
+//         email,
+//         bankName,
+//         feeType,
+//         first3,
+//         last3,
+//         authorizationCode: authorization_code,
+//     },
+//     { new: true, upsert: true } // Update if exists, create if not
+// );
+
 
             await cardDetails.save();
 

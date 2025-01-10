@@ -33,6 +33,9 @@ const verifySugToken = async (req, res, next) => {
         console.log("Authenticated User:", req.user);
         next();
     } catch (error) {
+        if (error.name === "TokenExpiredError") {
+            return res.status(401).json({ message: "Token has expired" });
+        }
         console.error("Token verification error:", error);
         return res.status(401).json({ message: "Invalid Token" });
     }

@@ -47,23 +47,53 @@ const getTrendingPosts = async (req, res) => {
                 .exec()
         ]);
 
-        // Fetch posts with high engagement (likes or comments)
-        const engagementPosts = await Promise.all([
-            SugPost.find({ ...query, $or: [{ "likes.0": { $exists: true } }, { "comments.0": { $exists: true } }] })
-                .populate("adminId", "sugFullName email")
-                .populate("schoolInfoId", "uniProfilePicture")
-                .exec(),
-            UserPost.find({ ...query, $or: [{ "likes.0": { $exists: true } }, { "comments.0": { $exists: true } }] })
-                .populate("user", "fullName profilePhoto")
-                .populate({
-                    path: "user",
-                    populate: {
-                        path: "studentInfo",
-                        select: "faculty department",
-                    },
-                })
-                .exec()
-        ]);
+        // // Fetch posts with high engagement (likes or comments)
+        // const engagementPosts = await Promise.all([
+        //     SugPost.find({ ...query, $or: [{ "likes.0": { $exists: true } }, { "comments.0": { $exists: true } }] })
+        //         .populate("adminId", "sugFullName email")
+        //         .populate("schoolInfoId", "uniProfilePicture")
+        //         .exec(),
+        //     UserPost.find({ ...query, $or: [{ "likes.0": { $exists: true } }, { "comments.0": { $exists: true } }] })
+        //         .populate("user", "fullName profilePhoto")
+        //         .populate({
+        //             path: "user",
+        //             populate: {
+        //                 path: "studentInfo",
+        //                 select: "faculty department",
+        //             },
+        //         })
+        //         .exec()
+        // ]);
+        // Fetch posts with high engagement (likes or comments above 20)
+const engagementPosts = await Promise.all([
+    SugPost.find({
+        ...query,
+        $or: [
+            { "likes.20": { $exists: true } }, // At least 20 likes
+            { "comments.20": { $exists: true } }, // At least 20 comments
+        ],
+    })
+        .populate("adminId", "sugFullName email")
+        .populate("schoolInfoId", "uniProfilePicture")
+        .exec(),
+    UserPost.find({
+        ...query,
+        $or: [
+            { "likes.20": { $exists: true } }, // At least 20 likes
+            { "comments.20": { $exists: true } }, // At least 20 comments
+        ],
+    })
+        .populate("user", "fullName profilePhoto")
+        .populate({
+            path: "user",
+            populate: {
+                path: "studentInfo",
+                select: "faculty department",
+            },
+        })
+        .exec(),
+]);
+
 
         // Combine all posts
         const allPosts = [...hashtagPosts[0], ...hashtagPosts[1], ...engagementPosts[0], ...engagementPosts[1]];
@@ -125,282 +155,6 @@ const getTrendingPosts = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-// const getTrendingPosts = async (req, res) => {
-//     try {
-//         const { schoolInfoId } = req.query; // Assume schoolInfoId is passed as a query parameter
-//         if (!schoolInfoId) {
-//             return res.status(400).json({ message: "schoolInfoId is required" });
-//         }
-
-//         const past24Hours = new Date();
-//         past24Hours.setDate(past24Hours.getDate() - 1);
-
-//         const calculateTrendingPosts = async (PostModel) => {
-//             return await PostModel.aggregate([
-//                 {
-//                     $match: {
-//                         schoolInfoId: new mongoose.Types.ObjectId(schoolInfoId), // Filter by school
-//                         createdAt: { $gte: past24Hours }, // Only posts in the last 24 hours
-//                     },
-//                 },
-//                 {
-//                     $addFields: {
-//                         likesCount: { $size: "$likes" }, // Number of likes
-//                         commentsCount: { $size: "$comments" }, // Number of comments
-//                         hashtagsCount: { $cond: { if: "$hashtags", then: { $size: "$hashtags" }, else: 0 } }, // Hashtags count
-//                         trendingScore: {
-//                             $add: [
-//                                 { $multiply: [{ $size: "$likes" }, 1] }, // Weight for likes
-//                                 { $multiply: [{ $size: "$comments" }, 2] }, // Weight for comments
-//                                 { $multiply: ["$hashtagsCount", 1] }, // Weight for hashtags
-//                             ],
-//                         },
-//                     },
-//                 },
-//                 {
-//                     $sort: { trendingScore: -1 }, // Sort by trending score descending
-//                 },
-//                 {
-//                     $limit: 10, // Top 10 posts
-//                 },
-//             ]);
-//         };
-
-//         // Fetch trending posts for both SugPosts and UserPosts
-//         const [trendingSugPosts, trendingUserPosts] = await Promise.all([
-//             calculateTrendingPosts(SugPost),
-//             calculateTrendingPosts(UserPost),
-//         ]);
-
-//         // Merge results and sort by trendingScore
-//         const allTrendingPosts = [...trendingSugPosts, ...trendingUserPosts].sort(
-//             (a, b) => b.trendingScore - a.trendingScore
-//         );
-
-//         res.status(200).json({
-//             message: "Trending posts fetched successfully",
-//             posts: allTrendingPosts,
-//         });
-//     } catch (error) {
-//         console.error("Error fetching trending posts:", error);
-//         res.status(500).json({ message: "Internal server error", error });
-//     }
-// };
-
-
-
-
-
-
-
-
-
-
-
-
-
-// const getTrendingPosts = async (req, res) => {
-//     try {
-//         const { schoolInfoId } = req.query;
-//         if (!schoolInfoId || !mongoose.Types.ObjectId.isValid(schoolInfoId)) {
-//             return res.status(400).json({ message: "Valid schoolInfoId is required" });
-//         }
-
-//         const past24Hours = new Date();
-//         past24Hours.setDate(past24Hours.getDate() - 1);
-
-//         const calculateTrendingPosts = async (PostModel) => {
-//             return await PostModel.aggregate([
-//                 {
-//                     $match: {
-//                         schoolInfoId: new mongoose.Types.ObjectId(schoolInfoId),
-//                         createdAt: { $gte: past24Hours },
-//                     },
-//                 },
-//                 {
-//                     $addFields: {
-//                         likesCount: { $size: "$likes" },
-//                         commentsCount: { $size: "$comments" },
-//                         hashtagsCount: { $cond: { if: "$hashtags", then: { $size: "$hashtags" }, else: 0 } },
-//                         trendingScore: {
-//                             $add: [
-//                                 { $multiply: [{ $size: "$likes" }, 1] },
-//                                 { $multiply: [{ $size: "$comments" }, 2] },
-//                                 { $multiply: ["$hashtagsCount", 1] },
-//                             ],
-//                         },
-//                     },
-//                 },
-//                 {
-//                     $match: { trendingScore: { $gte: 5 } },
-//                 },
-//                 { $sort: { trendingScore: -1 } },
-//                 { $limit: 10 },
-//             ]);
-//         };
-
-//         const [trendingSugPosts, trendingUserPosts] = await Promise.all([
-//             calculateTrendingPosts(SugPost),
-//             calculateTrendingPosts(UserPost),
-//         ]);
-
-//         const allTrendingPosts = [...trendingSugPosts, ...trendingUserPosts].sort(
-//             (a, b) => (b.trendingScore || 0) - (a.trendingScore || 0)
-//         );
-
-//         const fetchPosterDetails = async (post, isAdmin) => {
-//             try {
-//                 const postDetails = await (isAdmin
-//                     ? SugPost.findById(post._id)
-//                           .populate([
-//                               {
-//                                   path: "adminId",
-//                                   model: "SugUser",
-//                                   select: "sugFullName profilePicture role",
-//                                   populate: { path: "schoolInfo", model: "SchoolInfo", select: "university" },
-//                               },
-//                           ])
-//                           .lean()
-//                     : UserPost.findById(post._id)
-//                           .populate([
-//                               {
-//                                   path: "user",
-//                                   model: "User",
-//                                   select: "fullName profilePhoto email",
-//                                   populate: [
-//                                       { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
-//                                       { path: "schoolInfoId", model: "SchoolInfo", select: "university" },
-//                                   ],
-//                               },
-//                           ])
-//                           .lean());
-
-//                 if (!postDetails) throw new Error("Post details not found");
-
-//                 const user = isAdmin ? postDetails.adminId : postDetails.user;
-//                 if (!user) throw new Error("User not found");
-
-//                 const poster = {
-//                     name: user.sugFullName || user.fullName || "Unknown",
-//                     profilePicture: user.profilePicture || user.profilePhoto || "",
-//                     department: user.studentInfo?.department || "Unknown",
-//                     faculty: user.studentInfo?.faculty || "Unknown",
-//                 };
-
-//                 return { ...post, poster };
-//             } catch (err) {
-//                 console.error(`Error fetching poster details for post ${post._id}:`, err);
-//                 return post;
-//             }
-//         };
-
-//         const allTrendingPostsWithDetails = await Promise.all(
-//             allTrendingPosts.map((post) =>
-//                 fetchPosterDetails(post, post.schoolInfoId.toString() === schoolInfoId)
-//             )
-//         );
-
-//         res.status(200).json({
-//             message: "Trending posts fetched successfully",
-//             posts: allTrendingPostsWithDetails,
-//         });
-//     } catch (error) {
-//         console.error("Error fetching trending posts:", error);
-//         res.status(500).json({ message: "Internal server error", error });
-//     }
-// };
-
-
-
-
-
-
-
-// const getTrendingPosts = async (req, res) => {
-//     try {
-//         const { schoolInfoId } = req.query; // Assume schoolInfoId is passed as a query parameter
-//         if (!schoolInfoId) {
-//             return res.status(400).json({ message: "schoolInfoId is required" });
-//         }
-
-//         const past24Hours = new Date();
-//         past24Hours.setDate(past24Hours.getDate() - 1);
-
-//         const calculateTrendingPosts = async (PostModel) => {
-//             return await PostModel.aggregate([
-//                 {
-//                     $match: {
-//                         schoolInfoId: new mongoose.Types.ObjectId(schoolInfoId), // Filter by school
-//                         createdAt: { $gte: past24Hours }, // Only posts in the last 24 hours
-//                     },
-//                 },
-//                 {
-//                     $addFields: {
-//                         likesCount: { $size: "$likes" }, // Number of likes
-//                         commentsCount: { $size: "$comments" }, // Number of comments
-//                         hashtagsCount: { $cond: { if: "$hashtags", then: { $size: "$hashtags" }, else: 0 } }, // Hashtags count
-//                         trendingScore: {
-//                             $add: [
-//                                 { $multiply: [{ $size: "$likes" }, 1] }, // Weight for likes
-//                                 { $multiply: [{ $size: "$comments" }, 2] }, // Weight for comments
-//                                 { $multiply: ["$hashtagsCount", 1] }, // Weight for hashtags
-//                             ],
-//                         },
-//                     },
-//                 },
-//                 {
-//                     $sort: { trendingScore: -1 }, // Sort by trending score descending
-//                 },
-//                 {
-//                     $limit: 10, // Top 10 posts
-//                 },
-//             ]);
-//         };
-
-//         // Fetch trending posts for both SugPosts and UserPosts
-//         const [trendingSugPosts, trendingUserPosts] = await Promise.all([
-//             calculateTrendingPosts(SugPost),
-//             calculateTrendingPosts(UserPost),
-//         ]);
-
-//         // Merge results and sort by trendingScore
-//         const allTrendingPosts = [...trendingSugPosts, ...trendingUserPosts].sort(
-//             (a, b) => b.trendingScore - a.trendingScore
-//         );
-
-//         res.status(200).json({
-//             message: "Trending posts fetched successfully",
-//             posts: allTrendingPosts,
-            
-//         });
-//     } catch (error) {
-//         console.error("Error fetching trending posts:", error);
-//         res.status(500).json({ message: "Internal server error", error });
-//     }
-// };
-
-
-
-
-// const getTrendingPosts = async (req, res) => {
-//     try {
-//         const trendingPosts = await Promise.all([
-//             SugPost.find({ trending: true }).populate("schoolInfoId adminId"),
-//             UserPost.find({ trending: true }).populate("schoolInfoId user"),
-//         ]);
-//         res.status(200).json({ trendingPosts });
-//     } catch (error) {
-//         console.error("Error fetching trending posts:", error);
-//         res.status(500).json({ message: "Error fetching trending posts", error });
-//     }
-// };
 
 const extractHashtags = (text) => {
     if (typeof text !== "string") return [];

@@ -944,175 +944,126 @@ const addComment = async (req, res) => {
   }
 };
 
-// const addComment = async (req, res) => {
-//     const { postId } = req.params;
-//     const { text, userId, isAdmin, parentCommentId } = req.body;
 
-//     try {
-//         if (!postId || !userId || !text) {
-//             return res.status(400).json({ message: "postId, userId, and text are required." });
-//         }
-
-//         const isAdminFlag = isAdmin === true || isAdmin === "true"; // Handle different types
-//         const commentData = {
-//             post: postId,
-//             text,
-//             parentComment: parentCommentId || null,
-//             isAdmin: isAdminFlag,
-//             ...(isAdminFlag ? { admin: userId } : { user: userId }),
-//         };
-
-//         const newComment = await Comment.create(commentData);
-
-//         if (parentCommentId) {
-//             await Comment.findByIdAndUpdate(parentCommentId, {
-//                 $push: { replies: newComment._id },
-//             });
-//         }
-
-//         const populatedComment = await newComment.populate([
-//             {
-//                 path: "user",
-//                 model: "User",
-//                 select: "fullName profilePhoto",
-//             },
-//             {
-//                 path: "admin",
-//                 model: "SugUser",
-//                 populate: {
-//                     path: "schoolInfo", // Populate schoolInfo from SchoolInfo collection
-//                     model: "SchoolInfo",
-//                     select: "uniProfilePicture", // Select only uniProfilePicture
-//                 },
-//                 select: "sugFullName schoolInfo", // Ensure schoolInfo is included
-//             },
-//         ]);
-
-//         res.status(201).json({
-//             message: "Comment added successfully",
-//             comment: populatedComment,
-//         });
-//     } catch (error) {
-//         console.error("Error adding comment:", error.message || error);
-//         res.status(500).json({
-//             message: "Error adding comment",
-//             error: error.message || error,
-//         });
-//     }
-// };
 
 const fetchComments = async (req, res) => {
-  const { postId } = req.params;
-
-  try {
-    // Fetch all top-level comments for the post (both admin and user)
-    const comments = await Comment.find({ post: postId, parentComment: null })
-      .populate({
-        path: "user", // Populate user field for regular users
-        select: "fullName profilePhoto",
-        transform: (doc) => {
-          if (doc) {
-            return {
-              _id: doc._id,
-              fullName: doc.fullName,
-              profilePicture: doc.profilePhoto, // Rename profilePhoto to profilePicture
+    const { postId } = req.params;
+  
+    try {
+      // First fetch the comments without population
+      const comments = await Comment.find({ post: postId, parentComment: null });
+  
+      if (!comments.length) {
+        return res.status(404).json({ message: "No comments found for this post." });
+      }
+  
+      // Process each comment to get the correct user details
+      const populatedComments = await Promise.all(comments.map(async (comment) => {
+        const commentObj = comment.toObject();
+  
+        // First try to find user in regular Users collection
+        let userDetails = await User.findById(commentObj.user)
+          .select('fullName profilePhoto')
+          .lean();
+  
+        // If not found in Users, try SugUsers collection
+        if (!userDetails) {
+          const adminUser = await SugUser.findById(commentObj.user)
+            .select('sugFullName')
+            .populate({
+              path: 'schoolInfo',
+              model: 'SchoolInfo',
+              select: 'uniProfilePicture'
+            })
+            .lean();
+  
+          if (adminUser) {
+            userDetails = {
+              _id: adminUser._id,
+              fullName: adminUser.sugFullName,
+              profilePhoto: adminUser.schoolInfo?.uniProfilePicture || null,
+              isAdmin: true
             };
           }
-          return null;
-        },
-      })
-      .populate({
-        path: "admin", // Populate admin field for admin users
-        select: "sugFullName",
-        populate: {
-          path: "schoolInfo", // Populate the schoolInfo for the admin to get uniProfilePicture
-          model: "SchoolInfo",
-          select: "uniProfilePicture",
-        },
-        transform: (doc) => {
-          if (doc) {
-            return {
-              _id: doc._id,
-              fullName: doc.sugFullName, // Standardize field name to fullName for consistency
-              profilePicture: doc.schoolInfo
-                ? doc.schoolInfo.uniProfilePicture
-                : null, // Rename uniProfilePicture to profilePicture
-            };
-          }
-          return null;
-        },
-      })
-      .populate({
-        path: "replies", // Populate replies
-        populate: {
-          path: "user", // Populate user field in replies for regular users
-          select: "fullName profilePhoto",
-          transform: (doc) => {
-            if (doc) {
-              return {
-                _id: doc._id,
-                fullName: doc.fullName,
-                profilePicture: doc.profilePhoto, // Rename profilePhoto to profilePicture
-              };
-            }
-            return null;
-          },
-        },
-      });
-
-    if (!comments.length) {
-      return res
-        .status(404)
-        .json({ message: "No comments found for this post." });
-    }
-
-    // Transform fetched comments to replace `admin` with `user` dynamically
-    const transformedComments = comments.map((comment) => {
-      const obj = comment.toObject();
-
-      if (obj.admin) {
-        // Assign admin to user key
-        obj.user = { ...obj.admin };
-        delete obj.admin; // Remove admin key
-      }
-
-      // Recursively handle replies if they exist
-      if (obj.replies && obj.replies.length > 0) {
-        obj.replies = obj.replies.map((reply) => {
-          const replyObj = { ...reply };
-          if (replyObj.admin) {
-            replyObj.user = { ...replyObj.admin };
-            delete replyObj.admin;
-          }
-          return replyObj;
-        });
-      }
-
-      return obj;
-    });
-
-    // Helper function to build a nested comment tree
-    const buildCommentTree = (comments) => {
-      return comments.map((comment) => {
-        const commentObj = { ...comment };
-        if (comment.replies && comment.replies.length > 0) {
-          commentObj.replies = buildCommentTree(comment.replies);
+        } else {
+          // Format regular user details
+          userDetails = {
+            _id: userDetails._id,
+            fullName: userDetails.fullName,
+            profilePhoto: userDetails.profilePhoto || null,
+            isAdmin: false
+          };
         }
+  
+        // Assign the user details
+        commentObj.user = userDetails;
+  
+        // Handle replies if they exist
+        if (commentObj.replies && commentObj.replies.length > 0) {
+          // Fetch and populate all replies
+          const populatedReplies = await Promise.all(
+            commentObj.replies.map(async (replyId) => {
+              const reply = await Comment.findById(replyId).lean();
+              if (!reply) return null;
+  
+              // First check Users collection for reply author
+              let replyUser = await User.findById(reply.user)
+                .select('fullName profilePhoto')
+                .lean();
+  
+              // If not found, check SugUsers collection
+              if (!replyUser) {
+                const adminReplyUser = await SugUser.findById(reply.user)
+                  .select('sugFullName')
+                  .populate({
+                    path: 'schoolInfo',
+                    model: 'SchoolInfo',
+                    select: 'uniProfilePicture'
+                  })
+                  .lean();
+  
+                if (adminReplyUser) {
+                  replyUser = {
+                    _id: adminReplyUser._id,
+                    fullName: adminReplyUser.sugFullName,
+                    profilePhoto: adminReplyUser.schoolInfo?.uniProfilePicture || null,
+                    isAdmin: true
+                  };
+                }
+              } else {
+                replyUser = {
+                  _id: replyUser._id,
+                  fullName: replyUser.fullName,
+                  profilePhoto: replyUser.profilePhoto || null,
+                  isAdmin: false
+                };
+              }
+  
+              return {
+                ...reply,
+                user: replyUser
+              };
+            })
+          );
+  
+          commentObj.replies = populatedReplies.filter(reply => reply !== null);
+        }
+  
         return commentObj;
-      });
-    };
+      }));
+  
+      res.status(200).json({ comments: populatedComments });
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ message: "Error fetching comments", error: error.message });
+    }
+  };
+  
+  
+  
+  
+  
 
-    // Generate the comment tree structure
-    const commentTree = buildCommentTree(transformedComments);
-
-    res.status(200).json({ comments: commentTree });
-  } catch (error) {
-    console.error("Error fetching comments:", error);
-    res
-      .status(500)
-      .json({ message: "Error fetching comments", error: error.message });
-  }
-};
 
 const fetchPostDetails = async (req, res) => {
   try {
@@ -1224,12 +1175,6 @@ if (!currentUserId) {
       return res.status(404).json({ message: "School not found" });
     }
 
-    // Convert page and limit to integers
-    // const pageNumber = parseInt(page, 10);
-    // const limitNumber = parseInt(limit, 10);
-
-    // Fetch admin posts with pagination
-    // Fetch admin posts (no pagination applied here)
     const adminPosts = await SugPost.find({ schoolInfoId })
       .populate([
         {
@@ -1266,9 +1211,7 @@ if (!currentUserId) {
       .sort({ createdAt: -1 })
       .lean();
 
-    //   const currentUserId = req.user.userId;
-
-    // Format admin posts
+    
     const adminPostsWithDetails = adminPosts.map((post) => ({
         ...post,
         postType: "admin",
@@ -1406,158 +1349,7 @@ if (!currentUserId) {
   }
 };
 
-// const fetchPostsForSchool = async (req, res) => {
-//     const { schoolInfoId } = req.params;
-//     console.log("Received schoolInfoId:", schoolInfoId);
 
-//     if (!mongoose.Types.ObjectId.isValid(schoolInfoId)) {
-//         return res.status(400).json({ message: "Invalid schoolInfoId" });
-//     }
-
-//     try {
-//         // Fetching school information
-//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-//             .select("university state aboutUniversity userId uniProfilePicture")
-//             .populate({
-//                 path: "userId",
-//                 model: "User",
-//                 select: "fullName email"
-//             })
-//             .lean();
-
-//         if (!schoolInfo) {
-//             return res.status(404).json({ message: "School not found" });
-//         }
-
-//         // Fetch admin posts with comments
-//         const adminPosts = await SugPost.find({ schoolInfoId })
-//             .populate([
-//                 {
-//                     path: "adminId",
-//                     model: "SugUser",
-//                     select: "sugFullName email role",
-//                     populate: {
-//                         path: "schoolInfo",
-//                         model: "SchoolInfo",
-//                         select: "university uniProfilePicture"
-//                     }
-//                 },
-//                 {
-//                     path: "comments",
-//                     model: "Comment",
-//                     populate: [
-//                         { path: "user", model: "User", select: "fullName profilePhoto" },
-//                         { path: "admin", model: "SugUser", select: "sugFullName" },
-//                         {
-//                             path: "replies",
-//                             model: "Comment",
-//                             populate: [
-//                                 { path: "user", model: "User", select: "fullName profilePhoto" },
-//                                 { path: "admin", model: "SugUser", select: "sugFullName" }
-//                             ]
-//                         }
-//                     ]
-//                 }
-//             ])
-//             .sort({ createdAt: -1 })
-//             .lean();
-
-//         // Format admin posts
-//         const adminPostsWithDetails = adminPosts.map(post => ({
-//             ...post,
-//             postType: "admin",
-//             isAdmin: post.adminId?.role === "admin",
-//             userId: {
-//                 id: post.adminId?._id || "",
-//                 university: post.adminId?.schoolInfo?.university || "",
-//                 schoolInfo: {
-//                     id: post.adminId?.schoolInfo?._id || "",
-//                     university: post.adminId?.schoolInfo?.university || ""
-//                 },
-//                 profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || ""
-//             }
-//         }));
-
-//         // Fetch student posts with comments
-//         const studentPosts = await UserPost.find({ schoolInfoId })
-//             .populate([
-//                 {
-//                     path: "user",
-//                     model: "User",
-//                     select: "fullName email profilePhoto",
-//                     populate: [
-//                         { path: "studentInfo", model: "StudentInfo", select: "faculty department" },
-//                         { path: "schoolInfoId", model: "SchoolInfo", select: "university" }
-//                     ]
-//                 },
-//                 {
-//                     path: "comments",
-//                     model: "Comment",
-//                     populate: [
-//                         { path: "user", model: "User", select: "fullName profilePhoto" },
-//                         { path: "admin", model: "SugUser", select: "sugFullName" },
-//                         {
-//                             path: "replies",
-//                             model: "Comment",
-//                             populate: [
-//                                 { path: "user", model: "User", select: "fullName profilePhoto" },
-//                                 { path: "admin", model: "SugUser", select: "sugFullName" }
-//                             ]
-//                         }
-//                     ]
-//                 }
-//             ])
-//             .sort({ createdAt: -1 })
-//             .lean();
-
-//         // Format student posts
-//         const studentPostsWithDetails = studentPosts.map(post => ({
-//             ...post,
-//             postType: "student",
-//             userId: {
-//                 id: post.user?._id || "",
-//                 university: post.user?.schoolInfoId?.university || "",
-//                 schoolInfo: {
-//                     id: post.user?.schoolInfoId?._id || "",
-//                     university: post.user?.schoolInfoId?.university || ""
-//                 },
-//                 profilePicture: post.user?.profilePhoto || ""
-//             },
-//             faculty: post.user?.studentInfo?.faculty || "",
-//             department: post.user?.studentInfo?.department || ""
-//         }));
-
-//         // Combine and sort posts
-//         const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails].sort(
-//             (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-//         );
-
-//         // Fetch likes for each post with details
-//         const allPostsWithLikes = await Promise.all(
-//             allPosts.map(async post => {
-//                 const likesWithDetails = await Promise.all(
-//                     post.likes.map(async like => {
-//                         const userLike = await User.findById(like._id).select("fullName");
-//                         const adminLike = await SugUser.findById(like._id).select("sugFullName");
-//                         return {
-//                             _id: like._id,
-//                             fullName: userLike?.fullName || adminLike?.sugFullName || "Unknown Liker"
-//                         };
-//                     })
-//                 );
-//                 return { ...post, likes: likesWithDetails };
-//             })
-//         );
-
-//         res.json({
-//             schoolInfo,
-//             posts: allPostsWithLikes
-//         });
-//     } catch (error) {
-//         console.error("Error fetching school info and posts:", error);
-//         res.status(500).json({ message: "Error fetching school info and posts", error });
-//     }
-// };
 
 const deletePost = async (req, res) => {
   const { postId } = req.params;

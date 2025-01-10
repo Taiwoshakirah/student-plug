@@ -12,6 +12,7 @@ require("dotenv").config();
 const EventCardDetails = require('../models/eventCardDetails')
 const StudentInfo = require('../models/studentInfo')
 const EventTransaction = require('../models/eventTransaction')
+const sendMail = require('../utils/sendMail')
 
 
 
@@ -550,6 +551,23 @@ const chargeCard = async (req, res) => {
       return res.status(404).json({ success: false, message: "Student details not found." });
     }
 
+    // Fetch the admin user from SugUser based on the role or any criteria
+    const adminUser = await SugUser.findOne({ role: "admin" });
+
+    if (!adminUser || !adminUser.email) {
+        return res.status(404).json({ success: false, message: "Admin email not found." });
+    }
+
+    // Send email to the admin once payment is processed
+    const mailOptions = {
+        email: adminUser.email, // Admin email for the school
+        subject: `Payment Received for Event ${eventId}`,
+        text: `A payment of ₦${amount} has been successfully made for event with ID: ${eventId}. Student Details:\nName: ${eventPayment.firstName} ${eventPayment.lastName}\nDepartment: ${eventPayment.department}\nRegistration No: ${eventPayment.registrationNumber}\nEmail: ${eventPayment.email}`,
+    };
+
+    // Call sendMail function to notify the admin
+    await sendMail(mailOptions);
+
     const paymentData = {
       amount: amount * 100, // Convert to kobo
       email: eventPayment.email,
@@ -568,6 +586,16 @@ const chargeCard = async (req, res) => {
     };
 
     console.log("Payment Metadata:", paymentData.metadata);
+
+  //   // Send email to the admin once payment is processed
+  //   const mailOptions = {
+  //     email: process.env.ADMIN_EMAIL, // Admin email address
+  //     subject: `Payment Received for Event ${eventId}`,
+  //     text: `A payment of ₦${amount} has been successfully made for event with ID: ${eventId}. Student Details:\nName: ${eventPayment.firstName} ${eventPayment.lastName}\nDepartment: ${eventPayment.department}\nRegistration No: ${eventPayment.registrationNumber}\nEmail: ${eventPayment.email}`,
+  // };
+
+  // // Call sendMail function to notify the admin
+  // await sendMail(mailOptions);
 
     const response = await axios.post(
       "https://api.paystack.co/transaction/initialize",

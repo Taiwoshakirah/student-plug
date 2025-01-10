@@ -1187,13 +1187,20 @@ const fetchPostDetails = async (req, res) => {
 };
 
 const fetchPostsForSchool = async (req, res) => {
+    console.log("req.user:", req.user); // Log req.user
   const { schoolInfoId } = req.params;
   const { page = 1, limit = 10 } = req.query; // Default to page 1, 6 posts per page
 
-  const currentUserId = req.user?.id; // Ensure req.user is available
+  if (!req.user) {
+    return res.status(401).json({ message: "Unauthorized: User not authenticated" });
+}
+
+  const currentUserId = req.user.userId; // Ensure req.user is available
 if (!currentUserId) {
   console.warn("currentUserId is not defined. Make sure authentication middleware is in place.");
+  return res.status(401).json({ message: "Unauthorized: User not authenticated" });
 }
+
 
 
   console.log("Received schoolInfoId:", schoolInfoId);
@@ -1266,7 +1273,7 @@ if (!currentUserId) {
         ...post,
         postType: "admin",
         isAdmin: post.adminId?.role === "admin",
-        isLike: post.likes?.includes(currentUserId) || false, // Check if the user liked the post
+        isLike: Array.isArray(post.likes) && post.likes.some(like => like._id.toString() === currentUserId.toString()), // Updated logic
         userId: {
           id: post.adminId?._id || "",
           university: post.adminId?.schoolInfo?.university || "",
@@ -1337,7 +1344,7 @@ if (!currentUserId) {
     const studentPostsWithDetails = studentPosts.map((post) => ({
         ...post,
         postType: "student",
-        isLike: post.likes?.includes(currentUserId) || false, // Check if the user liked the post
+        isLike: Array.isArray(post.likes) && post.likes.some(like => like._id.toString() === currentUserId.toString()), // Updated logic
         userId: {
           id: post.user?._id || "",
           university: post.user?.schoolInfoId?.university || "",

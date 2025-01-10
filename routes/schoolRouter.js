@@ -17,7 +17,7 @@ router.route('/forgot').post(schoolForgotPassword).all(methodNotAllowed)
 router.route('/code-verification').post(schoolverifyResetCode).all(methodNotAllowed)
 router.route('/passwordReset').post(schoolresetPassword).all(methodNotAllowed)
 router.route('/getSug/:userId').get(getSugUserDetails).all(methodNotAllowed)
-router.route('/:schoolInfoId').get(fetchPostsForSchool).all(methodNotAllowed)
+router.route('/:schoolInfoId').get(authenticateToken,fetchPostsForSchool).all(methodNotAllowed)
 
 
 

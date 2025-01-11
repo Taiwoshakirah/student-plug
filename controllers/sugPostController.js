@@ -430,7 +430,7 @@ const toggleLike = async (req, res) => {
    console.log("Liker name before notification:", likerName);
    console.log("Liker photo before notification:", likerPhoto);
 
-
+   if (postOwnerId && postOwnerId !== likerId) {
    try {
   const notification = {
     userId: postOwnerId,
@@ -455,6 +455,7 @@ const toggleLike = async (req, res) => {
   console.log("Notification saved successfully.");
 } catch (error) {
   console.error("Error creating notification:", error);
+}
 }
 
 //    console.log("Notification object:", notification);
@@ -872,6 +873,7 @@ const addComment = async (req, res) => {
       ? commenter.schoolInfo?.uniProfilePicture || "" // Fallback to empty string if no photo
       : commenter.profilePhoto || ""; // Fallback to empty string if no photo
 
+      if (post.user && post.user.toString() !== userId) {
     const commentNotification = {
       userId: post.user || post.adminId, // Send notification to post owner
       postId,
@@ -894,6 +896,7 @@ const addComment = async (req, res) => {
     if (post.user) {
       sendNotificationToPostOwner(post.user, newCommentNotification);
     }
+}
 
     // Send WebSocket notification to the parent comment owner (if applicable)
     if (parentCommentId) {

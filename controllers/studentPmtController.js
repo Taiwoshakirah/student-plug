@@ -139,34 +139,6 @@ const newStudentPayment = await StudentPayment.findOneAndUpdate(
   
 
 
-// const studentPaymentDetails = async (req, res) => {
-//     const { firstName, lastName, department, regNo, academicLevel, email, feeType } = req.body;
-
-//     try {
-//         const newStudent = new StudentPayment({
-//             firstName,
-//             lastName,
-//             department,
-//             regNo,
-//             academicLevel,
-//             email,
-//             feeType,
-//         });
-
-//         await newStudent.save();
-
-//         res.status(201).json({ success: true, message: "Student added successfully!" });
-//     } catch (error) {
-//         if (error.code === 11000) {
-//             return res.status(400).json({ error: "Student with this Registration Number or Email already exists" });
-//         }
-//         res.status(500).json({ error: "An error occurred while saving student details" });
-//     }
-// };
-
-
-
-
 
 const addCard = async (req, res) => {
     const { cardNumber, cvv, expiryDate, email, feeType, bankName } = req.body;
@@ -291,57 +263,6 @@ const getStudentAndCardDetails = async (req, res) => {
 };
 
 
-  
-
-
-// const addCard = async (req, res) => {
-//     const { cardNumber, cvv, expiryMonth, expiryYear, email } = req.body;
-//     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-//     try {
-//         const response = await axios.post(
-//             "https://api.paystack.co/charge",
-//             {
-//                 email,
-//                 amount: 100, // Amount in kobo (₦1 for test purposes)
-//                 card: {
-//                     number: cardNumber,
-//                     cvv,
-//                     expiry_month: expiryMonth,
-//                     expiry_year: expiryYear,
-//                 },
-//             },
-//             {
-//                 headers: {
-//                     Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-//                     "Content-Type": "application/json",
-//                 },
-//             }
-//         );
-
-//         if (response.data.status) {
-//             const authorizationCode = response.data.data.authorization.authorization_code;
-
-//             // Save card token (authorization code) to the database for future transactions
-//             return res.status(200).json({
-//                 success: true,
-//                 cardToken: authorizationCode,
-//             });
-//         } else {
-//             return res.status(400).json({ error: "Card tokenization failed" });
-//         }
-//     } catch (error) {
-//         console.error("Tokenization error:", error.response?.data || error.message);
-
-//         if (error.response) {
-//             return res.status(error.response.status).json({ error: error.response.data.message });
-//         } else if (error.request) {
-//             return res.status(500).json({ error: "No response received from Paystack" });
-//         } else {
-//             return res.status(500).json({ error: "An unexpected error occurred" });
-//         }
-//     }
-// };
 
 
 
@@ -500,66 +421,7 @@ const recordPayment = async (req, res) => {
   };
   
 
-// const recordPayment = async (req, res) => {
-//     const { email, amount, feeType, reference, status, gatewayResponse } = req.body;
-  
-//     try {
-//       // Find the student payment by email
-//       const studentPayment = await StudentPayment.findOne({ email });
-//       if (!studentPayment) {
-//         return res.status(404).json({ success: false, message: "Student payment record not found." });
-//       }
-  
-//       console.log("Student Payment Record:", studentPayment);
-  
-//       // Find the student by registration number
-//       const registrationNumber = studentPayment.regNo.trim(); // Remove extra spaces
-//       const student = await Student.findOne({
-//         registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" }
-//       });
-  
-//       if (!student) {
-//         console.log("No student found for regNo:", registrationNumber);
-//         return res.status(404).json({ success: false, message: "Student record not found." });
-//       }
-  
-//       console.log("Student Record Found:", student);
-  
-//       // Create a new transaction
-//       const transaction = new Transaction({
-//         email,
-//         amount,
-//         feeType,
-//         reference,
-//         status,
-//         gatewayResponse,
-//         student: studentPayment._id, // Link to StudentPayment
-//       });
-  
-//       const savedTransaction = await transaction.save();
-  
-//       // Update the StudentPayment transactions array
-//       studentPayment.transactions.push(savedTransaction._id);
-//       await studentPayment.save();
-  
-//       // Update the Student transactions array
-//       student.transactions.push(savedTransaction._id);
-//       await student.save();
-  
-//       return res.status(200).json({
-//         success: true,
-//         message: "Payment recorded and linked successfully.",
-//         data: savedTransaction,
-//       });
-//     } catch (error) {
-//       console.error("Error recording payment:", error.stack || error);
-//       return res.status(500).json({
-//         success: false,
-//         message: "An error occurred while recording the payment.",
-//       });
-//     }
-//   };
-  
+
   
 
 

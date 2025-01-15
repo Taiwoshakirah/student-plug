@@ -870,18 +870,50 @@ const getFaculty = async (req, res) => {
 
 
 
+// const getSugUser = async (req, res) => {
+//     const { userId } = req.user; 
+
+//     try {
+        
+//         const user = await SugUser.findById(userId);
+//         if (!user) {
+//             return res.status(404).json({ message: "User not found" });
+//         }
+
+//         const school = await schoolInfo.findOne({ userId });
+
+//         const profilePhotoUrl = school?.uniProfilePicture || null;
+
+//         res.status(200).json({
+//             message: "Authenticated",
+//             user: {
+//                 _id: user._id,
+//                 name: user.fullName,
+//                 email: user.email,
+//                 profilePicture: profilePhotoUrl, 
+//             },
+//             schoolInfo: school || null, 
+//         });
+//     } catch (error) {
+//         console.error("Error fetching user or school information:", error);
+//         res.status(500).json({ message: "Internal Server Error" });
+//     }
+// };
+
 const getSugUser = async (req, res) => {
-    const { userId } = req.user; 
+    if (!req.user) {
+        return res.status(401).json({ message: "Token has expired or is invalid" });
+    }
+
+    const { userId } = req.user;
 
     try {
-        
         const user = await SugUser.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
         const school = await schoolInfo.findOne({ userId });
-
         const profilePhotoUrl = school?.uniProfilePicture || null;
 
         res.status(200).json({
@@ -890,15 +922,16 @@ const getSugUser = async (req, res) => {
                 _id: user._id,
                 name: user.fullName,
                 email: user.email,
-                profilePicture: profilePhotoUrl, 
+                profilePicture: profilePhotoUrl,
             },
-            schoolInfo: school || null, 
+            schoolInfo: school || null,
         });
     } catch (error) {
         console.error("Error fetching user or school information:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
 
   
 

@@ -1303,21 +1303,7 @@ if (!currentUserId) {
         faculty: post.user?.studentInfo?.faculty || "",
         department: post.user?.studentInfo?.department || "",
       }));
-    // const studentPostsWithDetails = studentPosts.map((post) => ({
-    //   ...post,
-    //   postType: "student",
-    //   userId: {
-    //     id: post.user?._id || "",
-    //     university: post.user?.schoolInfoId?.university || "",
-    //     schoolInfo: {
-    //       id: post.user?.schoolInfoId?._id || "",
-    //       university: post.user?.schoolInfoId?.university || "",
-    //     },
-    //     profilePicture: post.user?.profilePhoto || "",
-    //   },
-    //   faculty: post.user?.studentInfo?.faculty || "",
-    //   department: post.user?.studentInfo?.department || "",
-    // }));
+   
 
     // Combine posts
     const allPosts = [...adminPostsWithDetails, ...studentPostsWithDetails];
@@ -1400,7 +1386,7 @@ const deletePost = async (req, res) => {
         .json({ message: "Unauthorized to delete this post" });
     }
 
-    await UserComment.deleteMany({ post: postId });
+    await Comment.deleteMany({ post: postId });
 
     if (post.images && post.images.length > 0) {
       for (const imageUrl of post.images) {

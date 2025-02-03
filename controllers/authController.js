@@ -320,6 +320,7 @@ const signin = async (req, res) => {
       avatar: user.profilePhoto,
     },
   });
+  
 };
 
 

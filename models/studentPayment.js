@@ -25,8 +25,14 @@ const studentPymtSchema = new mongoose.Schema({
   academicLevel: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   feeType: { type: String, required: true },
+  feeAmount:Number,
+  schoolInfoId:{type: mongoose.Schema.Types.ObjectId, ref: "SchoolInfo", required: true},
 //   schoolInfo: { type: mongoose.Schema.Types.ObjectId, ref: 'SchoolInfo', required: true },
-  transactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Transaction" }], 
+  transactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Transaction" }],
+  virtualAccount: {
+    accountNumber: { type: String, required: true },
+    bankName: { type: String, required: true }
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model("StudentPayment", studentPymtSchema);

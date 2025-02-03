@@ -15,326 +15,502 @@ const User = require('../models/signUp')
 
 
 
-// Save student information
-// const studentPaymentDetails =  async (req, res) => {
-//     const { firstName, lastName, department, regNo, academicLevel, email } = req.body;
-
-//     try {
-//         const newStudent = new StudentPayment({
-//             firstName,
-//             lastName,
-//             department,
-//             regNo,
-//             academicLevel,
-//             email,
-//         });
-
-//         await newStudent.save();
-
-//         res.status(201).json({ success: true, message: "Student added successfully!" });
-//     } catch (error) {
-//         if (error.code === 11000) {
-//             return res.status(400).json({ error: "Student with this Registration Number or Email already exists" });
-//         }
-//         res.status(500).json({ error: "An error occurred while saving student details" });
+// const isValidRegNumber = (regNum) => {
+//     // validating regNo in the format 'ND/xxx/xxx'
+//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+//     return regNum && regNumberPattern.test(regNum);
+//   };
+  
+//   const studentPaymentDetails = async (req, res) => {
+//     const { userId, firstName, lastName, department, regNo, academicLevel, email, feeType, schoolInfoId } = req.body;
+  
+//     if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !feeType || !schoolInfoId) {
+//       return res.status(422).json({ success: false, message: "All fields are required, including schoolInfoId." });
 //     }
-// }
-
-
-
+  
+//     if (!isValidRegNumber(regNo)) {
+//       return res.status(400).json({ success: false, message: "Invalid registration number format." });
+//     }
+  
+//     try {
+//       const user = await User.findById(userId);
+//       if (!user) {
+//         return res.status(404).json({ success: false, message: "User not found" });
+//       }
+  
+//       const student = await Student.findOne({ registrationNumber: regNo });
+//       if (!student) {
+//         return res.status(404).json({ success: false, message: "Student with the given registration number not found." });
+//       }
+  
+//       // Fetch SchoolInfo to get the virtualAccount
+//     const schoolInfo = await SchoolInfo.findById(schoolInfoId);
+//     if (!schoolInfo) {
+//       return res.status(404).json({ success: false, message: "School information not found." });
+//     }
+      
+//     const newStudentPayment = await StudentPayment.findOneAndUpdate(
+//     { $or: [{ regNo }, { email }] },
+//     {
+//       userId,
+//       firstName,
+//       lastName,
+//       department,
+//       regNo,
+//       academicLevel,
+//       email,
+//       feeType,
+//       schoolInfoId,
+//       virtualAccount: schoolInfo.virtualAccount,
+//     },
+//     // Update if exists, create if not
+//     { new: true, upsert: true } 
+//   );
+//   console.log(newStudentPayment);
+  
+//       const savedPayment = await newStudentPayment.save();
+  
+//   res.status(201).json({
+//     success: true,
+//     message: "Payment details saved or updated successfully!",
+//     payment: savedPayment,
+//     virtualAccount: schoolInfo.virtualAccount,
+//   });
+  
+//     } catch (error) {
+//       console.error("Error in studentPaymentDetails:", error);
+//       res.status(500).json({ success: false, message: "An error occurred while saving payment details", error });
+//     }
+//   };
+  
 
 const isValidRegNumber = (regNum) => {
-    // Regular expression for validating regNo in the format 'ND/xxx/xxx'
-    const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
-    return regNum && regNumberPattern.test(regNum);
-  };
-  
-  const studentPaymentDetails = async (req, res) => {
-    const { userId, firstName, lastName, department, regNo, academicLevel, email, feeType, schoolInfoId } = req.body;
-  
-    // Validate required fields
-    if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !feeType || !schoolInfoId) {
-      return res.status(422).json({ success: false, message: "All fields are required, including schoolInfoId." });
-    }
-  
-    // Validate regNo format
-    if (!isValidRegNumber(regNo)) {
-      return res.status(400).json({ success: false, message: "Invalid registration number format." });
-    }
-  
-    try {
-      // Check if the user exists
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
-      }
-  
-      // Check if the regNo exists in the students collection
-      const student = await Student.findOne({ registrationNumber: regNo });
-      if (!student) {
-        return res.status(404).json({ success: false, message: "Student with the given registration number not found." });
-      }
-  
-      // Check for existing payment with the same regNo or email
-    //   const existingPayment = await StudentPayment.findOne({ 
-    //     $or: [{ regNo }, { email }] 
-    //   });
-    //   if (existingPayment) {
-    //     return res.status(400).json({ success: false, message: "Payment details already exist for this Registration Number or Email" });
-    //   }
-  
-    //   // Create a new payment record
-    //   const newStudentPayment = new StudentPayment({
-    //     userId,
-    //     firstName,
-    //     lastName,
-    //     department,
-    //     regNo,
-    //     academicLevel,
-    //     email,
-    //     feeType,
-    //     schoolInfoId,
-    //   });
-  
-    //   // Save payment record
-    //   const savedPayment = await newStudentPayment.save();
-  
-    //   res.status(201).json({
-    //     success: true,
-    //     message: "Payment details saved successfully!",
-    //     payment: savedPayment,
-    //   });
-    // Replace or create payment details for the same regNo or email
-const newStudentPayment = await StudentPayment.findOneAndUpdate(
-    { $or: [{ regNo }, { email }] }, // Match by regNo or email
-    {
-      userId,
-      firstName,
-      lastName,
-      department,
-      regNo,
-      academicLevel,
-      email,
-      feeType,
-      schoolInfoId,
-    },
-    { new: true, upsert: true } // Update if exists, create if not
-  );
-   // Save payment record
-      const savedPayment = await newStudentPayment.save();
-  
-  // Respond with success
-  res.status(201).json({
-    success: true,
-    message: "Payment details saved or updated successfully!",
-    payment: savedPayment,
-  });
-  
-    } catch (error) {
-      console.error("Error in studentPaymentDetails:", error);
-      res.status(500).json({ success: false, message: "An error occurred while saving payment details", error });
-    }
-  };
-  
-  
-
-
-
-const addCard = async (req, res) => {
-    const { cardNumber, cvv, expiryDate, email, feeType, bankName } = req.body;
-    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-    // Validate expiryDate format (MM/YY)
-    if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
-        return res.status(400).json({ error: "Invalid expiry date format. It should be MM/YY." });
-    }
-
-    const [expiryMonth, expiryYear] = expiryDate.split('/');
-
-    try {
-        const response = await axios.post(
-            "https://api.paystack.co/charge",
-            {
-                email,
-                amount: 1000, // Amount in kobo (₦1 for test purposes)
-                card: {
-                    number: cardNumber,
-                    cvv,
-                    expiry_month: expiryMonth,
-                    expiry_year: expiryYear,
-                },
-                metadata: {
-                    feeType,
-                    bankName,
-                },
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-
-        if (response.data.status) {
-            const { authorization_code } = response.data.data.authorization;
-
-            // Extract first 3 and last 3 digits
-            const first3 = cardNumber.slice(0, 3);
-            const last3 = cardNumber.slice(-3);
-
-            // Save non-sensitive information and token
-            const cardDetails = new CardDetails({
-                email,
-                bankName,
-                feeType,
-                first3,
-                last3,
-                authorizationCode: authorization_code,
-            });
-            // Update or create card details for the same email and feeType
-// const cardDetails = await CardDetails.findOneAndUpdate(
-//     { email, feeType }, // Match by email and feeType
-//     {
-//         email,
-//         bankName,
-//         feeType,
-//         first3,
-//         last3,
-//         authorizationCode: authorization_code,
-//     },
-//     { new: true, upsert: true } // Update if exists, create if not
-// );
-
-
-            await cardDetails.save();
-
-            return res.status(200).json({
-                success: true,
-                message: "Card added successfully",
-                cardToken: authorization_code,
-            });
-        } else {
-            return res.status(400).json({ error: "Card tokenization failed" });
-        }
-    } catch (error) {
-        console.error("Tokenization error:", error.response?.data || error.message);
-        res.status(500).json({ error: "An error occurred during tokenization" });
-    }
+  const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
+  return regNum && regNumberPattern.test(regNum);
 };
 
-  
-  
-const getStudentAndCardDetails = async (req, res) => {
-    const { email } = req.query;
+const studentPaymentDetails = async (req, res) => {
+  const { 
+    userId, 
+    firstName, 
+    lastName, 
+    department, 
+    regNo, 
+    academicLevel, 
+    email, 
+    feeType,
+    feeAmount,
+    schoolInfoId 
+  } = req.body;
 
-    try {
-        const studentDetails = await StudentPayment.findOne({ email });
-        if (!studentDetails) {
-            return res.status(404).json({ error: "Student not found" });
-        }
+  // Add logging to verify schoolInfoId
+  console.log('Received schoolInfoId:', schoolInfoId);
 
-        const cardDetails = await CardDetails.findOne({ email: studentDetails.email });
-        if (!cardDetails) {
-            return res.status(404).json({ error: "Card details not found" });
-        }
+  if (!userId || !firstName || !lastName || !department || !regNo || 
+      !academicLevel || !email || !feeType || !feeAmount || !schoolInfoId) {
+    return res.status(422).json({ 
+      success: false, 
+      message: "All fields are required, including schoolInfoId and feeAmount." 
+    });
+  }
 
-        res.status(200).json({
-            success: true,
-            student: {
-                firstName: studentDetails.firstName,
-                lastName: studentDetails.lastName,
-                department: studentDetails.department,
-                regNo: studentDetails.regNo,
-                academicLevel: studentDetails.academicLevel,
-                email: studentDetails.email,
-                feeType: studentDetails.feeType,
-            },
-            card: {
-                cardNumber: `${cardDetails.first3} **** **** ${cardDetails.last3}`, // Return first 3 and last 3 digits
-                bankName: cardDetails.bankName,
-                expiryDate: cardDetails.expiryDate,
-            },
-        });
-    } catch (error) {
-        console.error("Error fetching student or card details:", error.message);
-        res.status(500).json({ error: "An error occurred while fetching details" });
+  try {
+    // Verify schoolInfo exists before creating payment
+    const schoolInfo = await SchoolInfo.findById(schoolInfoId);
+    console.log('Found schoolInfo:', schoolInfo ? schoolInfo._id : 'not found');
+    
+    if (!schoolInfo) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "School information not found" 
+      });
     }
+
+    const newStudentPayment = await StudentPayment.findOneAndUpdate(
+      { $or: [{ regNo }, { email }] },
+      {
+        userId,
+        firstName,
+        lastName,
+        department,
+        regNo,
+        academicLevel,
+        email,
+        feeType,
+        feeAmount,
+        schoolInfoId: schoolInfo._id, 
+        virtualAccount: schoolInfo.virtualAccount,
+      },
+      { new: true, upsert: true }
+    );
+
+    console.log('Created/Updated payment with schoolInfoId:', newStudentPayment.schoolInfoId);
+
+    res.status(201).json({
+      success: true,
+      message: "Payment details saved or updated successfully!",
+      payment: newStudentPayment,
+      virtualAccount: schoolInfo.virtualAccount,
+    });
+
+  } catch (error) {
+    console.error("Error in studentPaymentDetails:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "An error occurred while saving payment details", 
+      error: error.message
+    });
+  }
+};
+  
+  
+const getStudentPaymentDetails = async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    const studentDetails = await StudentPayment.findOne({ email });
+    console.log('Found student payment:', studentDetails ? {
+      email: studentDetails.email,
+      schoolInfoId: studentDetails.schoolInfoId
+    } : 'not found');
+
+    if (!studentDetails) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Log the schoolInfoId we're trying to find
+    console.log('Looking for schoolInfoId:', studentDetails.schoolInfoId);
+
+    // Ensure schoolInfoId is valid before querying
+    if (!studentDetails.schoolInfoId) {
+      return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
+    }
+
+    const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
+    console.log('Found schoolInfo:', schoolInfo ? {
+      _id: schoolInfo._id,
+      university: schoolInfo.university
+    } : 'not found');
+
+    if (!schoolInfo) {
+      return res.status(404).json({ 
+        error: "School information not found",
+        searchedId: studentDetails.schoolInfoId
+      });
+    }
+
+    const { accountNumber, accountName, bankName } = schoolInfo.virtualAccount;
+    // const accountName = schoolInfo.university;
+
+    const serviceCharge = 100;
+    const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
+
+    res.status(200).json({
+      success: true,
+      student: {
+        firstName: studentDetails.firstName,
+        lastName: studentDetails.lastName,
+        department: studentDetails.department,
+        regNo: studentDetails.regNo,
+        academicLevel: studentDetails.academicLevel,
+        email: studentDetails.email,
+        feeType: studentDetails.feeType,
+        virtualAccount: {
+          accountNumber,
+          accountName,
+          bankName,
+        },
+        paymentDetails: {
+          paymentMethod: "Bank Transfer",
+          paymentAmount: totalFee,
+          originalAmount: studentDetails.feeAmount,
+          serviceCharge,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching student payment details:", error);
+    res.status(500).json({ 
+      error: "An error occurred while fetching details",
+      details: error.message
+    });
+  }
 };
 
 
 
+// const decryptFCMBPayload = async (encryptedData) => {
+//   try {
+//     const url = "https://devapi.fcmb.com/encrypt/api/Salt/DecryptByClientId";
+//     const payload = { encryptedData };
+//     const headers = {
+//       "client_id": 250,
+//       "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+//       "x-token": "06ea151602e3db8fd01aae346837ab22e6288e2ee7a6214003c62438092abe34a8f8d817c7999095d1b8aef6314f48a17cd2ea4753d741a7fbf6fbac1a39df73",
+//       "utctimestamp": "2025-02-03T13:48:39.689",
+//     };
+
+//     const response = await axios.post(url, payload, { headers });
+
+//     if (response.data && response.data.decryptedData) {
+//       return JSON.parse(response.data.decryptedData);
+//     } else {
+//       console.error("Decryption failed:", response.data.description);  // Log more details
+//       throw new Error("Decryption failed: No decrypted data in response");
+//     }
+//   } catch (error) {
+//     console.error("Decryption error:", error.message, error.response?.data);  // Log the error details
+//     throw new Error("Error decrypting the payload");
+//   }
+// };
 
 
 
-const chargeCard = async (req, res) => {
-    const { email, amount, cardToken, feeType } = req.body;
-    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
-    const allowedFeeTypes = ["SUG", "Departmental", "Faculty", "exam"];
+// const webhook = async (req, res) => {
+//   try {
+//     console.log("Received FCMB webhook:", req.body);
+//     console.log("Received Headers:", req.headers);  // Log headers to see if all are present
 
-    if (!feeType || !allowedFeeTypes.includes(feeType)) {
-        return res.status(400).json({ error: "Invalid or missing fee type" });
+//     // Extract headers (use lowercase names)
+//     const clientId = req.headers["client_id"];
+//     const subscriptionKey = req.headers["ocp-apim-subscription-key"];
+//     const xToken = req.headers["x-token"];
+//     const utcTimestamp = req.headers["utctimestamp"];
+
+//     if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
+//       return res.status(401).json({ message: "Missing required headers" });
+//     }
+
+//     // **Assuming the payload is encrypted**, decrypt it
+//     let decryptedPayload;
+//     try {
+//       if (!req.body.encryptedString) {
+//         return res.status(400).json({ message: "Missing encrypted data" });
+//       }
+//       decryptedPayload = decryptFCMBPayload(req.body.encryptedString); // Implement this function
+//     } catch (error) {
+//       console.error("Decryption error:", error);
+//       return res.status(400).json({ message: "Invalid encrypted payload" });
+//     }
+
+//     console.log("Decrypted Payload:", decryptedPayload);
+
+//     const { transactionId, accountNumber, amount, status, timestamp } = decryptedPayload;
+
+//     if (!transactionId || !accountNumber || !amount || !status) {
+//       return res.status(400).json({ message: "Invalid webhook payload" });
+//     }
+
+//     // **Update payment status in the database**
+//     const updatedPayment = await updatePaymentStatus(accountNumber, {
+//       transactionId,
+//       amount,
+//       status,
+//       timestamp,
+//     });
+
+//     console.log("Payment updated successfully:", updatedPayment);
+
+//     // **Acknowledge webhook**
+//     res.status(200).json({ success: true, message: "Webhook processed successfully" });
+//   } catch (error) {
+//     console.error("FCMB Webhook Error:", error);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
+// const webhook = async (req, res) => {
+//   try {
+//     console.log("Received FCMB webhook:", req.body);
+//     console.log("Received Headers:", req.headers);  
+
+//     // Extract headers (use lowercase names)
+//     const clientId = req.headers["client_id"];
+//     const subscriptionKey = req.headers["ocp-apim-subscription-key"];
+//     const xToken = req.headers["x-token"];
+//     const utcTimestamp = req.headers["utctimestamp"];
+
+//     if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
+//       return res.status(401).json({ message: "Missing required headers" });
+//     }
+
+//     // **Accept the encrypted string directly**
+//     if (!req.body.encryptedString) {
+//       return res.status(400).json({ message: "Missing encrypted data" });
+//     }
+
+//     // Log the encrypted string for now
+//     console.log("Received Encrypted Payload:", req.body.encryptedString);
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Webhook received successfully, encrypted data accepted",
+//       encryptedString: req.body.encryptedString 
+//     });
+
+//   } catch (error) {
+//     console.error("FCMB Webhook Error:", error);
+//     res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
+
+
+const webhook = async (req, res) => {
+  try {
+    console.log("Received FCMB webhook:", req.body);
+    console.log("Received Headers:", req.headers);  
+    
+    // Extract headers (use lowercase names)
+    const clientId = req.headers["client_id"];
+    const subscriptionKey = req.headers["ocp-apim-subscription-key"];
+    const xToken = req.headers["x-token"];
+    const utcTimestamp = req.headers["utctimestamp"];
+
+    if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
+      return res.status(401).json({ message: "Missing required headers" });
     }
 
-    try {
-        // Call Paystack API to charge card
-        const response = await axios.post(
-            "https://api.paystack.co/transaction/charge_authorization",
-            {
-                authorization_code: cardToken,
-                email,
-                amount, // Amount in kobo
-                metadata: { feeType },
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-
-        if (response.data.status) {
-            // Find the student by email
-            const student = await StudentPayment.findOne({ email });
-            if (!student) {
-                return res.status(404).json({ error: "Student not found" });
-            }
-
-            // Create and save the transaction
-            const newTransaction = new Transaction({
-                email,
-                amount,
-                feeType,
-                reference: response.data.data.reference,
-                status: response.data.data.status,
-                gatewayResponse: response.data.data.gateway_response,
-                student: student._id, // Link to the student
-            });
-
-            const savedTransaction = await newTransaction.save();
-
-            // Add transaction reference to the student
-            student.transactions.push(savedTransaction._id);
-            await student.save();
-
-            return res.status(200).json({ success: true, data: response.data.data });
-        } else {
-            return res.status(400).json({ error: response.data.message });
-        }
-    } catch (error) {
-        console.error("Charge error:", error.response?.data || error.message);
-
-        if (error.response) {
-            return res.status(error.response.status).json({ error: error.response.data.message });
-        } else if (error.request) {
-            return res.status(500).json({ error: "No response received from Paystack" });
-        } else {
-            return res.status(500).json({ error: "An unexpected error occurred" });
-        }
-    }
+    console.log("Received Encrypted Payload:", req.body.encryptedString);
+    // **Acknowledge webhook**
+    res.status(200).json({ success: true, message: "Webhook processed successfully" });
+  } catch (error) {
+    console.error("FCMB Webhook Error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 };
+
+
+
+
+
+
+// const getStudentPaymentDetails = async (req, res) => {
+//   const { email } = req.query;
+
+//   try {
+//       const studentDetails = await StudentPayment.findOne({ email });
+//       if (!studentDetails) {
+//           return res.status(404).json({ error: "Student not found" });
+//       }
+
+//       // Fetch the associated school information to get the virtual account details
+//       const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
+//       if (!schoolInfo || !schoolInfo.virtualAccount) {
+//           return res.status(404).json({ error: "School account details not found" });
+//       }
+
+//       // Extract virtual account details
+//       const { accountNumber, bankName } = schoolInfo.virtualAccount;
+
+//       // Set the account name as the university name
+//       const accountName = schoolInfo.university;
+
+//       // Calculate total fee including service charge
+//       const serviceCharge = 100; 
+//       const totalFee = studentDetails.feeType.amount + serviceCharge;
+
+//       res.status(200).json({
+//           success: true,
+//           student: {
+//               firstName: studentDetails.firstName,
+//               lastName: studentDetails.lastName,
+//               department: studentDetails.department,
+//               regNo: studentDetails.regNo,
+//               academicLevel: studentDetails.academicLevel,
+//               email: studentDetails.email,
+//               feeType: studentDetails.feeType,
+//               virtualAccount: {
+//                   accountNumber,
+//                   accountName,
+//                   bankName,
+//               },
+//               paymentDetails: {
+//                   paymentMethod: "Bank Transfer",
+//                   paymentAmount: totalFee,
+//                   serviceCharge,
+//               },
+//           },
+//       });
+//   } catch (error) {
+//       console.error("Error fetching student payment details:", error.message);
+//       res.status(500).json({ error: "An error occurred while fetching details" });
+//   }
+// };
+
+
+
+
+
+// const chargeCard = async (req, res) => {
+//     const { email, amount, cardToken, feeType } = req.body;
+//     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+
+//     const allowedFeeTypes = ["SUG", "Departmental", "Faculty", "exam"];
+
+//     if (!feeType || !allowedFeeTypes.includes(feeType)) {
+//         return res.status(400).json({ error: "Invalid or missing fee type" });
+//     }
+
+//     try {
+//         // Call Paystack API to charge card
+//         const response = await axios.post(
+//             "https://api.paystack.co/transaction/charge_authorization",
+//             {
+//                 authorization_code: cardToken,
+//                 email,
+//                 amount, 
+//                 metadata: { feeType },
+//             },
+//             {
+//                 headers: {
+//                     Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+//                     "Content-Type": "application/json",
+//                 },
+//             }
+//         );
+
+//         if (response.data.status) {
+//             // Find the student by email
+//             const student = await StudentPayment.findOne({ email });
+//             if (!student) {
+//                 return res.status(404).json({ error: "Student not found" });
+//             }
+
+//             // Create and save the transaction
+//             const newTransaction = new Transaction({
+//                 email,
+//                 amount,
+//                 feeType,
+//                 reference: response.data.data.reference,
+//                 status: response.data.data.status,
+//                 gatewayResponse: response.data.data.gateway_response,
+//                 student: student._id, 
+//             });
+
+//             const savedTransaction = await newTransaction.save();
+
+//             // Add transaction reference to the student
+//             student.transactions.push(savedTransaction._id);
+//             await student.save();
+
+//             return res.status(200).json({ success: true, data: response.data.data });
+//         } else {
+//             return res.status(400).json({ error: response.data.message });
+//         }
+//     } catch (error) {
+//         console.error("Charge error:", error.response?.data || error.message);
+
+//         if (error.response) {
+//             return res.status(error.response.status).json({ error: error.response.data.message });
+//         } else if (error.request) {
+//             return res.status(500).json({ error: "No response received from Paystack" });
+//         } else {
+//             return res.status(500).json({ error: "An unexpected error occurred" });
+//         }
+//     }
+// };
 
 
 const recordPayment = async (req, res) => {
@@ -350,7 +526,7 @@ const recordPayment = async (req, res) => {
       console.log("Student Payment Record:", studentPayment);
   
       // Find the student by registration number
-      const registrationNumber = studentPayment.regNo.trim(); // Remove extra spaces
+      const registrationNumber = studentPayment.regNo.trim(); 
       const student = await Student.findOne({
         registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" },
       });
@@ -393,7 +569,7 @@ const recordPayment = async (req, res) => {
         reference,
         status,
         gatewayResponse,
-        student: studentPayment._id, // Link to StudentPayment
+        student: studentPayment._id, 
       });
   
       const savedTransaction = await transaction.save();
@@ -426,7 +602,7 @@ const recordPayment = async (req, res) => {
 
 
 const retrieveStudentDetails = async (req, res) => {
-    const { email } = req.params; // Assume email is passed as a URL parameter
+    const { email } = req.params; 
 
     try {
         // Find the student and populate their transactions
@@ -521,8 +697,8 @@ const schoolPaymentStatus = async (req, res) => {
         const facultyEntries = Object.values(facultyWiseData);
         const totalFaculties = facultyEntries.length;
 
-        const startIndex = (page - 1) * limit; // Start index for pagination
-        const endIndex = startIndex + parseInt(limit, 10); // End index for pagination
+        const startIndex = (page - 1) * limit; 
+        const endIndex = startIndex + parseInt(limit, 10); 
 
         // Slice the faculty entries based on pagination indices
         const paginatedFaculties = facultyEntries.slice(
@@ -868,44 +1044,8 @@ const searchStudentByRegistrationNumber = async (req, res) => {
 
 
 
-// const chargeCard = async (req, res) => {
-//     const { email, amount, cardToken } = req.body; // Amount in kobo
-//     const PAYSTACK_SECRET_KEY = "sk_test_482f142b212c1e237586f1d705b56dfb2a9a0402";
-
-//     try {
-//         const response = await axios.post(
-//             "https://api.paystack.co/transaction/charge_authorization",
-//             {
-//                 authorization_code: cardToken,
-//                 email,
-//                 amount, // Amount in kobo (e.g., 5000 = ₦50)
-//             },
-//             {
-//                 headers: {
-//                     Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-//                     "Content-Type": "application/json",
-//                 },
-//             }
-//         );
-
-//         if (response.data.status) {
-//             return res.status(200).json({ success: true, data: response.data.data });
-//         } else {
-//             return res.status(400).json({ error: response.data.message });
-//         }
-//     } catch (error) {
-//         console.error("Charge error:", error.response?.data || error.message);
-
-//         if (error.response) {
-//             return res.status(error.response.status).json({ error: error.response.data.message });
-//         } else if (error.request) {
-//             return res.status(500).json({ error: "No response received from Paystack" });
-//         } else {
-//             return res.status(500).json({ error: "An unexpected error occurred" });
-//         }
-//     }
-// };
 
 
 
-module.exports = {studentPaymentDetails, addCard,getStudentAndCardDetails, chargeCard,recordPayment, retrieveStudentDetails, schoolPaymentStatus, searchStudentByRegistrationNumber}
+
+module.exports = {studentPaymentDetails, getStudentPaymentDetails,webhook, recordPayment, retrieveStudentDetails, schoolPaymentStatus, searchStudentByRegistrationNumber}

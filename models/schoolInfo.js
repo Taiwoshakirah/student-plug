@@ -23,7 +23,12 @@ const schoolInfoSchema = new mongoose.Schema({
     required: true,
   },
   faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], 
-  students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }]
+  students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
+  virtualAccount: {
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+  },
 });
 
 module.exports = mongoose.model("SchoolInfo", schoolInfoSchema);

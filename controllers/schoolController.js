@@ -17,6 +17,12 @@ const mammoth = require("mammoth");
 const bcrypt = require('bcrypt')
 const mongoose = require('mongoose')
 const sendMail = require('../utils/sendMail')
+require('dotenv').config()
+const { v4: uuidv4 } = require("uuid");
+const requestId = uuidv4(); // Generates a unique ID
+const axios = require('axios')
+
+
 
 
 const schoolSugSignup = async (req, res, next) => {
@@ -63,6 +69,238 @@ const schoolSugSignup = async (req, res, next) => {
     }
 };
 
+// process of generating virtual account starts here because of the helper functions
+// const generateRequestId = () => {
+//     return uuidv4().replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+// };
+
+// const sha512 = (input) => {
+//     const hash = crypto.createHash("sha512").update(Buffer.from(input, "utf8")).digest("hex");
+//     return hash;
+// };
+
+// const getXTokenHeader = (utcDate, clientID, password) => {
+//     // Format date as yyyyMMddHHmmss (without any separators)
+//     const date = utcDate.toISOString().replace(/[-T:Z.]/g, "").slice(0, 14); 
+//     const data = date + clientID + password;
+//     console.log("Formatted Date for Hashing:", date);
+//     console.log("Data Before Hashing:", data);
+//     return sha512(data);
+// };
+
+
+
+// // xToken = 'cc7624c43117d27de9e274bacc49b053ea387b58f98add29051b26efcbc996275fd860117026365fbfb9766dca6f62a930eb8d3ef76f32b0abb1defe5ecc496e';
+// // utctimestamp = '2025-01-28T23:55:42.792'
+
+// const generateFCMBVirtualAccount = async () => {
+//     const requestId = generateRequestId();
+//     const utcDate = new Date();
+//     const clientID = "250";
+//     const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+    
+//     //Format for header needs to be yyyy-MM-ddTHH:mm:ss.fff
+//     const utctimestamp = utcDate.toISOString().replace("Z", "").slice(0, 23); 
+
+//     const xToken = getXTokenHeader(utcDate, clientID, password);
+
+//     const payload = {
+//         requestId: requestId,
+//         collectionAccount: "1000058072",
+//         preferredName: "OSB TEST",
+//         clientId: clientID,
+//         external_Name_Validation_Required: false,
+//         productId: 34,
+//     };
+
+//     const config = {
+//         method: "post",
+//         url: "https://devapi.fcmb.com/ClientVirtualAcct/VirtualAccounts/v1/openVirtualAccount",
+//         headers: {
+//             "Content-Type": "application/json",
+//             "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+//             "client_id": clientID,
+//             "x-token": xToken,
+//             "utctimestamp": utctimestamp
+//         },
+//         data: payload,
+//     };
+
+//     console.log("Request Headers:", config.headers);
+//     console.log("Payload:", payload);
+
+//     try {
+//         const response = await axios(config);
+//         console.log("Virtual account created successfully:", response.data);
+//         return response.data.data;
+//     } catch (error) {
+//         console.error("Error creating virtual account:", error.response?.data || error.message);
+//         throw new Error("Failed to create virtual account.");
+//     }
+// };
+
+
+
+
+
+
+
+// const generateRequestId = () => {
+//     return uuidv4().replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+// };
+
+// const sha512 = (input) => {
+//     return crypto.createHash("sha512")
+//         .update('hashing')
+//         .digest("hex");
+// };
+
+// const formatDateForToken = (date) => {
+//     return date.toISOString().replace(/[-T:.Z]/g, "").slice(0, 14);
+// };
+
+// const formatDateForTimestamp = (date) => {
+//     return date.toISOString().slice(0, -1);
+// };
+
+// const getXTokenHeader = (utcDate, clientID, password) => {
+//     const formattedDate = formatDateForToken(utcDate);
+//     const hash = crypto.createHash("sha512");
+
+//     const digest = hash.update(clientID, "utf-8").update(formattedDate, "utf-8").update(password, "utf-8").digest();
+//     return digest.toString("hex").toUpperCase();
+// };
+
+// const generateFCMBVirtualAccount = async () => {
+//     try {
+//         const requestId = generateRequestId();
+//         const utcDate = new Date();
+//         const clientID = "250";
+//         const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+
+//         const utctimestamp = formatDateForTimestamp(utcDate);
+//         const xToken = getXTokenHeader(utcDate, clientID, password);
+
+//         const payload = {
+//             requestId,
+//             collectionAccount: "1000058072",
+//             preferredName: "OSB TEST",
+//             clientId: clientID,
+//             external_Name_Validation_Required: false,
+//             productId: 34,
+//         };
+
+//         const config = {
+//             method: "post",
+//             url: "https://devapi.fcmb.com/ClientVirtualAcct/VirtualAccounts/v1/openVirtualAccount",
+//             headers: {
+//                 "Content-Type": "application/json",
+//                 "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+//                 "client_id": clientID,
+//                 "x-token": xToken,
+//                 "utctimestamp": utctimestamp
+//             },
+//             data: payload,
+//         };
+
+//         const response = await axios(config);
+//         return response.data.data;
+//     } catch (error) {
+//         console.error("Full error response:", {
+//             status: error.response?.status,
+//             data: error.response?.data,
+//             headers: error.response?.headers,
+//             xToken: error.config?.headers['x-token']?.substring(0, 10) + '...',
+//             timestamp: error.config?.headers['utctimestamp']
+//         });
+//         throw new Error(`Failed to create virtual account: ${error.response?.data?.message || error.message}`);
+//     }
+// };
+
+
+
+    // Define a private function to generate x-token
+
+
+
+    const generateRequestId = () => {
+            return uuidv4().replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+        };
+
+    function generateXToken(utcdate, ClientID, Password) {
+    const date = utcdate.toISOString().slice(0, 10) + utcdate.toISOString().slice(11, 19).replace(/:/g, '');
+    const data = date + ClientID + Password;
+    return SHA512(data);
+  }
+  
+  // Define a private function to calculate SHA512 hash
+  function SHA512(input) {
+    const hash = crypto.createHash('sha512');
+    hash.update(input, 'utf8');
+    return hash.digest('hex');
+  }
+  
+  const GetToken = () => {
+    const utcdate = new Date();
+    const ClientID = process.env.CLIENT_ID;
+    const Password = process.env.PASSWORD;
+    const xtoken = generateXToken(utcdate, ClientID, Password);
+    const UTCTimestamp = utcdate.toISOString().replace("Z","");
+    return { xtoken, UTCTimestamp };
+  };
+
+  const generateFCMBVirtualAccount = async () => {
+        const requestId = generateRequestId();
+        const utcDate = new Date();
+        const clientID = "250";
+        const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+        
+        //Format for header needs to be yyyy-MM-ddTHH:mm:ss.fff
+        const utctimestamp = utcDate.toISOString().replace("Z", "").slice(0, 23); 
+    
+        const xToken = generateXToken(utcDate, clientID, password);
+    
+        const payload = {
+            requestId: requestId,
+            collectionAccount: "1000058072",
+            preferredName: "SchoolPlug",
+            clientId: clientID,
+            external_Name_Validation_Required: false,
+            productId: 34,
+        };
+    
+        const config = {
+            method: "post",
+            url: "https://devapi.fcmb.com/ClientVirtualAcct/VirtualAccounts/v1/openVirtualAccount",
+            headers: {
+                "Content-Type": "application/json",
+                "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+                "client_id": clientID,
+                "x-token": xToken,
+                "utctimestamp": utctimestamp
+            },
+            data: payload,
+        };
+    
+        console.log("Request Headers:", config.headers);
+        console.log("Payload:", payload);
+    
+        try {
+            const response = await axios(config);
+            console.log("Virtual account created successfully:", response.data);
+            return {
+                accountNumber: response.data.data,
+                accountName: payload.preferredName,  // Added this to return account name
+                bankName: "FCMB",
+            };
+        } catch (error) {
+            // console.error("Error creating virtual account:", error.response?.data || error.message);
+            console.error("FCMB API Error:", error.response?.data || error.message);
+
+            throw new Error("Failed to create virtual account.");
+        }
+    };
+
 
 const schoolInformation = async (req, res, next) => {
     const { university, state, aboutUniversity, userId } = req.body;
@@ -90,15 +328,48 @@ const schoolInformation = async (req, res, next) => {
 
         const imageUrl = uploadResult.secure_url; 
 
-        const schoolData = await SchoolInfo.create({
-            userId,
-            university,
-            state,
-            aboutUniversity,
-            uniProfilePicture: imageUrl, 
-            faculties: [],
-            students: [] 
-        });
+        
+
+        // Generate FCMB Virtual Account
+        // const virtualAccountNumber = await generateFCMBVirtualAccount({
+        //     name: university,
+        //     email: req.body.email,
+        //     phoneNumber: req.body.phoneNumber,
+        //   });
+
+      // Define bank name 
+    // const bankName = "FCMB";
+
+    const { accountNumber, accountName, bankName } = await generateFCMBVirtualAccount({
+        name: university,
+        email: req.body.email,
+        phoneNumber: req.body.phoneNumber,
+    });
+    
+
+    const schoolData = await SchoolInfo.create({
+        userId,
+        university,
+        state,
+        aboutUniversity,
+        uniProfilePicture: imageUrl, 
+        faculties: [],
+        students: [],
+        virtualAccount: {
+            accountNumber,
+            accountName,
+            bankName,
+        },
+    });
+
+      // Update school information with virtual account details
+      schoolData.virtualAccount = {
+        accountNumber, 
+       accountName,
+       bankName,  
+    };
+    
+    await schoolData.save();
 
         await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
 
@@ -732,6 +1003,69 @@ const schoolresetPassword = async (req, res, next) => {
         res.status(500).json({ message: "Error fetching schools", error });
     }
 };
+
+// const generateRequestId = () => {
+//     return uuidv4().replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+// };
+
+// const sha512 = (input) => {
+//     const hash = crypto.createHash("sha512");
+//     hash.update(input, "utf8");
+//     return hash.digest("hex");
+// };
+
+// const getXTokenHeader = (utcDate, clientID, password) => {
+//     const date = utcDate.toISOString().replace("Z", ""); 
+//     // const data = date + clientID + password;
+//     const data = `${date}${clientID}${password}`;
+//     return sha512(data);
+// };
+
+// const generateFCMBVirtualAccount = async () => {
+//     const requestId = generateRequestId();
+//     const utcDate = new Date();
+//     const clientID = "250";
+//     const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+//     const utctimestamp = utcDate.toISOString().replace("Z", ""); 
+//     const xToken = getXTokenHeader(utcDate, clientID, password);
+
+//     console.log("Generated x-token:", xToken);
+
+//     const payload = {
+//         requestId: requestId,
+//         collectionAccount: "1000058072",
+//         preferredName: "OSB TEST",
+//         clientId: clientID,
+//         external_Name_Validation_Required: false,
+//         productId: 34,
+//     };
+
+//     const config = {
+//         method: "post",
+//         url: "https://devapi.fcmb.com/ClientVirtualAcct/VirtualAccounts/v1/openVirtualAccount",
+//         headers: {
+//             "Content-Type": "application/json",
+//             "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+//             "client_id": clientID,
+//             "x-token": xToken,
+//             "utctimestamp": utctimestamp, // Use corrected UTCTimestamp format
+//         },
+//         data: payload,
+//     };
+
+//     console.log("Request Headers:", config.headers);
+//     console.log("Payload:", payload);
+
+//     try {
+//         const response = await axios(config);
+//         console.log("Virtual account created successfully:", response.data);
+//         return response.data.data; // Return response data
+//     } catch (error) {
+//         console.error("Error creating virtual account:", error.response?.data || error.message);
+//         throw new Error("Failed to create virtual account.");
+//     }
+// };
+
 
 
 

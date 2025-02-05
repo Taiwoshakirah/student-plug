@@ -361,7 +361,7 @@ const webhook = async (req, res) => {
   try {
     console.log("Received FCMB webhook:", req.body);
     console.log("Received Headers:", req.headers);  
-    
+
     // Extract headers (use lowercase names)
     const clientId = req.headers["client_id"];
     const subscriptionKey = req.headers["ocp-apim-subscription-key"];
@@ -374,7 +374,7 @@ const webhook = async (req, res) => {
 
     console.log("Received Encrypted Payload:", req.body.encryptedString);
     // **Acknowledge webhook**
-    res.status(200).json({ success: true, message: "Webhook processed successfully" });
+    res.status(200).json({ "code": "00","description": "Notification received Successfully ","data": {} });
   } catch (error) {
     console.error("FCMB Webhook Error:", error);
     res.status(500).json({ success: false, message: "Server error" });

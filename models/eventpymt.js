@@ -38,6 +38,14 @@ const eventPaymentSchema = new mongoose.Schema({
   }],
   studentInfoId: { type: mongoose.Schema.Types.ObjectId, ref: "StudentInfo" },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Add userId here
+  feeType: { type: String, required: true },
+  feeAmount:Number,
+    schoolInfoId:{type: mongoose.Schema.Types.ObjectId, ref: "SchoolInfo", required: true},
+  virtualAccount: {
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+  },
 });
 
 module.exports = mongoose.model("EventPayment", eventPaymentSchema);

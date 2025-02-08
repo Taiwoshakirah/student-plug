@@ -13,6 +13,10 @@ const EventCardDetails = require('../models/eventCardDetails')
 const StudentInfo = require('../models/studentInfo')
 const EventTransaction = require('../models/eventTransaction')
 const sendMail = require('../utils/sendMail')
+const { v4: uuidv4 } = require("uuid");
+const requestId = uuidv4(); // Generates a unique ID
+const crypto = require("crypto");
+
 
 
 
@@ -292,6 +296,84 @@ const getEventsByAdmin = async (req, res) => {
 };
 
 
+const generateRequestId = () => {
+  return uuidv4().replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
+};
+
+function generateXToken(utcdate, ClientID, Password) {
+const date = utcdate.toISOString().slice(0, 10) + utcdate.toISOString().slice(11, 19).replace(/:/g, '');
+const data = date + ClientID + Password;
+return SHA512(data);
+}
+
+// Define a private function to calculate SHA512 hash
+function SHA512(input) {
+const hash = crypto.createHash('sha512');
+hash.update(input, 'utf8');
+return hash.digest('hex');
+}
+
+const GetToken = () => {
+const utcdate = new Date();
+const ClientID = process.env.CLIENT_ID;
+const Password = process.env.PASSWORD;
+const xtoken = generateXToken(utcdate, ClientID, Password);
+const UTCTimestamp = utcdate.toISOString().replace("Z","");
+return { xtoken, UTCTimestamp };
+};
+
+const generateFCMBVirtualAccount = async () => {
+const requestId = generateRequestId();
+const utcDate = new Date();
+const clientID = "250";
+const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+
+//Format for header needs to be yyyy-MM-ddTHH:mm:ss.fff
+const utctimestamp = utcDate.toISOString().replace("Z", "").slice(0, 23); 
+
+const xToken = generateXToken(utcDate, clientID, password);
+
+const payload = {
+  requestId: requestId,
+  collectionAccount: "1000058072",
+  preferredName: "SchoolPlugEvent",
+  clientId: clientID,
+  external_Name_Validation_Required: false,
+  productId: 34,
+};
+
+const config = {
+  method: "post",
+  url: "https://devapi.fcmb.com/ClientVirtualAcct/VirtualAccounts/v1/openVirtualAccount",
+  headers: {
+      "Content-Type": "application/json",
+      "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+      "client_id": clientID,
+      "x-token": xToken,
+      "utctimestamp": utctimestamp
+  },
+  data: payload,
+};
+
+console.log("Request Headers:", config.headers);
+console.log("Payload:", payload);
+
+try {
+  const response = await axios(config);
+  console.log("Virtual account created successfully:", response.data);
+  return {
+      accountNumber: response.data.data,
+      accountName: payload.preferredName,  // Added this to return account name
+      bankName: "FCMB",
+  };
+} catch (error) {
+  // console.error("Error creating virtual account:", error.response?.data || error.message);
+  console.error("FCMB API Error:", error.response?.data || error.message);
+
+  throw new Error("Failed to create virtual account.");
+}
+};
+
 
 
 const isValidRegNumber = (regNum) => {
@@ -301,70 +383,62 @@ const isValidRegNumber = (regNum) => {
 };
 
 const saveStudentDetails = async (req, res) => {
-  const { userId, firstName, lastName, department, regNo, academicLevel, email, eventId } = req.body;
+  const { userId, firstName, lastName, department, regNo, academicLevel, email, eventId, feeType, feeAmount, schoolInfoId } = req.body;
 
-  // Validate required fields
-  if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !eventId) {
+  if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !eventId || !feeType || !feeAmount || !schoolInfoId) {
     return res.status(422).json({ success: false, message: "All fields are required." });
   }
 
-  // Validate regNo format
   if (!isValidRegNumber(regNo)) {
     return res.status(400).json({ success: false, message: "Invalid registration number format." });
   }
 
   try {
-    // Verify if the registration number exists in the Student collection
     const student = await Student.findOne({ registrationNumber: regNo });
 
     if (!student) {
       return res.status(404).json({ success: false, message: "Invalid registration number." });
     }
 
-    // const newPayment = new EventPayment({
-    //   studentId: student._id, 
-    //   registrationNumber: regNo,
-    //   paymentStatus: "pending",
-    //   eventId,
-    //   studentInfoId: student._id,
-    //   amountPaid: 0, // Default value
-    //   firstName,
-    //   lastName,
-    //   department,
-    //   academicLevel,
-    //   email,
-    //   userId // Including userId here to store in the EventPayment collection
-    // });
+    const { accountNumber, accountName, bankName } = await generateFCMBVirtualAccount({
+      email: req.body.email,
+      phoneNumber: req.body.phoneNumber,
+    });
 
+    // 🔹 **Added `schoolInfoId` to `findOneAndUpdate`**
     const newPayment = await EventPayment.findOneAndUpdate(
-      { registrationNumber: regNo, eventId }, // Find by regNo and eventId
+      { registrationNumber: regNo, eventId }, 
       {
         studentId: student._id,
         registrationNumber: regNo,
         paymentStatus: "pending",
         eventId,
         studentInfoId: student._id,
-        amountPaid: 0, // Default value
+        schoolInfoId,  // ✅ Include `schoolInfoId`
+        amountPaid: 0, 
         firstName,
         lastName,
         department,
         academicLevel,
         email,
-        userId, // Including userId here to store in the EventPayment collection
+        userId,
+        feeType,
+        feeAmount,
+        virtualAccount: {
+          accountNumber,
+          accountName,
+          bankName,
+        },
       },
-      { new: true, upsert: true } // Return the updated document and create if not found
+      { new: true, upsert: true }
     );
-    
 
-    const savedPayment = await newPayment.save();
-
-    // Return both studentId and userId in the response
     return res.status(201).json({
       success: true,
       message: "Student details saved successfully.",
-      eventPayment: savedPayment,
-      studentId: student._id, // Include studentId
-      userId, // Include userId
+      eventPayment: newPayment,
+      studentId: student._id,
+      userId,
     });
   } catch (error) {
     console.error("Error saving student details:", error.message);
@@ -374,6 +448,82 @@ const saveStudentDetails = async (req, res) => {
     });
   }
 };
+
+
+
+const fetchPaymentDetail = async (req, res) => {
+  const { email } = req.query;
+
+  try {
+    const studentDetails = await EventPayment.findOne({ email });
+    console.log('Found student payment:', studentDetails ? {
+      email: studentDetails.email,
+      schoolInfoId: studentDetails.schoolInfoId
+    } : 'not found');
+
+    if (!studentDetails) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Log the schoolInfoId we're trying to find
+    console.log('Looking for schoolInfoId:', studentDetails.schoolInfoId);
+
+    // Ensure schoolInfoId is valid before querying
+    if (!studentDetails.schoolInfoId) {
+      return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
+    }
+
+    const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
+    console.log('Found schoolInfo:', schoolInfo ? {
+      _id: schoolInfo._id,
+      university: schoolInfo.university
+    } : 'not found');
+
+    if (!schoolInfo) {
+      return res.status(404).json({ 
+        error: "School information not found",
+        searchedId: studentDetails.schoolInfoId
+      });
+    }
+
+    const { accountNumber, accountName, bankName } = studentDetails.virtualAccount;
+
+    const serviceCharge = 100;
+    const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
+
+    res.status(200).json({
+      success: true,
+      student: {
+        firstName: studentDetails.firstName,
+        lastName: studentDetails.lastName,
+        department: studentDetails.department,
+        regNo: studentDetails.regNo,
+        academicLevel: studentDetails.academicLevel,
+        email: studentDetails.email,
+        feeType: studentDetails.feeType,
+        virtualAccount: {
+          accountNumber,
+          accountName,
+          bankName,
+        },
+        paymentDetails: {
+          paymentMethod: "Bank Transfer",
+          paymentAmount: totalFee,
+          originalAmount: studentDetails.feeAmount,
+          serviceCharge,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching student payment details:", error);
+    res.status(500).json({ 
+      error: "An error occurred while fetching details",
+      details: error.message
+    });
+  }
+};
+
+
 
 
 const saveCardDetails = async (req, res) => {
@@ -505,13 +655,13 @@ const fetchConfirmationDetails = async (req, res) => {
 
     // Prepare the confirmation details
     const confirmationDetails = {
-      firstName: eventPayment.firstName,                     // Return firstName separately
-      lastName: eventPayment.lastName,                       // Return lastName separately
-      regNo: eventPayment.registrationNumber,                // Use regNo from EventPayment
-      department: eventPayment.department,                   // Use department from EventPayment
-      academicLevel: eventPayment.academicLevel,             // Use academicLevel from EventPayment
-      cardMasked: `${cardDetails.firstThree}******${cardDetails.lastThree}`, // Masked card details
-      bankName: cardDetails.bankName,                        // Fetch bank name from EventCardDetails
+      firstName: eventPayment.firstName,                     
+      lastName: eventPayment.lastName,                       
+      regNo: eventPayment.registrationNumber,                
+      department: eventPayment.department,                   
+      academicLevel: eventPayment.academicLevel,             
+      cardMasked: `${cardDetails.firstThree}******${cardDetails.lastThree}`, 
+      bankName: cardDetails.bankName,                        
     };
 
     return res.status(200).json({
@@ -833,4 +983,4 @@ const verifyPayment = async (req, res) => {
 
   
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,fetchPaymentDetail,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };

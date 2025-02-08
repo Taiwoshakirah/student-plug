@@ -11,78 +11,11 @@ const StudentInfo = require('../models/studentInfo')
 const Faculty = require('../models/faculties')
 const mongoose = require('mongoose')
 const User = require('../models/signUp')
+const WebHookNotification = require('../models/webhook')
+const crypto = require('crypto')
 
 
-
-
-// const isValidRegNumber = (regNum) => {
-//     // validating regNo in the format 'ND/xxx/xxx'
-//     const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
-//     return regNum && regNumberPattern.test(regNum);
-//   };
-  
-//   const studentPaymentDetails = async (req, res) => {
-//     const { userId, firstName, lastName, department, regNo, academicLevel, email, feeType, schoolInfoId } = req.body;
-  
-//     if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !feeType || !schoolInfoId) {
-//       return res.status(422).json({ success: false, message: "All fields are required, including schoolInfoId." });
-//     }
-  
-//     if (!isValidRegNumber(regNo)) {
-//       return res.status(400).json({ success: false, message: "Invalid registration number format." });
-//     }
-  
-//     try {
-//       const user = await User.findById(userId);
-//       if (!user) {
-//         return res.status(404).json({ success: false, message: "User not found" });
-//       }
-  
-//       const student = await Student.findOne({ registrationNumber: regNo });
-//       if (!student) {
-//         return res.status(404).json({ success: false, message: "Student with the given registration number not found." });
-//       }
-  
-//       // Fetch SchoolInfo to get the virtualAccount
-//     const schoolInfo = await SchoolInfo.findById(schoolInfoId);
-//     if (!schoolInfo) {
-//       return res.status(404).json({ success: false, message: "School information not found." });
-//     }
-      
-//     const newStudentPayment = await StudentPayment.findOneAndUpdate(
-//     { $or: [{ regNo }, { email }] },
-//     {
-//       userId,
-//       firstName,
-//       lastName,
-//       department,
-//       regNo,
-//       academicLevel,
-//       email,
-//       feeType,
-//       schoolInfoId,
-//       virtualAccount: schoolInfo.virtualAccount,
-//     },
-//     // Update if exists, create if not
-//     { new: true, upsert: true } 
-//   );
-//   console.log(newStudentPayment);
-  
-//       const savedPayment = await newStudentPayment.save();
-  
-//   res.status(201).json({
-//     success: true,
-//     message: "Payment details saved or updated successfully!",
-//     payment: savedPayment,
-//     virtualAccount: schoolInfo.virtualAccount,
-//   });
-  
-//     } catch (error) {
-//       console.error("Error in studentPaymentDetails:", error);
-//       res.status(500).json({ success: false, message: "An error occurred while saving payment details", error });
-//     }
-//   };
-  
+ 
 
 const isValidRegNumber = (regNum) => {
   const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
@@ -239,145 +172,113 @@ const getStudentPaymentDetails = async (req, res) => {
 
 
 
-// const decryptFCMBPayload = async (encryptedData) => {
-//   try {
-//     const url = "https://devapi.fcmb.com/encrypt/api/Salt/DecryptByClientId";
-//     const payload = { encryptedData };
-//     const headers = {
-//       "client_id": 250,
-//       "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
-//       "x-token": "06ea151602e3db8fd01aae346837ab22e6288e2ee7a6214003c62438092abe34a8f8d817c7999095d1b8aef6314f48a17cd2ea4753d741a7fbf6fbac1a39df73",
-//       "utctimestamp": "2025-02-03T13:48:39.689",
-//     };
-
-//     const response = await axios.post(url, payload, { headers });
-
-//     if (response.data && response.data.decryptedData) {
-//       return JSON.parse(response.data.decryptedData);
-//     } else {
-//       console.error("Decryption failed:", response.data.description);  // Log more details
-//       throw new Error("Decryption failed: No decrypted data in response");
-//     }
-//   } catch (error) {
-//     console.error("Decryption error:", error.message, error.response?.data);  // Log the error details
-//     throw new Error("Error decrypting the payload");
-//   }
-// };
 
 
 
+// Function to decrypt data (modify based on FCMB encryption)
+function decryptData(encryptedData) {
+  if (!encryptedData) {
+    throw new Error("Missing encrypted data for decryption");
+}
 
-// const webhook = async (req, res) => {
-//   try {
-//     console.log("Received FCMB webhook:", req.body);
-//     console.log("Received Headers:", req.headers);  // Log headers to see if all are present
+const buffer = Buffer.from(encryptedData, "base64");
+  try {
+    const algorithm = "aes-256-cbc"; // Example, replace with actual
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex"); // Load from env
+    const iv = Buffer.from(process.env.ENCRYPTION_IV, "hex"); // Load from env
 
-//     // Extract headers (use lowercase names)
-//     const clientId = req.headers["client_id"];
-//     const subscriptionKey = req.headers["ocp-apim-subscription-key"];
-//     const xToken = req.headers["x-token"];
-//     const utcTimestamp = req.headers["utctimestamp"];
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encryptedText, "base64", "utf8");
+    decrypted += decipher.final("utf8");
 
-//     if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
-//       return res.status(401).json({ message: "Missing required headers" });
-//     }
+    return JSON.parse(decrypted); // Assuming it's JSON
+  } catch (error) {
+    console.error("Decryption Error:", error);
+    return null;
+  }
+}
 
-//     // **Assuming the payload is encrypted**, decrypt it
-//     let decryptedPayload;
-//     try {
-//       if (!req.body.encryptedString) {
-//         return res.status(400).json({ message: "Missing encrypted data" });
-//       }
-//       decryptedPayload = decryptFCMBPayload(req.body.encryptedString); // Implement this function
-//     } catch (error) {
-//       console.error("Decryption error:", error);
-//       return res.status(400).json({ message: "Invalid encrypted payload" });
-//     }
 
-//     console.log("Decrypted Payload:", decryptedPayload);
-
-//     const { transactionId, accountNumber, amount, status, timestamp } = decryptedPayload;
-
-//     if (!transactionId || !accountNumber || !amount || !status) {
-//       return res.status(400).json({ message: "Invalid webhook payload" });
-//     }
-
-//     // **Update payment status in the database**
-//     const updatedPayment = await updatePaymentStatus(accountNumber, {
-//       transactionId,
-//       amount,
-//       status,
-//       timestamp,
-//     });
-
-//     console.log("Payment updated successfully:", updatedPayment);
-
-//     // **Acknowledge webhook**
-//     res.status(200).json({ success: true, message: "Webhook processed successfully" });
-//   } catch (error) {
-//     console.error("FCMB Webhook Error:", error);
-//     res.status(500).json({ success: false, message: "Server error" });
-//   }
-// };
-
-// const webhook = async (req, res) => {
-//   try {
-//     console.log("Received FCMB webhook:", req.body);
-//     console.log("Received Headers:", req.headers);  
-
-//     // Extract headers (use lowercase names)
-//     const clientId = req.headers["client_id"];
-//     const subscriptionKey = req.headers["ocp-apim-subscription-key"];
-//     const xToken = req.headers["x-token"];
-//     const utcTimestamp = req.headers["utctimestamp"];
-
-//     if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
-//       return res.status(401).json({ message: "Missing required headers" });
-//     }
-
-//     // **Accept the encrypted string directly**
-//     if (!req.body.encryptedString) {
-//       return res.status(400).json({ message: "Missing encrypted data" });
-//     }
-
-//     // Log the encrypted string for now
-//     console.log("Received Encrypted Payload:", req.body.encryptedString);
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Webhook received successfully, encrypted data accepted",
-//       encryptedString: req.body.encryptedString 
-//     });
-
-//   } catch (error) {
-//     console.error("FCMB Webhook Error:", error);
-//     res.status(500).json({ success: false, message: "Server error" });
-//   }
-// };
+function generateXToken(utcdate, ClientID, Password) {
+    const date = utcdate.toISOString().slice(0, 10) + utcdate.toISOString().slice(11, 19).replace(/:/g, '');
+    const data = date + ClientID + Password;
+    return SHA512(data);
+  }
+  
+  // Define a private function to calculate SHA512 hash
+  function SHA512(input) {
+    const hash = crypto.createHash('sha512');
+    hash.update(input, 'utf8');
+    return hash.digest('hex');
+  }
+  
+  const GetToken = () => {
+    const utcdate = new Date();
+    const ClientID = process.env.CLIENT_ID;
+    const Password = process.env.PASSWORD;
+    const xtoken = generateXToken(utcdate, ClientID, Password);
+    const UTCTimestamp = utcdate.toISOString().replace("Z","");
+    return { xtoken, UTCTimestamp };
+  };
 
 
 
 const webhook = async (req, res) => {
   try {
-    console.log("Received FCMB webhook:", req.body);
-    console.log("Received Headers:", req.headers);  
+    console.log("Received FCMB webhook:", JSON.stringify(req.body, null, 2));
+    console.log("Received Headers:", req.headers);
 
-    // Extract headers (use lowercase names)
-    const clientId = req.headers["client_id"];
-    const subscriptionKey = req.headers["ocp-apim-subscription-key"];
-    const xToken = req.headers["x-token"];
-    const utcTimestamp = req.headers["utctimestamp"];
+    // const clientId = req.headers["client_id"];
+    // const subscriptionKey = req.headers["ocp-apim-subscription-key"];
+    // const xToken = req.headers["x-token"];
+    // const utcTimestamp = req.headers["utctimestamp"];
 
-    if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
-      return res.status(401).json({ message: "Missing required headers" });
+    // if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
+    //   return res.status(401).json({ message: "Missing required headers" });
+    // }
+
+    const utcDate = new Date();
+        const clientID = "250";
+        const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
+        
+        //Format for header needs to be yyyy-MM-ddTHH:mm:ss.fff
+        const utctimestamp = utcDate.toISOString().replace("Z", "").slice(0, 23); 
+    
+        const xToken = generateXToken(utcDate, clientID, password);
+    
+
+    const encryptedString = req.body?.encryptedString;
+    if (!encryptedString) {
+      return res.status(400).json({ message: "Missing encryptedString in request body" });
     }
 
-    console.log("Received Encrypted Payload:", req.body.encryptedString);
-    // **Acknowledge webhook**
-    res.status(200).json({ "code": "00","description": "Notification received Successfully ","data": {} });
+    console.log("Received Encrypted Payload:", encryptedString);
+
+    // const decryptedPayload = decryptData(encryptedString);
+    // if (!decryptedPayload) {
+    //   return res.status(400).json({ message: "Invalid encrypted data" });
+    // }
+
+    // console.log("Decrypted Payload:", decryptedPayload);
+
+    const newNotification = new WebHookNotification({
+      "clientId":clientID,
+      "xToken":xToken,
+      "utcTimestamp":utctimestamp,
+      "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
+      // payload: decryptedPayload,
+    });
+
+    await newNotification.save();
+
+    return res.status(200).json({
+      code: "00",
+      description: "Notification received successfully",
+      data: {},
+    });
   } catch (error) {
     console.error("FCMB Webhook Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -386,58 +287,8 @@ const webhook = async (req, res) => {
 
 
 
-// const getStudentPaymentDetails = async (req, res) => {
-//   const { email } = req.query;
 
-//   try {
-//       const studentDetails = await StudentPayment.findOne({ email });
-//       if (!studentDetails) {
-//           return res.status(404).json({ error: "Student not found" });
-//       }
 
-//       // Fetch the associated school information to get the virtual account details
-//       const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
-//       if (!schoolInfo || !schoolInfo.virtualAccount) {
-//           return res.status(404).json({ error: "School account details not found" });
-//       }
-
-//       // Extract virtual account details
-//       const { accountNumber, bankName } = schoolInfo.virtualAccount;
-
-//       // Set the account name as the university name
-//       const accountName = schoolInfo.university;
-
-//       // Calculate total fee including service charge
-//       const serviceCharge = 100; 
-//       const totalFee = studentDetails.feeType.amount + serviceCharge;
-
-//       res.status(200).json({
-//           success: true,
-//           student: {
-//               firstName: studentDetails.firstName,
-//               lastName: studentDetails.lastName,
-//               department: studentDetails.department,
-//               regNo: studentDetails.regNo,
-//               academicLevel: studentDetails.academicLevel,
-//               email: studentDetails.email,
-//               feeType: studentDetails.feeType,
-//               virtualAccount: {
-//                   accountNumber,
-//                   accountName,
-//                   bankName,
-//               },
-//               paymentDetails: {
-//                   paymentMethod: "Bank Transfer",
-//                   paymentAmount: totalFee,
-//                   serviceCharge,
-//               },
-//           },
-//       });
-//   } catch (error) {
-//       console.error("Error fetching student payment details:", error.message);
-//       res.status(500).json({ error: "An error occurred while fetching details" });
-//   }
-// };
 
 
 

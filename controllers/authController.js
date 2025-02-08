@@ -49,7 +49,7 @@ const signUp = async (req, res, next) => {
         googleId: uid,
         profilePicture: picture || null,
         agreedToTerms: agreedToTermsBool,
-        fcmToken,
+        
       });
 
       const token = jwt.sign({ userId: newUser._id, schoolId: newUser.schoolInfoId }, process.env.JWT_SECRET, { expiresIn: "3d" });
@@ -79,7 +79,7 @@ const signUp = async (req, res, next) => {
         phoneNumber,
         password,
         agreedToTerms: agreedToTermsBool,
-        // fcmToken,
+       
       });
       
       const redirectUrl = `/dashboard/school/${newUser.schoolInfoId}`;
@@ -354,10 +354,10 @@ const googleSignIn = async (req, res) => {
     }
 
      // Update the user's FCM token
-  if (fcmToken) {
-    user.fcmToken = fcmToken;
-    await user.save();
-  }
+  // if (fcmToken) {
+  //   user.fcmToken = fcmToken;
+  //   await user.save();
+  // }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
   const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;
@@ -441,7 +441,7 @@ const forgotPassword = async (req, res, next) => {
     const resetCode = Math.floor(1000 + Math.random() * 9000).toString();
 
     user.resetPasswordCode = crypto.createHash('sha256').update(resetCode).digest('hex');
-    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiration
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; 
     await user.save();
 
     if (email) {

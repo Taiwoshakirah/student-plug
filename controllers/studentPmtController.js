@@ -267,6 +267,7 @@ const webhook = async (req, res) => {
       "utcTimestamp":utctimestamp,
       "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
       // payload: decryptedPayload,
+      payload: encryptedString,
     });
 
     await newNotification.save();

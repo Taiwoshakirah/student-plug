@@ -452,32 +452,35 @@ const saveStudentDetails = async (req, res) => {
 
 
 const fetchPaymentDetail = async (req, res) => {
-  const { email } = req.query;
+  const { email, eventId } = req.query;
+
+  if (!email || !eventId) {
+    return res.status(400).json({ error: "Email and eventId are required" });
+  }
 
   try {
-    const studentDetails = await EventPayment.findOne({ email });
-    console.log('Found student payment:', studentDetails ? {
+    const studentDetails = await EventPayment.findOne({ email, eventId });
+
+    console.log("Found student payment:", studentDetails ? {
       email: studentDetails.email,
+      eventId: studentDetails.eventId,
       schoolInfoId: studentDetails.schoolInfoId
-    } : 'not found');
+    } : "not found");
 
     if (!studentDetails) {
-      return res.status(404).json({ error: "Student not found" });
+      return res.status(404).json({ error: "Student payment details not found for this event" });
     }
 
-    // Log the schoolInfoId we're trying to find
-    console.log('Looking for schoolInfoId:', studentDetails.schoolInfoId);
-
-    // Ensure schoolInfoId is valid before querying
     if (!studentDetails.schoolInfoId) {
       return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
     }
 
     const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
-    console.log('Found schoolInfo:', schoolInfo ? {
+
+    console.log("Found schoolInfo:", schoolInfo ? {
       _id: schoolInfo._id,
       university: schoolInfo.university
-    } : 'not found');
+    } : "not found");
 
     if (!schoolInfo) {
       return res.status(404).json({ 
@@ -522,6 +525,7 @@ const fetchPaymentDetail = async (req, res) => {
     });
   }
 };
+
 
 
 

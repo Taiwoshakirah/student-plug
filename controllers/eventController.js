@@ -497,7 +497,7 @@ const fetchPaymentDetail = async (req, res) => {
         firstName: studentDetails.firstName,
         lastName: studentDetails.lastName,
         department: studentDetails.department,
-        regNo: studentDetails.regNo,
+        regNo: studentDetails.registrationNumber,
         academicLevel: studentDetails.academicLevel,
         email: studentDetails.email,
         feeType: studentDetails.feeType,

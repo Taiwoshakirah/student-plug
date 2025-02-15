@@ -322,7 +322,7 @@ const processFacultyRegistrationNumbers = async (
       // Update the school's faculties array with unique faculties
       await SchoolInfo.findByIdAndUpdate(
         schoolInfoId,
-        { $addToSet: { faculties: { $each: addedFaculties } } }, // Use $addToSet to avoid duplicates
+        { $addToSet: { faculties: { $each: addedFaculties } } },
         { new: true } // Return the updated document
       );
   
@@ -529,7 +529,6 @@ schoolData.students = schoolData.students.filter((student) => student !== null);
         return res.status(500).send("Error processing file.");
     }
 };
-
 
 
 

@@ -16,7 +16,7 @@ const  {setupWebSocket}  = require('./utils/websocket');
 const corsOptions = {
   origin: [
     "http://localhost:5173", 
-    "https://school-plug.vercel.app", 
+    "https://schoolplug.ng", 
   ],
   methods: ["GET", "POST", "PUT", "DELETE","PATCH"], 
   allowedHeaders: ["Content-Type", "Authorization"], 
@@ -36,9 +36,7 @@ const server = http.createServer(app)
 setupWebSocket(server);
 
 console.log("HTTP Server:", server);
-// Attach WebSocket to the HTTP server
-// const {wss, sendNotification} = setupWebSocket(server)
-// const { wss, sendNotification } = setupWebSocket(server);
+
 
 
 const port = process.env.PORT || 5000;

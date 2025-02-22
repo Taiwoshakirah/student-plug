@@ -176,112 +176,121 @@ const getStudentPaymentDetails = async (req, res) => {
 
 
 // Function to decrypt data (modify based on FCMB encryption)
-function decryptData(encryptedData) {
-  if (!encryptedData) {
-    throw new Error("Missing encrypted data for decryption");
-}
 
-const buffer = Buffer.from(encryptedData, "base64");
-  try {
-    const algorithm = "aes-256-cbc"; // Example, replace with actual
-    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex"); // Load from env
-    const iv = Buffer.from(process.env.ENCRYPTION_IV, "hex"); // Load from env
+  // const crypto = require('crypto');
 
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    let decrypted = decipher.update(encryptedText, "base64", "utf8");
-    decrypted += decipher.final("utf8");
-
-    return JSON.parse(decrypted); // Assuming it's JSON
-  } catch (error) {
-    console.error("Decryption Error:", error);
-    return null;
-  }
-}
-
-
-function generateXToken(utcdate, ClientID, Password) {
-    const date = utcdate.toISOString().slice(0, 10) + utcdate.toISOString().slice(11, 19).replace(/:/g, '');
-    const data = date + ClientID + Password;
-    return SHA512(data);
-  }
+  // Verify webhook signature
+  const verifyWebhookSignature = (payload, receivedHash, secretKey) => {
+    try {
+      // Compute hash using HMACSHA256
+      const computedHash = crypto
+        .createHmac('sha256', secretKey)
+        .update(JSON.stringify(payload))
+        .digest('hex');
   
-  // Define a private function to calculate SHA512 hash
-  function SHA512(input) {
-    const hash = crypto.createHash('sha512');
-    hash.update(input, 'utf8');
-    return hash.digest('hex');
-  }
-  
-  const GetToken = () => {
-    const utcdate = new Date();
-    const ClientID = process.env.CLIENT_ID;
-    const Password = process.env.PASSWORD;
-    const xtoken = generateXToken(utcdate, ClientID, Password);
-    const UTCTimestamp = utcdate.toISOString().replace("Z","");
-    return { xtoken, UTCTimestamp };
-  };
-
-
-
-const webhook = async (req, res) => {
-  try {
-    console.log("Received FCMB webhook:", JSON.stringify(req.body, null, 2));
-    console.log("Received Headers:", req.headers);
-
-    // const clientId = req.headers["client_id"];
-    // const subscriptionKey = req.headers["ocp-apim-subscription-key"];
-    // const xToken = req.headers["x-token"];
-    // const utcTimestamp = req.headers["utctimestamp"];
-
-    // if (!clientId || !subscriptionKey || !xToken || !utcTimestamp) {
-    //   return res.status(401).json({ message: "Missing required headers" });
-    // }
-
-    const utcDate = new Date();
-        const clientID = "250";
-        const password = "Tt9=dEB$4FdruOjlg1j1^sNR";
-        
-        //Format for header needs to be yyyy-MM-ddTHH:mm:ss.fff
-        const utctimestamp = utcDate.toISOString().replace("Z", "").slice(0, 23); 
-    
-        const xToken = generateXToken(utcDate, clientID, password);
-    
-
-    const encryptedString = req.body?.encryptedString;
-    if (!encryptedString) {
-      return res.status(400).json({ message: "Missing encryptedString in request body" });
+      // Compare computed hash with received hash
+      return crypto.timingSafeEqual(
+        Buffer.from(computedHash),
+        Buffer.from(receivedHash)
+      );
+    } catch (error) {
+      console.error('Hash verification error:', error);
+      return false;
     }
-
-    console.log("Received Encrypted Payload:", encryptedString);
-
-    // const decryptedPayload = decryptData(encryptedString);
-    // if (!decryptedPayload) {
-    //   return res.status(400).json({ message: "Invalid encrypted data" });
-    // }
-
-    // console.log("Decrypted Payload:", decryptedPayload);
-
-    const newNotification = new WebHookNotification({
-      "clientId":clientID,
-      "xToken":xToken,
-      "utcTimestamp":utctimestamp,
-      "Ocp-Apim-Subscription-Key": process.env.FCMB_SUBSCRIPTION_KEY,
-      // payload: decryptedPayload,
-      payload: encryptedString,
-    });
-
-    await newNotification.save();
-
-    return res.status(200).json({
-      code: "00",
-      description: "Notification received successfully",
-      data: {},
-    });
-  } catch (error) {
-    console.error("FCMB Webhook Error:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+  };
+  
+  const webhook = async (req, res) => {
+    try {
+      // Log raw request details for debugging
+      console.log("Received FCMB webhook:", JSON.stringify(req.body, null, 2));
+      console.log("Received Headers:", req.headers);
+  
+      // Extract the hash from headers
+      const receivedHash = req.headers['x-checksum-hash'];
+      
+      if (!receivedHash) {
+        console.error('Missing X-checksum-hash header');
+        return res.status(401).json({
+          code: "01",
+          description: "Missing signature header",
+          data: {}
+        });
+      }
+  
+      // Verify webhook signature
+      const isValidSignature = verifyWebhookSignature(
+        req.body,
+        receivedHash,
+        process.env.FCMB_WEBHOOK_SECRET_KEY
+      );
+  
+      if (!isValidSignature) {
+        console.error('Invalid webhook signature');
+        return res.status(401).json({
+          code: "01",
+          description: "Invalid webhook signature",
+          data: {}
+        });
+      }
+  
+      const {
+        creationTime,
+        expirationTime,
+        amount,
+        accountNumber,
+        name,
+        type
+      } = req.body.data;
+  
+      // Validate required fields
+      if (!accountNumber || !name || !type || !creationTime) {
+        return res.status(400).json({
+          code: "01",
+          description: "Missing required fields",
+          data: {}
+        });
+      }
+  
+      // Create new notification record
+      const newNotification = await WebHookNotification.create({
+        webhookHash: receivedHash, 
+        
+        // Virtual account data
+        virtualAccount: {
+          creationTime,
+          expirationTime,
+          amount,
+          accountNumber,
+          name,
+          type
+        }
+      });
+  
+      // Log successful verification and storage
+      console.log("Verified and saved webhook notification:", newNotification._id);
+  
+      // Send success response
+      return res.status(200).json({
+        code: "00",
+        description: "Notification received and verified successfully",
+        data: {
+          notificationId: newNotification._id
+        }
+      });
+  
+    } catch (error) {
+      console.error("FCMB Webhook Error:", error);
+      
+      return res.status(500).json({
+        code: "99",
+        description: "Internal server error",
+        data: {}
+      });
+    }
+  };
+  
+  
+  
 
 
 

@@ -179,115 +179,283 @@ const getStudentPaymentDetails = async (req, res) => {
 
   // const crypto = require('crypto');
 
-  // Verify webhook signature
-  const verifyWebhookSignature = (payload, receivedHash, secretKey) => {
-    try {
-      // Compute hash using HMACSHA256
-      const computedHash = crypto
-        .createHmac('sha256', secretKey)
-        .update(JSON.stringify(payload))
-        .digest('hex');
+  //Verify webhook signature
+  // const verifyWebhookSignature = (payload, receivedHash, secretKey) => {
+  //   try {
+  //     // Compute hash using HMACSHA256
+  //     const computedHash = crypto
+  //       .createHmac('sha256', secretKey)
+  //       .update(JSON.stringify(payload))
+  //       .digest('hex');
   
-      // Compare computed hash with received hash
-      return crypto.timingSafeEqual(
-        Buffer.from(computedHash),
-        Buffer.from(receivedHash)
-      );
-    } catch (error) {
-      console.error('Hash verification error:', error);
-      return false;
-    }
-  };
+  //     // Compare computed hash with received hash
+  //     return crypto.timingSafeEqual(
+  //       Buffer.from(computedHash),
+  //       Buffer.from(receivedHash)
+  //     );
+  //   } catch (error) {
+  //     console.error('Hash verification error:', error);
+  //     return false;
+  //   }
+  // };
+//   const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
+//     if (!secretKey) {
+//         console.error("Missing FCMB_WEBHOOK_SECRET_KEY in environment variables!");
+//         return false;
+//     }
+
+//     // Deep cleaning to remove newlines and extra spaces, also sort the keys to ensure consistency
+//     const rawBodyString = JSON.stringify(rawBody)
+//   .replace(/\r\n|\n|\r/g, "")   
+//   .replace(/\s+/g, "");     
+// console.log("Cleaned Raw Body String:", rawBodyString);
+
+
+// const computedHash = crypto.createHmac("sha256", secretKey)
+//     .update(rawBody, "utf8")  
+//     .digest("hex");
+
+
+// console.log("Computed Hash:", computedHash);
+// console.log("Received Hash:", receivedHash);
+
+
+//     // Compare the computed hash and the received hash
+//     if (computedHash.toLowerCase() === receivedHash.toLowerCase()) {
+//         console.log("Valid webhook signature");
+//         return true;
+//     } else {
+//         console.log("Invalid webhook signature");
+//         return false;
+//     }
+// };
+
+// const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
+//     if (!secretKey) {
+//         console.error("Missing FCMB_WEBHOOK_SECRET_KEY in environment variables!");
+//         return false;
+//     }
+    
+//     // If rawBody is already a string, use it directly. If it's an object, stringify it
+//     const rawBodyString = typeof rawBody === 'string' 
+//         ? rawBody 
+//         : JSON.stringify(rawBody);
+
+//     // Clean the string
+//     const cleanedBody = rawBodyString
+//         .replace(/\r\n|\n|\r/g, "")
+//         .replace(/\s+/g, "");
+
+//     const computedHash = crypto.createHmac("sha256", secretKey)
+//         .update(cleanedBody, "utf8")
+//         .digest("hex");
+
+//     // Add debug logging
+//     console.log({
+//         cleanedBody,
+//         computedHash,
+//         receivedHash,
+//         match: computedHash.toLowerCase() === receivedHash.toLowerCase()
+//     });
+
+//     return computedHash.toLowerCase() === receivedHash.toLowerCase();
+// };
+
+const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
+  if (!secretKey) {
+    console.error("Missing FCMB_WEBHOOK_SECRET_KEY in environment variables!");
+    return false;
+  }
+  if (!rawBody || !receivedHash) {
+    console.error("Missing rawBody or receivedHash");
+    return false;
+  }
+
+  const payloadString = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody;
+  const compactPayload = JSON.stringify(JSON.parse(payloadString)); // Strip formatting
+
+  const computedHashFormatted = crypto
+    .createHmac('sha256', secretKey)
+    .update(payloadString, 'utf8')
+    .digest('hex');
+
+  const computedHashCompact = crypto
+    .createHmac('sha256', secretKey)
+    .update(compactPayload, 'utf8')
+    .digest('hex');
+
+  console.log({
+    payloadString,
+    compactPayload,
+    computedHashFormatted,
+    computedHashCompact,
+    receivedHash,
+    matchFormatted: computedHashFormatted === receivedHash,
+    matchCompact: computedHashCompact === receivedHash
+  });
+
+  return computedHashCompact === receivedHash; // Assume compact for now
+};
+
+// const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
+//   if (!secretKey) {
+//       console.error("Missing FCMB_WEBHOOK_SECRET_KEY in environment variables!");
+//       return false;
+//   }
+
+//   const computedHash = crypto.createHmac("sha256", secretKey)
+//       .update(rawBody, "utf8")
+//       .digest("hex");
+
+//   console.log("Computed Hash:", computedHash);
+//   console.log("Received Hash:", receivedHash);
+
+//   return computedHash.toLowerCase() === receivedHash.toLowerCase();
+// };
+
+
+
+
+
+
   
-  const webhook = async (req, res) => {
-    try {
-      // Log raw request details for debugging
-      console.log("Received FCMB webhook:", JSON.stringify(req.body, null, 2));
-      console.log("Received Headers:", req.headers);
-  
-      // Extract the hash from headers
-      const receivedHash = req.headers['x-checksum-hash'];
-      
-      if (!receivedHash) {
-        console.error('Missing X-checksum-hash header');
-        return res.status(401).json({
-          code: "01",
-          description: "Missing signature header",
-          data: {}
-        });
+// const webhook = async (req, res) => {
+//   try {
+//       // Extract the hash from headers
+//       const receivedHash = req.headers["x-checksum-hash"];
+//       console.log("Received X-checksum-hash:", receivedHash);
+
+//       if (!receivedHash) {
+//           console.error("Missing X-checksum-hash header");
+//           return res.status(401).json({
+//               code: "01",
+//               description: "Missing signature header",
+//               data: {},
+//           });
+//       }
+
+//       // Ensure you're using raw body for signature verification
+//       const rawBody = req.rawBody || req.body; // Ensure rawBody is available or fallback to body
+
+//       // Verify webhook signature
+//       const isValidSignature = verifyWebhookSignature(rawBody, receivedHash, process.env.FCMB_WEBHOOK_SECRET_KEY);
+
+//       if (!isValidSignature) {
+//           console.error("Invalid webhook signature");
+//           return res.status(401).json({
+//               code: "01",
+//               description: "Invalid webhook signature",
+//               data: {},
+//           });
+//       }
+
+//       const { creationTime, expirationTime, amount, accountNumber, name, type } = req.body.data;
+
+//       // Validate required fields
+//       if (!accountNumber || !name || !type || !creationTime) {
+//           return res.status(400).json({
+//               code: "01",
+//               description: "Missing required fields",
+//               data: {},
+//           });
+//       }
+
+//       // Create new notification record
+//       const newNotification = await WebHookNotification.create({
+//           webhookHash: receivedHash,
+//           // Virtual account data
+//           virtualAccount: {
+//               creationTime,
+//               expirationTime,
+//               amount,
+//               accountNumber,
+//               name,
+//               type,
+//           },
+//       });
+
+//       // Log successful verification and storage
+//       console.log("Verified and saved the webhook notification:", newNotification._id);
+
+//       // Send success response
+//       return res.status(200).json({
+//           code: "00",
+//           description: "Notification received and verified successfully",
+//           data: {
+//               notificationId: newNotification._id,
+//           },
+//       });
+//   } catch (error) {
+//       console.error("FCMB Webhook Error:", error);
+//       return res.status(500).json({
+//           code: "99",
+//           description: "Internal server error",
+//           data: {},
+//       });
+//   }
+// };
+
+
+
+const webhook = async (req, res) => {
+  console.log("Received Headers:", req.headers);
+console.log("Received Body:", req.body);
+console.log("Received Raw Body:", req.rawBody);
+
+  try {
+      const receivedHash = req.headers["x-checksum-hash"];
+      const rawPayload = req.rawBody;
+
+      if (!verifyWebhookSignature(rawPayload, receivedHash, process.env.FCMB_WEBHOOK_SECRET_KEY)) {
+          return res.status(401).json({
+              code: "01",
+              description: "Invalid webhook signature",
+              data: {},
+          });
       }
-  
-      // Verify webhook signature
-      const isValidSignature = verifyWebhookSignature(
-        req.body,
-        receivedHash,
-        process.env.FCMB_WEBHOOK_SECRET_KEY
-      );
-  
-      if (!isValidSignature) {
-        console.error('Invalid webhook signature');
-        return res.status(401).json({
-          code: "01",
-          description: "Invalid webhook signature",
-          data: {}
-        });
+
+      const event = req.body;
+
+      console.log("Received FCMB Webhook:", event);
+
+      // Prevent duplicate processing
+      if (processedEvents.has(event.reference)) {
+          return res.status(200).json({ message: "Duplicate event ignored" });
       }
-  
-      const {
-        creationTime,
-        expirationTime,
-        amount,
-        accountNumber,
-        name,
-        type
-      } = req.body.data;
-  
-      // Validate required fields
-      if (!accountNumber || !name || !type || !creationTime) {
-        return res.status(400).json({
-          code: "01",
-          description: "Missing required fields",
-          data: {}
-        });
-      }
-  
-      // Create new notification record
+
+      processedEvents.add(event.reference);
+
+      const { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference } = event;
+
+      // Store webhook data
       const newNotification = await WebHookNotification.create({
-        webhookHash: receivedHash, 
-        
-        // Virtual account data
-        virtualAccount: {
-          creationTime,
-          expirationTime,
-          amount,
-          accountNumber,
-          name,
-          type
-        }
+          webhookHash: receivedHash,
+          virtualAccount: {
+              senderAccountNumber,
+              senderBank,
+              amount,
+              accountNumber,
+              senderAccountName,
+              type,
+              time,
+              reference
+          },
       });
-  
-      // Log successful verification and storage
-      console.log("Verified and saved webhook notification:", newNotification._id);
-  
-      // Send success response
+
       return res.status(200).json({
-        code: "00",
-        description: "Notification received and verified successfully",
-        data: {
-          notificationId: newNotification._id
-        }
+          code: "00",
+          description: "Notification received and verified successfully",
+          data: {
+              notificationId: newNotification._id,
+          },
       });
-  
-    } catch (error) {
-      console.error("FCMB Webhook Error:", error);
-      
-      return res.status(500).json({
-        code: "99",
-        description: "Internal server error",
-        data: {}
-      });
-    }
-  };
+
+  } catch (error) {
+      console.error("Webhook processing error:", error);
+      return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
   
   
   

@@ -400,61 +400,108 @@ const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
 
 const webhook = async (req, res) => {
   console.log("Received Headers:", req.headers);
-console.log("Received Body:", req.body);
-console.log("Received Raw Body:", req.rawBody);
+  console.log("Received Body:", req.body);
+  console.log("Received Raw Body:", req.rawBody?.toString('utf8'));
 
   try {
-      const receivedHash = req.headers["x-checksum-hash"];
-      const rawPayload = req.rawBody;
+    const receivedHash = req.headers["x-checksum-hash"];
+    const rawPayload = req.rawBody;
 
-      if (!verifyWebhookSignature(rawPayload, receivedHash, process.env.FCMB_WEBHOOK_SECRET_KEY)) {
-          return res.status(401).json({
-              code: "01",
-              description: "Invalid webhook signature",
-              data: {},
-          });
-      }
-
-      const event = req.body;
-
-      console.log("Received FCMB Webhook:", event);
-
-      // Prevent duplicate processing
-      if (processedEvents.has(event.reference)) {
-          return res.status(200).json({ message: "Duplicate event ignored" });
-      }
-
-      processedEvents.add(event.reference);
-
-      const { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference } = event;
-
-      // Store webhook data
-      const newNotification = await WebHookNotification.create({
-        amount,
-        accountNumber,
-        type,
-        senderAccountNumber,
-        senderAccountName,
-        senderBank,
-        time,
-        reference,
-        webhookHash: receivedHash
+    if (!rawPayload || !receivedHash) {
+      return res.status(400).json({
+        code: "02",
+        description: "Missing payload or signature",
+        data: {},
       });
+    }
 
-      return res.status(200).json({
-          code: "00",
-          description: "Notification received and verified successfully",
-          data: {
-              notificationId: newNotification._id,
-          },
+    if (!verifyWebhookSignature(rawPayload, receivedHash, process.env.FCMB_WEBHOOK_SECRET_KEY)) {
+      return res.status(401).json({
+        code: "01",
+        description: "Invalid webhook signature",
+        data: {},
       });
+    }
+
+    const event = req.body;
+    if (!event || typeof event !== 'object') {
+      console.error("Invalid event payload:", event);
+      return res.status(400).json({
+        code: "03",
+        description: "Invalid or missing event payload",
+        data: {},
+      });
+    }
+
+    console.log("Received FCMB Webhook:", event);
+
+    if (!event.reference) {
+      console.error("Missing reference in event:", event);
+      return res.status(400).json({
+        code: "04",
+        description: "Event missing reference",
+        data: {},
+      });
+    }
+
+    if (processedEvents.has(event.reference)) {
+      return res.status(200).json({ message: "Duplicate event ignored" });
+    }
+
+    // Destructure with defaults to catch missing fields
+    const {
+      amount = undefined,
+      accountNumber = undefined,
+      type = undefined,
+      senderAccountNumber = undefined,
+      senderAccountName = undefined,
+      senderBank = undefined,
+      time = undefined,
+      reference = undefined
+    } = event;
+
+    // Check for missing fields
+    const requiredFields = { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference };
+    const missingFields = Object.entries(requiredFields)
+      .filter(([_, value]) => value === undefined)
+      .map(([key]) => key);
+
+    if (missingFields.length > 0) {
+      console.error("Missing required fields:", missingFields);
+      return res.status(400).json({
+        code: "05",
+        description: `Missing required fields: ${missingFields.join(', ')}`,
+        data: {},
+      });
+    }
+
+    const newNotification = await WebHookNotification.create({
+      amount,
+      accountNumber,
+      type,
+      senderAccountNumber,
+      senderAccountName,
+      senderBank,
+      time,
+      reference,
+      webhookHash: receivedHash
+    });
+
+    processedEvents.add(event.reference);
+
+    return res.status(200).json({
+      code: "00",
+      description: "Notification received and verified successfully",
+      data: {
+        notificationId: newNotification._id,
+      },
+    });
 
   } catch (error) {
-      console.error("Webhook processing error:", error);
-      return res.status(500).json({ error: "Internal server error" });
+    console.error("Webhook processing error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
-
   
   
   

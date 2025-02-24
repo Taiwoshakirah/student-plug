@@ -399,10 +399,6 @@ const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
 
 
 const webhook = async (req, res) => {
-  console.log("Received Headers:", req.headers);
-  console.log("Received Body:", req.body);
-  console.log("Received Raw Body:", req.rawBody?.toString('utf8'));
-
   try {
     const receivedHash = req.headers["x-checksum-hash"];
     const rawPayload = req.rawBody;
@@ -424,8 +420,7 @@ const webhook = async (req, res) => {
     }
 
     const event = req.body;
-    if (!event || typeof event !== 'object') {
-      console.error("Invalid event payload:", event);
+    if (!event || typeof event !== 'object' || !event.data) {
       return res.status(400).json({
         code: "03",
         description: "Invalid or missing event payload",
@@ -433,27 +428,23 @@ const webhook = async (req, res) => {
       });
     }
 
-    console.log("Received FCMB Webhook:", event);
-
-    // Check reference in event.data
-    if (!event.data || !event.data.reference) {
-      console.error("Missing reference in event.data:", event);
+    if (!event.id || !event.type) {
       return res.status(400).json({
         code: "04",
-        description: "Event missing reference in data",
+        description: "Event missing id or type",
         data: {},
       });
     }
 
-    if (processedEvents.has(event.data.reference)) {
+    const eventKey = `${event.type}:${event.id}`;
+    if (processedEvents.has(eventKey)) {
       return res.status(200).json({ message: "Duplicate event ignored" });
     }
 
-    // Destructure from event.data
     const {
       amount,
       accountNumber,
-      type,
+      type: dataType,
       senderAccountNumber,
       senderAccountName,
       senderBank,
@@ -461,17 +452,26 @@ const webhook = async (req, res) => {
       reference
     } = event.data;
 
-    // Validate required fields
-    const requiredFields = { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference };
+    const requiredFields = {
+      amount,
+      accountNumber,
+      type: dataType,
+      senderAccountNumber,
+      senderAccountName,
+      senderBank,
+      time,
+      reference,
+      eventId: event.id,
+      eventType: event.type
+    };
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined)
+      .filter(([_, value]) => value === undefined || value === null)
       .map(([key]) => key);
 
     if (missingFields.length > 0) {
-      console.error("Missing required fields in event.data:", missingFields);
       return res.status(400).json({
         code: "05",
-        description: `Missing required fields: ${missingFields.join(', ')}`,
+        description: `Missing or null required fields: ${missingFields.join(', ')}`,
         data: {},
       });
     }
@@ -479,16 +479,18 @@ const webhook = async (req, res) => {
     const newNotification = await WebHookNotification.create({
       amount,
       accountNumber,
-      type,
+      type: dataType,
       senderAccountNumber,
       senderAccountName,
       senderBank,
       time,
       reference,
-      webhookHash: receivedHash
+      webhookHash: receivedHash,
+      eventId: event.id,
+      eventType: event.type
     });
 
-    processedEvents.add(event.data.reference);
+    processedEvents.add(eventKey);
 
     return res.status(200).json({
       code: "00",
@@ -499,7 +501,6 @@ const webhook = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Webhook processing error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };

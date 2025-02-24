@@ -430,17 +430,15 @@ console.log("Received Raw Body:", req.rawBody);
 
       // Store webhook data
       const newNotification = await WebHookNotification.create({
-          webhookHash: receivedHash,
-          virtualAccount: {
-              senderAccountNumber,
-              senderBank,
-              amount,
-              accountNumber,
-              senderAccountName,
-              type,
-              time,
-              reference
-          },
+        amount,
+        accountNumber,
+        type,
+        senderAccountNumber,
+        senderAccountName,
+        senderBank,
+        time,
+        reference,
+        webhookHash: receivedHash
       });
 
       return res.status(200).json({

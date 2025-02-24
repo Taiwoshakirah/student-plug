@@ -435,39 +435,40 @@ const webhook = async (req, res) => {
 
     console.log("Received FCMB Webhook:", event);
 
-    if (!event.reference) {
-      console.error("Missing reference in event:", event);
+    // Check reference in event.data
+    if (!event.data || !event.data.reference) {
+      console.error("Missing reference in event.data:", event);
       return res.status(400).json({
         code: "04",
-        description: "Event missing reference",
+        description: "Event missing reference in data",
         data: {},
       });
     }
 
-    if (processedEvents.has(event.reference)) {
+    if (processedEvents.has(event.data.reference)) {
       return res.status(200).json({ message: "Duplicate event ignored" });
     }
 
-    // Destructure with defaults to catch missing fields
+    // Destructure from event.data
     const {
-      amount = undefined,
-      accountNumber = undefined,
-      type = undefined,
-      senderAccountNumber = undefined,
-      senderAccountName = undefined,
-      senderBank = undefined,
-      time = undefined,
-      reference = undefined
-    } = event;
+      amount,
+      accountNumber,
+      type,
+      senderAccountNumber,
+      senderAccountName,
+      senderBank,
+      time,
+      reference
+    } = event.data;
 
-    // Check for missing fields
+    // Validate required fields
     const requiredFields = { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference };
     const missingFields = Object.entries(requiredFields)
       .filter(([_, value]) => value === undefined)
       .map(([key]) => key);
 
     if (missingFields.length > 0) {
-      console.error("Missing required fields:", missingFields);
+      console.error("Missing required fields in event.data:", missingFields);
       return res.status(400).json({
         code: "05",
         description: `Missing required fields: ${missingFields.join(', ')}`,
@@ -487,7 +488,7 @@ const webhook = async (req, res) => {
       webhookHash: receivedHash
     });
 
-    processedEvents.add(event.reference);
+    processedEvents.add(event.data.reference);
 
     return res.status(200).json({
       code: "00",

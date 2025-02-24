@@ -421,17 +421,24 @@ console.log("Received Raw Body:", req.rawBody);
 
       // Prevent duplicate processing
       if (processedEvents.has(event.reference)) {
-          return res.status(200).json({ message: "Duplicate event ignored" });
+        return res.status(200).json({ message: "Duplicate event ignored" });
       }
-
-      processedEvents.add(event.reference);
-
-      const { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference } = event;
-
-      // Store webhook data
-      const newNotification = await WebHookNotification.create({
-          webhookHash: receivedHash,
-          virtualAccount: {
+  
+      res.status(200).json({
+        code: "00",
+        description: "Notification received and verified successfully",
+        data: {},
+      });
+  
+      setImmediate(async () => {
+        try {
+          processedEvents.add(event.reference);
+  
+          const { amount, accountNumber, type, senderAccountNumber, senderAccountName, senderBank, time, reference } = event;
+  
+          const newNotification = await WebHookNotification.create({
+            webhookHash: receivedHash,
+            virtualAccount: {
               senderAccountNumber,
               senderBank,
               amount,
@@ -439,22 +446,23 @@ console.log("Received Raw Body:", req.rawBody);
               senderAccountName,
               type,
               time,
-              reference
-          },
+              reference,
+            },
+          });
+          console.log(newNotification);
+          
+  
+          console.log("Notification stored:", newNotification._id);
+        } catch (error) {
+          console.error("Async processing error:", error);
+        }
       });
-
-      return res.status(200).json({
-          code: "00",
-          description: "Notification received and verified successfully",
-          data: {
-              notificationId: newNotification._id,
-          },
-      });
-
-  } catch (error) {
+  
+    } catch (error) {
       console.error("Webhook processing error:", error);
       return res.status(500).json({ error: "Internal server error" });
-  }
+    }
+  
 };
 
   

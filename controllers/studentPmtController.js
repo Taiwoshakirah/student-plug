@@ -34,14 +34,15 @@ const studentPaymentDetails = async (req, res) => {
     email, 
     feeType,
     feeAmount,
-    schoolInfoId 
+    schoolInfoId,
+    senderAccountNumber
   } = req.body;
 
   // Add logging to verify schoolInfoId
   console.log('Received schoolInfoId:', schoolInfoId);
 
   if (!userId || !firstName || !lastName || !department || !regNo || 
-      !academicLevel || !email || !feeType || !feeAmount || !schoolInfoId) {
+      !academicLevel || !email || !feeType || !feeAmount || !schoolInfoId || !senderAccountNumber) {
     return res.status(422).json({ 
       success: false, 
       message: "All fields are required, including schoolInfoId and feeAmount." 
@@ -74,6 +75,7 @@ const studentPaymentDetails = async (req, res) => {
         feeAmount,
         schoolInfoId: schoolInfo._id, 
         virtualAccount: schoolInfo.virtualAccount,
+        senderAccountNumber
       },
       { new: true, upsert: true }
     );
@@ -149,6 +151,7 @@ const getStudentPaymentDetails = async (req, res) => {
         academicLevel: studentDetails.academicLevel,
         email: studentDetails.email,
         feeType: studentDetails.feeType,
+        senderAccountNumber:studentDetails.senderAccountNumber,
         virtualAccount: {
           accountNumber,
           accountName,

@@ -32,7 +32,8 @@ const studentPymtSchema = new mongoose.Schema({
   virtualAccount: {
     accountNumber: { type: String, required: true },
     bankName: { type: String, required: true }
-  }
+  },
+  senderAccountNumber:{type:Number, required:true}
 }, { timestamps: true });
 
 module.exports = mongoose.model("StudentPayment", studentPymtSchema);

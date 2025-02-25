@@ -479,6 +479,27 @@ const webhook = async (req, res) => {
       });
     }
 
+    if (!senderAccountNumber) {
+      return res.status(400).json({
+        code: "05",
+        description: "Missing sender account number",
+        data: {},
+      });
+    }
+
+    // 🔍 Find student by senderAccountNumber
+    let studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+
+    if (!studentPayment) {
+      return res.status(404).json({
+        code: "06",
+        description: "Student payment record not found",
+        data: {},
+      });
+    }
+
+    const { firstName, lastName, regNo, department, academicLevel } = studentPayment;
+
     const newNotification = await WebHookNotification.create({
       amount,
       accountNumber,
@@ -490,7 +511,12 @@ const webhook = async (req, res) => {
       reference,
       webhookHash: receivedHash,
       eventId: event.id,
-      eventType: event.type
+      eventType: event.type,
+      firstName,
+      lastName,
+      regNo,
+      department,
+      academicLevel,
     });
 
     processedEvents.add(eventKey);
@@ -500,6 +526,11 @@ const webhook = async (req, res) => {
       description: "Notification received and verified successfully",
       data: {
         notificationId: newNotification._id,
+        firstName,
+        lastName,
+        regNo,
+        department,
+        academicLevel,
       },
     });
 

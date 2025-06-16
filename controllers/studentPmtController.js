@@ -554,7 +554,7 @@ const fidelityWebhook = async (req, res) => {
     const receivedSignature = req.headers["signature"];
     const requestRef = payload.request_ref;
 
-    if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_WEBHOOK_SECRET_KEY)) {
+    if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_API_SECRET)) {
       return res.status(401).json({
         code: "F01",
         description: "Invalid webhook signature from Fidelity",
@@ -575,10 +575,13 @@ const fidelityWebhook = async (req, res) => {
       amount,
       status,
       transaction_ref: reference,
+    } = meta;
+
+    const {
       customer_firstname: firstName,
       customer_surname: lastName,
       customer_ref: regNo,
-    } = meta;
+    } = details;
 
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
       return res.status(400).json({
@@ -590,14 +593,6 @@ const fidelityWebhook = async (req, res) => {
 
     const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
 
-    if (!studentPayment) {
-      return res.status(404).json({
-        code: "F06",
-        description: "Student payment record not found",
-        data: {},
-      });
-    }
-
     await FidelityNotification.create({
       amount,
       accountNumber,
@@ -607,34 +602,25 @@ const fidelityWebhook = async (req, res) => {
       senderAccountName,
       senderBank,
       reference,
-      webhookHash: "N/A",
+      webhookHash: receivedSignature,
       eventType: "fidelity_transaction",
-      firstName: studentPayment.firstName,
-      lastName: studentPayment.lastName,
-      regNo: studentPayment.regNo,
-      department: studentPayment.department,
-      academicLevel: studentPayment.academicLevel,
+      firstName: studentPayment?.firstName || firstName,
+      lastName: studentPayment?.lastName || lastName,
+      regNo: studentPayment?.regNo || regNo,
+      department: studentPayment?.department || "",
+      academicLevel: studentPayment?.academicLevel || "",
     });
 
     return res.status(200).json({
-      request_ref: payload.request_ref,
-      request_type: "transaction_notification",
+      request_ref: requestRef,
+      request_type: payload.request_type,
       requester: payload.requester,
       mock_mode: payload.mock_mode,
       details: {
-        data: details.data,
-        meta,
+        ...details,
         amount,
         status,
-        provider: details.provider,
-        customer_ref: regNo,
-        customer_email: details.customer_email,
         transaction_ref: reference,
-        customer_surname: lastName,
-        transaction_desc: details.transaction_desc,
-        transaction_type: details.transaction_type,
-        customer_firstname: firstName,
-        customer_mobile_no: details.customer_mobile_no,
       },
       app_info: payload.app_info,
     });
@@ -644,6 +630,103 @@ const fidelityWebhook = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// const fidelityWebhook = async (req, res) => {
+//   try {
+//     const payload = req.body;
+//     const receivedSignature = req.headers["signature"];
+//     const requestRef = payload.request_ref;
+
+//     if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_WEBHOOK_SECRET_KEY)) {
+//       return res.status(401).json({
+//         code: "F01",
+//         description: "Invalid webhook signature from Fidelity",
+//         data: {},
+//       });
+//     }
+
+//     const details = payload.details || {};
+//     const meta = details.meta || {};
+
+//     const {
+//       originator_account_number: senderAccountNumber,
+//       originator_account_name: senderAccountName,
+//       originator_bank_name: senderBank,
+//       cr_account: accountNumber,
+//       cr_account_name: accountName,
+//       narration,
+//       amount,
+//       status,
+//       transaction_ref: reference,
+//       customer_firstname: firstName,
+//       customer_surname: lastName,
+//       customer_ref: regNo,
+//     } = meta;
+
+//     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
+//       return res.status(400).json({
+//         code: "F05",
+//         description: "Missing required fields from Fidelity webhook",
+//         data: {},
+//       });
+//     }
+
+//     const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+
+//     if (!studentPayment) {
+//       return res.status(404).json({
+//         code: "F06",
+//         description: "Student payment record not found",
+//         data: {},
+//       });
+//     }
+
+//     await FidelityNotification.create({
+//       amount,
+//       accountNumber,
+//       accountName,
+//       narration,
+//       senderAccountNumber,
+//       senderAccountName,
+//       senderBank,
+//       reference,
+//       webhookHash: "N/A",
+//       eventType: "fidelity_transaction",
+//       firstName: studentPayment.firstName,
+//       lastName: studentPayment.lastName,
+//       regNo: studentPayment.regNo,
+//       department: studentPayment.department,
+//       academicLevel: studentPayment.academicLevel,
+//     });
+
+//     return res.status(200).json({
+//       request_ref: payload.request_ref,
+//       request_type: "transaction_notification",
+//       requester: payload.requester,
+//       mock_mode: payload.mock_mode,
+//       details: {
+//         data: details.data,
+//         meta,
+//         amount,
+//         status,
+//         provider: details.provider,
+//         customer_ref: regNo,
+//         customer_email: details.customer_email,
+//         transaction_ref: reference,
+//         customer_surname: lastName,
+//         transaction_desc: details.transaction_desc,
+//         transaction_type: details.transaction_type,
+//         customer_firstname: firstName,
+//         customer_mobile_no: details.customer_mobile_no,
+//       },
+//       app_info: payload.app_info,
+//     });
+
+//   } catch (error) {
+//     console.error("Fidelity webhook error:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// };
 
 
 

@@ -29,6 +29,11 @@ const schoolInfoSchema = new mongoose.Schema({
     accountName: String,
     bankName: String,
   },
+  OtherVirtualAccount: {
+  accountNumber: String,
+  accountName: String,
+  bankName: String,
+},
 });
 
 module.exports = mongoose.model("SchoolInfo", schoolInfoSchema);

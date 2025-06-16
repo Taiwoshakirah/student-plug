@@ -85,61 +85,7 @@ const schoolSugSignup = async (req, res, next) => {
   }
 };
 
-// process of generating virtual account starts here because of the helper functions
 
-// const generateFCMBVirtualAccount = async ({ name, email, phoneNumber }) => {
-//     // Construct payload using provided parameters
-//     const payload = {
-//       "email": "cantoned.field@gmail.com",
-//       firstName: name.split(' ')[0] || name, // Take first word as firstName
-//       lastName: name.split(' ').slice(1).join(' ') || name, // Rest as lastName
-//       phone: 52767210801,
-//     };
-  
-//     const config = {
-//       method: "post",
-//       url: "https://baas.dev.getrova.co.uk/virtual-account/static",
-//       headers: {
-//         "x-organization-id": "test_client",
-//         authorization: `Bearer ${process.env.FCMB_API_TOKEN}`,
-//       },
-//       data: payload,
-//     };
-  
-//     console.log("Request Headers:", config.headers);
-//     console.log("Payload:", payload);
-  
-//     try {
-//       const response = await axios(config);
-//       console.log("Virtual account created successfully:", response.data);
-  
-//       const { successfulVirtualAccounts } = response.data.data;
-  
-//       if (!successfulVirtualAccounts || successfulVirtualAccounts.length === 0) {
-//         throw new Error("No successful virtual accounts were created.");
-//       }
-  
-//       const virtualAccount = successfulVirtualAccounts[0];
-//       console.log("Virtual Account Object:", virtualAccount);
-  
-//       // Update property names based on actual response structure
-//       const accountNumber = virtualAccount.virtualAccountNumber;
-//       const accountName = virtualAccount.virtualAccountName;
-  
-//       if (!accountNumber) {
-//         throw new Error("No account number found in the response.");
-//       }
-  
-//       return {
-//         accountNumber,
-//         accountName,
-//         bankName: "FCMB"
-//       };
-//     } catch (error) {
-//       console.error("FCMB API Error:", error.response?.data || error.message);
-//       throw new Error("Failed to create virtual account.");
-//     }
-//   };
 
 const generateToken = async () => {
     const tokenPayload = new URLSearchParams();
@@ -214,152 +160,403 @@ const generateFCMBVirtualAccount = async ({ name, email, phoneNumber }) => {
     throw new Error("Failed to create virtual account.");
   }
 };
+
+
+
+// const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
+// const SIGNATURE = "F5CB3C9028B8CAE185B6B892DEFE0995";
+// const API_URL = "https://api.paygateplus.ng/v2/transact";
+
+// // Generating unique references
+// const requestRef = `REQ-${Date.now()}`;
+// const transactionRef = `TXN-${Date.now()}`;
+
+// const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
+//   const requestRef = `REQ-${Date.now()}`;
+//   const transactionRef = `TXN-${Date.now()}`;
+
+//   const payload = {
+//     request_ref: requestRef,
+//     request_type: "open_account",
+//     auth: {
+//       type: null,
+//       secure: null,
+//       auth_provider: "FidelityVirtual",
+//       route_mode: null,
+//     },
+//     transaction: {
+//       transaction_ref: transactionRef,
+//       transaction_desc: "Virtual account for school",
+//       transaction_ref_parent: null,
+//       amount: 0,
+//       customer: {
+//         customer_ref: phoneNumber || "2348000000000",
+//         firstname: "SchoolPlug",
+//         surname: `${name}/SUG`,
+//         email,
+//         mobile_no: phoneNumber,
+//       },
+//       meta: {
+//         a_key: "a_meta_value_1",
+//         b_key: "a_meta_value_2"
+//       },
+//       details: {
+//         name_on_account: `SchoolPlug/${name}/SUG`,
+//         middlename: "",
+//         dob: "2000-01-01",
+//         gender: "M",
+//         title: "Mr",
+//         address_line_1: "2, Akoka, Yaba",
+//         address_line_2: "Ikorodu",
+//         city: "Ikeja",
+//         state: "Lagos",
+//         country: "Nigeria",
+//       },
+//     },
+//   };
+
+//   try {
+//     const response = await axios.post(API_URL, payload, {
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${FIDELITY_API_KEY}`,
+//         Signature: SIGNATURE,
+//       },
+//     });
+
+//     const accountData = response.data?.data;
+//     if (!accountData || !accountData.account_number) {
+//       throw new Error("Fidelity virtual account not returned.");
+//     }
+
+//     return {
+//       accountNumber: accountData.account_number,
+//       accountName: `SchoolPlug/${name}/SUG`,
+//       bankName: "Fidelity Bank"
+//     };
+//   } catch (error) {
+//     console.error("Error creating Fidelity virtual account:", error.response?.data || error.message);
+//     throw new Error("Failed to create Fidelity virtual account.");
+//   }
+// };
+
+// const crypto = require("crypto");
+// const axios = require("axios");
+
+
+
+
+
+const API_URL = "https://api.paygateplus.ng/v2/transact";
+const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
+const FIDELITY_API_SECRET = process.env.FIDELITY_API_SECRET;
+
+// const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
+  // const requestRef = `REQ-${Date.now()}`;
+  // const requestRef = `REQ-1718017300000`;
+  // const transactionRef = `TXN-${Date.now()}`;
+
+//   const rawSignature = `${requestRef};${FIDELITY_API_SECRET}`;
+//   const signatureHash = crypto.createHash("md5").update(rawSignature).digest("hex");
+
+//   const payload = {
+//     request_ref: requestRef,
+//     request_type: "open_account",
+//     auth: {
+//       type: null,
+//       secure: null,
+//       auth_provider: "FidelityVirtual",
+//       route_mode: null,
+//     },
+//     transaction: {
+//       transaction_ref: transactionRef,
+//       transaction_desc: "Virtual account for school",
+//       transaction_ref_parent: null,
+//       amount: 0,
+//       customer: {
+//         customer_ref: phoneNumber || "2348000000000",
+//         firstname: "SchoolPlug",
+//         surname: `${name}/SUG`,
+//         email,
+//         mobile_no: phoneNumber,
+//       },
+//       meta: {
+//         a_key: "a_meta_value_1",
+//         b_key: "a_meta_value_2",
+//       },
+//       details: {
+//         name_on_account: `SchoolPlug/${name}/SUG`,
+//         middlename: "",
+//         dob: "2000-01-01",
+//         gender: "M",
+//         title: "Mr",
+//         address_line_1: "2, Akoka, Yaba",
+//         address_line_2: "Ikorodu",
+//         city: "Ikeja",
+//         state: "Lagos",
+//         country: "Nigeria",
+//       },
+//     },
+//   };
+
+//   try {
+//     const response = await axios.post(API_URL, payload, {
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${FIDELITY_API_KEY}`,
+//         Signature: signatureHash, // ✅ Matches the request_ref
+//       },
+//     });
+
+//     const accountData = response.data?.data;
+//     if (!accountData || !accountData.account_number) {
+//       throw new Error("Fidelity virtual account not returned.");
+//     }
+
+//     return {
+//       accountNumber: accountData.account_number,
+//       accountName: `SchoolPlug/${name}/SUG`,
+//       bankName: "Fidelity Bank",
+//     };
+//   } catch (error) {
+//     console.error("Error creating Fidelity virtual account:", error.response?.data || error.message);
+//     throw new Error("Failed to create Fidelity virtual account.");
+//   }
+// };
+const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
+  const requestRef = `REQ-${Date.now()}`;
+  const transactionRef = `TXN-${Date.now()}`;
+
+  // Generate MD5 signature
+  const rawSignature = `${requestRef};${FIDELITY_API_SECRET}`;
+  const signatureHash = crypto.createHash("md5").update(rawSignature).digest("hex");
+
+  const payload = {
+    request_ref: requestRef,
+    request_type: "open_account",
+    auth: {
+      type: null,
+      secure: null,
+      auth_provider: "FidelityVirtual",
+      route_mode: null,
+    },
+    transaction: {
+      transaction_ref: transactionRef,
+      transaction_desc: "Virtual account for school",
+      transaction_ref_parent: null,
+      amount: 0,
+      customer: {
+        customer_ref: phoneNumber,
+        firstname: "SchoolPlug",
+        surname: `${name}/SUG`,
+        email,
+        mobile_no: phoneNumber,
+      },
+      meta: {
+        a_key: "a_meta_value_1",
+        b_key: "a_meta_value_2",
+      },
+      details: {
+        name_on_account: `SchoolPlug/${name}/SUG`,
+        middlename: "",
+        dob: "2000-01-01",
+        gender: "M",
+        title: "Mr",
+        address_line_1: "2, Akoka, Yaba",
+        address_line_2: "Ikorodu",
+        city: "Ikeja",
+        state: "Lagos",
+        country: "Nigeria",
+      },
+    },
+  };
+
+  try {
+    const response = await axios.post(API_URL, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${FIDELITY_API_KEY}`,
+        Signature: signatureHash,
+      },
+    });
+
+    const providerResponse = response.data?.data?.provider_response;
+
+if (!providerResponse?.account_number) {
+  throw new Error("Fidelity virtual account number not returned in response.");
+}
+
+return {
+  accountNumber: providerResponse.account_number,
+  accountName: providerResponse.account_name || `SchoolPlug/${name}/SUG`,
+  bankName: providerResponse.bank_name || "Fidelity Bank",
+  bankCode: providerResponse.bank_code || "070",
+  rawResponse: providerResponse,
+};
+
+
+    return {
+      accountNumber: accountData.account_number,
+      accountName: `SchoolPlug/${name}/SUG`,
+      bankName: "Fidelity Bank",
+      bankCode: accountData.bank_code || "070",
+      rawResponse: accountData,
+    };
+  } catch (error) {
+    console.error("Error creating Fidelity virtual account:", error.message);
+    if (error.response) {
+      console.error("Response:", error.response.data);
+    }
+    throw new Error(error.response?.data?.message || "Failed to create Fidelity virtual account.");
+  }
+};
+
+
+
   
+  // const schoolInformation = async (req, res, next) => {
+  //   try {
+  //     const { university, state, aboutUniversity, userId, email, phoneNumber } = req.body;
+  //     const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
+  
+  //     // Validation
+  //     if (!uniProfilePicture) {
+  //       return res.status(422).json({ message: "Profile picture is required" });
+  //     }
+  
+  //     if (!university || !state || !aboutUniversity) {
+  //       return res.status(422).json({ message: "All school details are required" });
+  //     }
+  
+  //     // Handle file upload
+  //     const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
+  //     await uniProfilePicture.mv(tempPath);
+  
+  //     // Upload to Cloudinary
+  //     const uploadResult = await uploadToCloudinary(tempPath);
+  //     const imageUrl = uploadResult.secure_url;
+  
+  //     // Generate virtual account
+  //     const virtualAccountDetails = await generateFCMBVirtualAccount({
+  //       name: university,
+  //       email,
+  //       phoneNumber,
+  //     });
+  //     const OtherVirtualAccountDetails = await createFidelityVirtualAccount({
+  //       name: university,
+  //       email,
+  //       phoneNumber,
+  //     });
+  
+  //     // Create school data
+  //     const schoolData = await SchoolInfo.create({
+  //       userId,
+  //       university,
+  //       state,
+  //       aboutUniversity,
+  //       uniProfilePicture: imageUrl,
+  //       faculties: [],
+  //       students: [],
+  //       virtualAccount: virtualAccountDetails,
+  //       OtherVirtualAccount: OtherVirtualAccountDetails
+  //     });
+
+  //     await schoolData.save();
+  
+  //     // Update user with school info
+  //     await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
+  
+  //     return res.json({
+  //       success: true,
+  //       message: "School details added, proceed to faculty selection",
+  //       schoolData,
+  //     });
+  
+  //   } catch (error) {
+  //     console.error("Add school details error:", error);
+  //     return res.status(500).json({ 
+  //       success: false,
+  //       message: "Failed to add school details",
+  //       error: error.message 
+  //     });
+  //   }
+  // };
+
   const schoolInformation = async (req, res, next) => {
-    try {
-      const { university, state, aboutUniversity, userId, email, phoneNumber } = req.body;
-      const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
-  
-      // Validation
-      if (!uniProfilePicture) {
-        return res.status(422).json({ message: "Profile picture is required" });
-      }
-  
-      if (!university || !state || !aboutUniversity) {
-        return res.status(422).json({ message: "All school details are required" });
-      }
-  
-      // Handle file upload
-      const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
-      await uniProfilePicture.mv(tempPath);
-  
-      // Upload to Cloudinary
-      const uploadResult = await uploadToCloudinary(tempPath);
-      const imageUrl = uploadResult.secure_url;
-  
-      // Generate virtual account
-      const virtualAccountDetails = await generateFCMBVirtualAccount({
+  try {
+    const { university, state, aboutUniversity, userId, email, phoneNumber } = req.body;
+    const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
+
+    if (!uniProfilePicture) {
+      return res.status(422).json({ message: "Profile picture is required" });
+    }
+
+    if (!university || !state || !aboutUniversity) {
+      return res.status(422).json({ message: "All school details are required" });
+    }
+
+    const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
+    await uniProfilePicture.mv(tempPath);
+
+    const uploadResult = await uploadToCloudinary(tempPath);
+    const imageUrl = uploadResult.secure_url;
+
+    // Check if school already exists with a virtual account
+    const existingSchool = await SchoolInfo.findOne({ university });
+
+    let virtualAccountDetails;
+    let fidelityVirtualAccountDetails;
+
+    if (existingSchool) {
+      // Reuse existing accounts
+      virtualAccountDetails = existingSchool.virtualAccount;
+      fidelityVirtualAccountDetails = existingSchool.OtherVirtualAccount;
+    } else {
+      // Generate FCMB & Fidelity virtual accounts
+      virtualAccountDetails = await generateFCMBVirtualAccount({
         name: university,
         email,
         phoneNumber,
       });
-  
-      // Create school data
-      const schoolData = await SchoolInfo.create({
-        userId,
-        university,
-        state,
-        aboutUniversity,
-        uniProfilePicture: imageUrl,
-        faculties: [],
-        students: [],
-        virtualAccount: virtualAccountDetails,
-      });
 
-      await schoolData.save();
-  
-      // Update user with school info
-      await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
-  
-      return res.json({
-        success: true,
-        message: "School details added, proceed to faculty selection",
-        schoolData,
-      });
-  
-    } catch (error) {
-      console.error("Add school details error:", error);
-      return res.status(500).json({ 
-        success: false,
-        message: "Failed to add school details",
-        error: error.message 
+      fidelityVirtualAccountDetails = await createFidelityVirtualAccount({
+        name: university,
+        email,
+        phoneNumber,
       });
     }
-  };
-// const schoolInformation = async (req, res, next) => {
-//   const { university, state, aboutUniversity, userId } = req.body;
 
-//   const uniProfilePicture = req.files ? req.files.uniProfilePicture : null;
+    // Create new school if not already created
+    const schoolData = existingSchool || await SchoolInfo.create({
+      userId,
+      university,
+      state,
+      aboutUniversity,
+      uniProfilePicture: imageUrl,
+      faculties: [],
+      students: [],
+      virtualAccount: virtualAccountDetails,
+      OtherVirtualAccount: fidelityVirtualAccountDetails,
+    });
 
-//   console.log("Received files:", req.files);
+    await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
 
-//   if (!uniProfilePicture) {
-//     return res.status(422).json({ message: "Profile picture is required" });
-//   }
+    return res.json({
+      success: true,
+      message: "School details added, proceed to faculty selection",
+      schoolData,
+    });
 
-//   if (!university || !state || !aboutUniversity) {
-//     return res.status(422).json({ message: "All school details are required" });
-//   }
+  } catch (error) {
+    console.error("Add school details error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add school details",
+      error: error.message,
+    });
+  }
+};
 
-//   //  to temporarily store the file
-//   const tempPath = `${process.env.UPLOAD_PATH}${uniProfilePicture.name}`;
-
-//   // Moving the uploaded file to the desired location
-//   await uniProfilePicture.mv(tempPath);
-
-//   try {
-//     const uploadResult = await uploadToCloudinary(tempPath);
-
-//     const imageUrl = uploadResult.secure_url;
-
-//     const virtualAccountResponse = await generateFCMBVirtualAccount({
-//       name: university,
-//       email: req.body.email,
-//       phoneNumber: req.body.phoneNumber,
-//     });
-
-//     // Extract virtual account details safely
-//     const { accountNumber, accountName } = virtualAccountResponse;
-
-//     if (!accountNumber) {
-//       throw new Error("Failed to retrieve virtual account number.");
-//     }
-
-//     // Log the first object inside successfulVirtualAccounts
-//     console.log("Successful Virtual Account Object:", virtualAccount);
-
-//     if (!accountNumber) {
-//       throw new Error("Failed to retrieve virtual account number.");
-//     }
-
-//     const schoolData = await SchoolInfo.create({
-//       userId,
-//       university,
-//       state,
-//       aboutUniversity,
-//       uniProfilePicture: imageUrl,
-//       faculties: [],
-//       students: [],
-//       virtualAccount: {
-//         accountNumber, // Ensure it's a string
-//         accountName,
-//         bankName: "FCMB",
-//       },
-//     });
-
-//     await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
-
-//     // Update school information with virtual account details
-//     schoolData.virtualAccount = {
-//       accountNumber,
-//       accountName,
-//       bankName,
-//     };
-
-//     await schoolData.save();
-
-//     await SugUser.findByIdAndUpdate(userId, { schoolInfo: schoolData._id });
-
-//     res.json({
-//       success: true,
-//       message: "School details added, proceed to faculty selection",
-//       schoolData,
-//     });
-//   } catch (error) {
-//     console.error("Add school details error:", error);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// };
 
 const isValidRegNumber = (regNum) => {
   const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;

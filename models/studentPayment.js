@@ -33,6 +33,11 @@ const studentPymtSchema = new mongoose.Schema({
     accountNumber: { type: String, required: true },
     bankName: { type: String, required: true }
   },
+  OtherVirtualAccount: {
+    accountNumber: String,
+    bankName: String,
+    accountName: String, // optional if needed
+  },
   senderAccountNumber:{type:Number, required:true}
 }, { timestamps: true });
 

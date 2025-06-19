@@ -13,6 +13,10 @@ const mongoose = require('mongoose')
 const User = require('../models/signUp')
 const WebHookNotification = require('../models/webhook')
 const FidelityNotification = require('../models/fidelityWehook')
+
+
+const generateReceiptDetails = require("../utils/generateReceiptDetails");
+
 const crypto = require('crypto')
 const processedEvents = new Set();
 
@@ -542,11 +546,58 @@ const webhook = async (req, res) => {
   }
 };
 
-// const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
-//   const hashInput = `${requestRef};${secretKey}`;
-//   const computedHash = crypto.createHash("md5").update(hashInput).digest("hex");
-//   return computedHash === receivedSignature;
-// };
+/**
+ * Record a transaction once payment is received.
+ * Links Student via regNo and stores data in Transaction collection.
+ * @param {string} senderAccountNumber
+ */
+const recordTransaction = async (senderAccountNumber) => {
+  try {
+    // Get payment notification details
+    const notification = await FidelityNotification.findOne({ senderAccountNumber });
+    if (!notification) {
+      throw new Error("Fidelity notification not found.");
+    }
+
+    const { amount, narration, requestRef } = notification;
+    const status = "successful"; // or notification.status if available
+
+    // Get student payment info
+    const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+    if (!studentPayment) {
+      throw new Error("StudentPayment not found.");
+    }
+
+    const { email, feeType, regNo } = studentPayment;
+
+    // Get the actual Student by regNo
+    const student = await Student.findOne({ regNo });
+    if (!student) {
+      throw new Error("Student not found.");
+    }
+
+    // Create new transaction record
+    const transaction = new Transaction({
+      email,
+      amount,
+      feeType,
+      reference: requestRef,
+      status,
+      student: student._id,
+    });
+
+    await transaction.save();
+    console.log("Transaction recorded successfully.");
+    return transaction;
+
+  } catch (error) {
+    console.error("Error recording transaction:", error.message);
+    throw error;
+  }
+};
+
+module.exports = { recordTransaction };
+
 
 const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
   const hashInput = `${requestRef};${secretKey}`;
@@ -600,7 +651,7 @@ const fidelityWebhook = async (req, res) => {
       });
     }
 
-    // Save to DB
+    // Saving to DB
     await FidelityNotification.create({
       amount,
       narration,
@@ -616,12 +667,14 @@ const fidelityWebhook = async (req, res) => {
       customerRef,
       customerEmail,
       transactionDesc,
-      webhookRaw: payload, // store entire payload for traceability
+      webhookRaw: payload, 
     });
+
+    await recordTransaction(senderAccountNumber);
 
     return res.status(200).json({
       success: true,
-      message: "Fidelity transaction logged successfully",
+      message: "Fidelity transaction logged and recorded successfully",
       request_ref: requestRef,
       transaction_ref: reference,
     });
@@ -633,268 +686,21 @@ const fidelityWebhook = async (req, res) => {
 };
 
 
+const getReceipt = async (req, res) => {
+  const { accountNumber } = req.params;
 
-// const fidelityWebhook = async (req, res) => {
-//   try {
-//     const payload = req.body;
-//     const receivedSignature = req.headers["signature"];
-//     const requestRef = payload.request_ref;
+  const receipt = await generateReceiptDetails(accountNumber);
 
-//     if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_API_SECRET)) {
-//       return res.status(401).json({
-//         code: "F01",
-//         description: "Invalid webhook signature from Fidelity",
-//         data: {},
-//       });
-//     }
+  if (!receipt) {
+    return res.status(404).json({ message: "Receipt not found" });
+  }
 
-//     const details = payload.details || {};
-//     const meta = details.meta || {};
-
-//     const {
-//       originator_account_number: senderAccountNumber,
-//       originator_account_name: senderAccountName,
-//       originator_bank_name: senderBank,
-//       cr_account: accountNumber,
-//       cr_account_name: accountName,
-//       narration,
-//       amount,
-//       status,
-//       transaction_ref: reference,
-//     } = meta;
-
-//     const {
-//       customer_firstname: firstName,
-//       customer_surname: lastName,
-//       customer_ref: regNo,
-//     } = details;
-
-//     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
-//       return res.status(400).json({
-//         code: "F05",
-//         description: "Missing required fields from Fidelity webhook",
-//         data: {},
-//       });
-//     }
-
-//     const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
-
-//     await FidelityNotification.create({
-//       amount,
-//       accountNumber,
-//       accountName,
-//       narration,
-//       senderAccountNumber,
-//       senderAccountName,
-//       senderBank,
-//       reference,
-//       webhookHash: receivedSignature,
-//       eventType: "fidelity_transaction",
-//       firstName: studentPayment?.firstName || firstName,
-//       lastName: studentPayment?.lastName || lastName,
-//       regNo: studentPayment?.regNo || regNo,
-//       department: studentPayment?.department || "",
-//       academicLevel: studentPayment?.academicLevel || "",
-//     });
-
-//     return res.status(200).json({
-//       request_ref: requestRef,
-//       request_type: payload.request_type,
-//       requester: payload.requester,
-//       mock_mode: payload.mock_mode,
-//       details: {
-//         ...details,
-//         amount,
-//         status,
-//         transaction_ref: reference,
-//       },
-//       app_info: payload.app_info,
-//     });
-
-//   } catch (error) {
-//     console.error("Fidelity webhook error:", error);
-//     return res.status(500).json({ error: "Internal server error" });
-//   }
-// };
-
-// const fidelityWebhook = async (req, res) => {
-//   try {
-//     const payload = req.body;
-//     const receivedSignature = req.headers["signature"];
-//     const requestRef = payload.request_ref;
-
-//     if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_WEBHOOK_SECRET_KEY)) {
-//       return res.status(401).json({
-//         code: "F01",
-//         description: "Invalid webhook signature from Fidelity",
-//         data: {},
-//       });
-//     }
-
-//     const details = payload.details || {};
-//     const meta = details.meta || {};
-
-//     const {
-//       originator_account_number: senderAccountNumber,
-//       originator_account_name: senderAccountName,
-//       originator_bank_name: senderBank,
-//       cr_account: accountNumber,
-//       cr_account_name: accountName,
-//       narration,
-//       amount,
-//       status,
-//       transaction_ref: reference,
-//       customer_firstname: firstName,
-//       customer_surname: lastName,
-//       customer_ref: regNo,
-//     } = meta;
-
-//     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
-//       return res.status(400).json({
-//         code: "F05",
-//         description: "Missing required fields from Fidelity webhook",
-//         data: {},
-//       });
-//     }
-
-//     const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
-
-//     if (!studentPayment) {
-//       return res.status(404).json({
-//         code: "F06",
-//         description: "Student payment record not found",
-//         data: {},
-//       });
-//     }
-
-//     await FidelityNotification.create({
-//       amount,
-//       accountNumber,
-//       accountName,
-//       narration,
-//       senderAccountNumber,
-//       senderAccountName,
-//       senderBank,
-//       reference,
-//       webhookHash: "N/A",
-//       eventType: "fidelity_transaction",
-//       firstName: studentPayment.firstName,
-//       lastName: studentPayment.lastName,
-//       regNo: studentPayment.regNo,
-//       department: studentPayment.department,
-//       academicLevel: studentPayment.academicLevel,
-//     });
-
-//     return res.status(200).json({
-//       request_ref: payload.request_ref,
-//       request_type: "transaction_notification",
-//       requester: payload.requester,
-//       mock_mode: payload.mock_mode,
-//       details: {
-//         data: details.data,
-//         meta,
-//         amount,
-//         status,
-//         provider: details.provider,
-//         customer_ref: regNo,
-//         customer_email: details.customer_email,
-//         transaction_ref: reference,
-//         customer_surname: lastName,
-//         transaction_desc: details.transaction_desc,
-//         transaction_type: details.transaction_type,
-//         customer_firstname: firstName,
-//         customer_mobile_no: details.customer_mobile_no,
-//       },
-//       app_info: payload.app_info,
-//     });
-
-//   } catch (error) {
-//     console.error("Fidelity webhook error:", error);
-//     return res.status(500).json({ error: "Internal server error" });
-//   }
-// };
+  res.json(receipt);
+};
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-// const chargeCard = async (req, res) => {
-//     const { email, amount, cardToken, feeType } = req.body;
-//     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-//     const allowedFeeTypes = ["SUG", "Departmental", "Faculty", "exam"];
-
-//     if (!feeType || !allowedFeeTypes.includes(feeType)) {
-//         return res.status(400).json({ error: "Invalid or missing fee type" });
-//     }
-
-//     try {
-//         // Call Paystack API to charge card
-//         const response = await axios.post(
-//             "https://api.paystack.co/transaction/charge_authorization",
-//             {
-//                 authorization_code: cardToken,
-//                 email,
-//                 amount, 
-//                 metadata: { feeType },
-//             },
-//             {
-//                 headers: {
-//                     Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-//                     "Content-Type": "application/json",
-//                 },
-//             }
-//         );
-
-//         if (response.data.status) {
-//             // Find the student by email
-//             const student = await StudentPayment.findOne({ email });
-//             if (!student) {
-//                 return res.status(404).json({ error: "Student not found" });
-//             }
-
-//             // Create and save the transaction
-//             const newTransaction = new Transaction({
-//                 email,
-//                 amount,
-//                 feeType,
-//                 reference: response.data.data.reference,
-//                 status: response.data.data.status,
-//                 gatewayResponse: response.data.data.gateway_response,
-//                 student: student._id, 
-//             });
-
-//             const savedTransaction = await newTransaction.save();
-
-//             // Add transaction reference to the student
-//             student.transactions.push(savedTransaction._id);
-//             await student.save();
-
-//             return res.status(200).json({ success: true, data: response.data.data });
-//         } else {
-//             return res.status(400).json({ error: response.data.message });
-//         }
-//     } catch (error) {
-//         console.error("Charge error:", error.response?.data || error.message);
-
-//         if (error.response) {
-//             return res.status(error.response.status).json({ error: error.response.data.message });
-//         } else if (error.request) {
-//             return res.status(500).json({ error: "No response received from Paystack" });
-//         } else {
-//             return res.status(500).json({ error: "An unexpected error occurred" });
-//         }
-//     }
-// };
 
 
 const recordPayment = async (req, res) => {
@@ -1432,4 +1238,4 @@ const searchStudentByRegistrationNumber = async (req, res) => {
 
 
 
-module.exports = {studentPaymentDetails, getStudentPaymentDetails,webhook,fidelityWebhook, recordPayment, retrieveStudentDetails, schoolPaymentStatus, searchStudentByRegistrationNumber}
+module.exports = {studentPaymentDetails, getStudentPaymentDetails,webhook,fidelityWebhook, recordPayment, retrieveStudentDetails, schoolPaymentStatus, searchStudentByRegistrationNumber,getReceipt}

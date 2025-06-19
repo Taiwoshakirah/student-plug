@@ -559,7 +559,7 @@ const recordTransaction = async (senderAccountNumber) => {
       throw new Error("Fidelity notification not found.");
     }
 
-    const { amount, narration, requestRef } = notification;
+    const { amount, narration, reference } = notification;
     const status = "successful"; // or notification.status if available
 
     // Get student payment info
@@ -581,7 +581,7 @@ const recordTransaction = async (senderAccountNumber) => {
       email,
       amount,
       feeType,
-      reference: requestRef,
+      reference,
       status,
       student: student._id,
     });

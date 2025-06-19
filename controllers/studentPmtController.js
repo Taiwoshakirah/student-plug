@@ -554,6 +554,7 @@ const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
   return computedHash.toLowerCase() === receivedSignature.toLowerCase();
 };
 
+
 const fidelityWebhook = async (req, res) => {
   try {
     const payload = req.body;
@@ -568,29 +569,29 @@ const fidelityWebhook = async (req, res) => {
       });
     }
 
-    console.log("Incoming Fidelity Webhook Payload:", JSON.stringify(payload, null, 2));
+    console.log("Received Fidelity Webhook:", JSON.stringify(payload, null, 2));
 
     const details = payload.details || {};
-    const meta = payload.meta || details.meta || {};
+    const data = details.data || {};
+    const meta = details.meta || {};
 
-    const {
-      originator_account_number: senderAccountNumber,
-      originator_account_name: senderAccountName,
-      originator_bank_name: senderBank,
-      cr_account: accountNumber,
-      cr_account_name: accountName,
-      narration,
-      amount,
-      status,
-      transaction_ref: reference,
-    } = meta;
+    const senderAccountNumber = meta.originator_account_number || data.originatoraccountnumber;
+    const senderAccountName = meta.originator_account_name || data.originatorname;
+    const senderBank = meta.originator_bank_name || data.bankname;
+    const accountNumber = meta.cr_account || data.craccount;
+    const accountName = meta.cr_account_name || data.craccountname;
+    const narration = meta.narration || data.narration;
+    const reference = details.transaction_ref || data.paymentreference;
+    const amount = String(details.amount || data.amount || "0");
 
-    const {
-      customer_firstname: firstName,
-      customer_surname: lastName,
-      customer_ref: regNo,
-    } = details;
+    const transactionType = details.transaction_type || "collect";
+    const status = details.status || data.statusmessage;
+    const provider = details.provider || payload.requester;
+    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
+    const customerEmail = details.customer_email || "N/A";
+    const transactionDesc = details.transaction_desc || data.narration;
 
+    // Validate required fields
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
       return res.status(400).json({
         code: "F05",
@@ -599,38 +600,30 @@ const fidelityWebhook = async (req, res) => {
       });
     }
 
-    const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
-
+    // Save to DB
     await FidelityNotification.create({
       amount,
+      narration,
       accountNumber,
       accountName,
-      narration,
       senderAccountNumber,
       senderAccountName,
       senderBank,
       reference,
-      webhookHash: receivedSignature,
-      eventType: "fidelity_transaction",
-      firstName: studentPayment?.firstName || firstName,
-      lastName: studentPayment?.lastName || lastName,
-      regNo: studentPayment?.regNo || regNo,
-      department: studentPayment?.department || "",
-      academicLevel: studentPayment?.academicLevel || "",
+      transactionType,
+      status,
+      provider,
+      customerRef,
+      customerEmail,
+      transactionDesc,
+      webhookRaw: payload, // store entire payload for traceability
     });
 
     return res.status(200).json({
+      success: true,
+      message: "Fidelity transaction logged successfully",
       request_ref: requestRef,
-      request_type: payload.request_type,
-      requester: payload.requester,
-      mock_mode: payload.mock_mode,
-      details: {
-        ...details,
-        amount,
-        status,
-        transaction_ref: reference,
-      },
-      app_info: payload.app_info,
+      transaction_ref: reference,
     });
 
   } catch (error) {
@@ -638,6 +631,7 @@ const fidelityWebhook = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
 
 
 // const fidelityWebhook = async (req, res) => {

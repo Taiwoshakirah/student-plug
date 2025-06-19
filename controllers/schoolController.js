@@ -116,12 +116,12 @@ const generateFCMBVirtualAccount = async ({ name, email, phoneNumber }) => {
     // Generate new token
     const token = await generateToken();
     
-    // Format the account name as SchoolPlug/schoolname/SUG
-    const formattedAccountName = `SchoolPlug/${name}/SUG`;
+    // Format the account name as Monieplug/schoolname/SUG
+    const formattedAccountName = `Monieplug/${name}/SUG`;
     
     const payload = {
       email: email || "cantoned.field@gmail.com",
-      firstName: "SchoolPlug",
+      firstName: "Monieplug",
       lastName: `${name}/SUG`,
       phone: phoneNumber || 52767210801,
     };
@@ -327,7 +327,7 @@ const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
   const requestRef = `REQ-${Date.now()}`;
   const transactionRef = `TXN-${Date.now()}`;
 
-  // Generate MD5 signature
+  // Generating MD5 signature
   const rawSignature = `${requestRef};${FIDELITY_API_SECRET}`;
   const signatureHash = crypto.createHash("md5").update(rawSignature).digest("hex");
 
@@ -347,7 +347,7 @@ const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
       amount: 0,
       customer: {
         customer_ref: phoneNumber,
-        firstname: "SchoolPlug",
+        firstname: "Monieplug",
         surname: `${name}/SUG`,
         email,
         mobile_no: phoneNumber,
@@ -357,7 +357,7 @@ const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
         b_key: "a_meta_value_2",
       },
       details: {
-        name_on_account: `SchoolPlug/${name}/SUG`,
+        name_on_account: `Monieplug/${name}/SUG`,
         middlename: "",
         dob: "2000-01-01",
         gender: "M",
@@ -388,7 +388,7 @@ if (!providerResponse?.account_number) {
 
 return {
   accountNumber: providerResponse.account_number,
-  accountName: providerResponse.account_name || `SchoolPlug/${name}/SUG`,
+  accountName: providerResponse.account_name || `Monieplug/${name}/SUG`,
   bankName: providerResponse.bank_name || "Fidelity Bank",
   bankCode: providerResponse.bank_code || "070",
   rawResponse: providerResponse,
@@ -397,7 +397,7 @@ return {
 
     return {
       accountNumber: accountData.account_number,
-      accountName: `SchoolPlug/${name}/SUG`,
+      accountName: `Monieplug/${name}/SUG`,
       bankName: "Fidelity Bank",
       bankCode: accountData.bank_code || "070",
       rawResponse: accountData,

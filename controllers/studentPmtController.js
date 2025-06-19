@@ -542,11 +542,18 @@ const webhook = async (req, res) => {
   }
 };
 
+// const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
+//   const hashInput = `${requestRef};${secretKey}`;
+//   const computedHash = crypto.createHash("md5").update(hashInput).digest("hex");
+//   return computedHash === receivedSignature;
+// };
+
 const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
   const hashInput = `${requestRef};${secretKey}`;
   const computedHash = crypto.createHash("md5").update(hashInput).digest("hex");
-  return computedHash === receivedSignature;
+  return computedHash.toLowerCase() === receivedSignature.toLowerCase();
 };
+
 
 const fidelityWebhook = async (req, res) => {
   try {

@@ -813,7 +813,7 @@ const schoolPaymentStatus = async (req, res) => {
         // Categorize students by faculty and payment status
         schoolInfo.students.forEach((student) => {
             const hasPaid = student.transactions.some(
-                (transaction) => transaction.status === "success"
+                (transaction) => transaction.status === "successful"
             );
             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
             const formattedRegNo = `${student.registrationNumber}`;

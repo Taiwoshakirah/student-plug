@@ -45,7 +45,9 @@ const recordTransaction = async (senderAccountNumber) => {
     await transaction.save();
     // Push transaction ID into studentPayment.transaction array
     studentPayment.transactions.push(transaction._id);
+    student.transactions.push(transaction._id)
     await studentPayment.save();
+    await student.save();
     
     console.log("Transaction recorded successfully.");
     return transaction;

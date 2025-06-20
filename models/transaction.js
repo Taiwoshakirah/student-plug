@@ -21,7 +21,7 @@ const transactionSchema = new mongoose.Schema({
     reference: { type: String, required: true },
     status: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
-    student: { type: mongoose.Schema.Types.ObjectId, ref: "StudentPayment" }, // Link student
+    student: { type: mongoose.Schema.Types.ObjectId, ref: "StudentPayment" }, 
 });
 
 

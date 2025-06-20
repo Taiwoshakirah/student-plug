@@ -13,7 +13,7 @@ const mongoose = require('mongoose')
 const User = require('../models/signUp')
 const WebHookNotification = require('../models/webhook')
 const FidelityNotification = require('../models/fidelityWehook')
-const recordTransaction = require('../utils/recordTransaction')
+const {recordTransaction} = require('../utils/recordTransaction')
 
 const generateReceiptDetails = require("../utils/generateReceiptDetails");
 

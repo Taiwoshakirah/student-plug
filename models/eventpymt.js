@@ -41,11 +41,24 @@ const eventPaymentSchema = new mongoose.Schema({
   feeType: { type: String, required: true },
   feeAmount:Number,
     schoolInfoId:{type: mongoose.Schema.Types.ObjectId, ref: "SchoolInfo", required: true},
-  virtualAccount: {
+    virtualAccounts: {
+  fcmb: {
     accountNumber: String,
     accountName: String,
     bankName: String,
   },
+  fidelity: {
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+  },
+},
+
+  // virtualAccount: {
+  //   accountNumber: String,
+  //   accountName: String,
+  //   bankName: String,
+  // },
 });
 
 module.exports = mongoose.model("EventPayment", eventPaymentSchema);

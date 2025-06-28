@@ -163,90 +163,6 @@ const generateFCMBVirtualAccount = async ({ name, email, phoneNumber }) => {
 
 
 
-// const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
-// const SIGNATURE = "F5CB3C9028B8CAE185B6B892DEFE0995";
-// const API_URL = "https://api.paygateplus.ng/v2/transact";
-
-// // Generating unique references
-// const requestRef = `REQ-${Date.now()}`;
-// const transactionRef = `TXN-${Date.now()}`;
-
-// const createFidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
-//   const requestRef = `REQ-${Date.now()}`;
-//   const transactionRef = `TXN-${Date.now()}`;
-
-//   const payload = {
-//     request_ref: requestRef,
-//     request_type: "open_account",
-//     auth: {
-//       type: null,
-//       secure: null,
-//       auth_provider: "FidelityVirtual",
-//       route_mode: null,
-//     },
-//     transaction: {
-//       transaction_ref: transactionRef,
-//       transaction_desc: "Virtual account for school",
-//       transaction_ref_parent: null,
-//       amount: 0,
-//       customer: {
-//         customer_ref: phoneNumber || "2348000000000",
-//         firstname: "SchoolPlug",
-//         surname: `${name}/SUG`,
-//         email,
-//         mobile_no: phoneNumber,
-//       },
-//       meta: {
-//         a_key: "a_meta_value_1",
-//         b_key: "a_meta_value_2"
-//       },
-//       details: {
-//         name_on_account: `SchoolPlug/${name}/SUG`,
-//         middlename: "",
-//         dob: "2000-01-01",
-//         gender: "M",
-//         title: "Mr",
-//         address_line_1: "2, Akoka, Yaba",
-//         address_line_2: "Ikorodu",
-//         city: "Ikeja",
-//         state: "Lagos",
-//         country: "Nigeria",
-//       },
-//     },
-//   };
-
-//   try {
-//     const response = await axios.post(API_URL, payload, {
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: `Bearer ${FIDELITY_API_KEY}`,
-//         Signature: SIGNATURE,
-//       },
-//     });
-
-//     const accountData = response.data?.data;
-//     if (!accountData || !accountData.account_number) {
-//       throw new Error("Fidelity virtual account not returned.");
-//     }
-
-//     return {
-//       accountNumber: accountData.account_number,
-//       accountName: `SchoolPlug/${name}/SUG`,
-//       bankName: "Fidelity Bank"
-//     };
-//   } catch (error) {
-//     console.error("Error creating Fidelity virtual account:", error.response?.data || error.message);
-//     throw new Error("Failed to create Fidelity virtual account.");
-//   }
-// };
-
-// const crypto = require("crypto");
-// const axios = require("axios");
-
-
-
-
-
 const API_URL = "https://api.paygateplus.ng/v2/transact";
 const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
 const FIDELITY_API_SECRET = process.env.FIDELITY_API_SECRET;
@@ -317,7 +233,8 @@ if (!providerResponse?.account_number) {
 
 return {
   accountNumber: providerResponse.account_number,
-  accountName: providerResponse.account_name || `Monieplug/${name}/SUG`,
+  accountName: `Monieplug/${name}/SUG`,
+  // accountName: providerResponse.account_name || `Monieplug/${name}/SUG`,
   bankName: providerResponse.bank_name || "Fidelity Bank",
   bankCode: providerResponse.bank_code || "070",
   rawResponse: providerResponse,

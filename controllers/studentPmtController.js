@@ -622,28 +622,28 @@ const fidelityWebhook = async (req, res) => {
     });
 
     //  Determine what the payment is for
-    const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
-    if (event) {
-      console.log(`Payment for event: ${event.title}`);
-      await EventPayment.updateOne(
-        { eventId: event._id, registrationNumber: customerRef },
-        { paymentStatus: "paid", amountPaid: amount }
-      );
-    } else {
-      const studentPayment = await StudentPayment.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
-      if (studentPayment) {
-        console.log(` Payment for SUG dues: ${studentPayment._id}`);
-        await StudentPayment.updateOne(
-          { _id: studentPayment._id, registrationNumber: customerRef },
-          { paymentStatus: "paid", amountPaid: amount }
-        );
-      } else {
-        console.warn(` Unknown account number: ${accountNumber}`);
-      }
-    }
+    // … previous code …
+const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
+if (event) {
+  console.log(`Payment for event: ${event.title}`);
+  await EventPayment.updateOne(
+    { eventId: event._id, registrationNumber: customerRef },
+    { paymentStatus: "paid", amountPaid: amount }
+  );
+} else {
+  const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+  if (studentPayment) {
+    console.log(`Payment for SUG dues: ${studentPayment._id}`);
+    await StudentPayment.updateOne(
+      { _id: studentPayment._id, registrationNumber: customerRef },
+      { paymentStatus: "paid", amountPaid: amount }
+    );
 
-    // Log transaction elsewhere if needed
     await recordTransaction(senderAccountNumber);
+  } else {
+    console.warn(`Unknown sender account number: ${senderAccountNumber}`);
+  }
+}
 
     return res.status(200).json({
       success: true,

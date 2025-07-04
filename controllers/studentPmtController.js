@@ -1,6 +1,7 @@
 // routes/student.js
 const express = require('express')
 const StudentPayment = require("../models/studentPayment");
+const Event= require('../models/event')
 const Student = require('../models/studentRegNo')
 const axios = require("axios");
 require("dotenv").config();

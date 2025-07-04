@@ -633,16 +633,17 @@ if (event) {
 } else {
   const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
   if (studentPayment) {
-    console.log(`Payment for SUG dues: ${studentPayment._id}`);
-    await StudentPayment.updateOne(
-      { _id: studentPayment._id, registrationNumber: customerRef },
-      { paymentStatus: "paid", amountPaid: amount }
-    );
+  console.log(`Payment for SUG dues: ${studentPayment._id}`);
 
-    await recordTransaction(senderAccountNumber);
-  } else {
-    console.warn(`Unknown sender account number: ${senderAccountNumber}`);
-  }
+  studentPayment.paymentStatus = "paid";
+  studentPayment.amountPaid = amount;
+  await studentPayment.save();
+
+  await recordTransaction(senderAccountNumber);
+} else {
+  console.warn(`Unknown sender account number: ${senderAccountNumber}`);
+}
+
 }
 
     return res.status(200).json({

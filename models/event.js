@@ -16,6 +16,18 @@ const eventSchema = new mongoose.Schema({
     postedBy: { type: String, enum: Object.values(Roles), required: true }, // Accepts "admin", "user", etc.
     createdAt: { type: Date, default: Date.now },
     postedByBody: { type: String, enum: ["sug", "faculty", "department"], required: true }, // Body
+    virtualAccounts: {
+  fcmb: {
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+  },
+  fidelity: {
+    accountNumber: String,
+    accountName: String,
+    bankName: String,
+  },
+},
 });
 
 

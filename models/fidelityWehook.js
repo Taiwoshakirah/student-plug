@@ -14,6 +14,6 @@ const FidelityNotificationSchema = new mongoose.Schema({
   customerRef: { type: String },
   customerEmail: { type: String },
   transactionDesc: { type: String },
-  webhookRaw: { type: mongoose.Schema.Types.Mixed }, // if you want to store full raw
+  webhookRaw: { type: mongoose.Schema.Types.Mixed },
 }, { timestamps: true });
 module.exports = mongoose.model("FidelityNotification", FidelityNotificationSchema)

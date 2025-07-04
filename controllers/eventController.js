@@ -107,6 +107,106 @@ const createUnpaidEvent = async (req, res) => {
     }
 };
 
+const API_URL = "https://api.paygateplus.ng/v2/transact";
+const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
+const FIDELITY_API_SECRET = process.env.FIDELITY_API_SECRET;
+
+
+const fidelityVirtualAccount = async ({ name, email, phoneNumber, schoolInfoId }) => {
+  console.log("✅ Fidelity account name passed:", name);
+  const requestRef = `REQ-${Date.now()}`;
+  const transactionRef = `TXN-${Date.now()}`;
+
+  const rawSignature = `${requestRef};${FIDELITY_API_SECRET}`;
+  const signatureHash = crypto.createHash("md5").update(rawSignature).digest("hex");
+  const customerRef = `${schoolInfoId}-${Date.now()}`;
+
+
+  const payload = {
+    request_ref: requestRef,
+    request_type: "open_account",
+    auth: {
+      type: null,
+      secure: null,
+      auth_provider: "FidelityVirtual",
+      route_mode: null,
+    },
+    transaction: {
+      transaction_ref: transactionRef,
+      transaction_desc: "Virtual account for event payment",
+      transaction_ref_parent: null,
+      amount: 0,
+      customer: {
+      customer_ref: customerRef, //  unique
+      firstname: "Monieplug",
+      surname: `${name}/Event`,
+      email,
+      mobile_no: phoneNumber,
+    },
+      // customer: {
+      //   customer_ref: phoneNumber,
+      //   firstname: "Monieplug",
+      //   surname: `${name}/Event`,
+      //   email,
+      //   mobile_no: phoneNumber,
+      // },
+      meta: {
+        a_key: "a_meta_value_1",
+        b_key: "a_meta_value_2",
+      },
+      details: {
+        name_on_account: `Monieplug/${name}/Event`,
+        middlename: "",
+        dob: "2000-01-01",
+        gender: "M",
+        title: "Mr",
+        address_line_1: "2, Akoka, Yaba",
+        address_line_2: "Ikorodu",
+        city: "Ikeja",
+        state: "Lagos",
+        country: "Nigeria",
+      },
+    },
+  };
+
+  try {
+    const response = await axios.post(API_URL, payload, {
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${FIDELITY_API_KEY}`,
+    Signature: signatureHash,
+  },
+});
+
+console.log("Fidelity Raw Data:", JSON.stringify(response.data, null, 2));
+console.log("Full Payload You Sent:", JSON.stringify(payload, null, 2));
+
+const providerResponse = response.data?.data?.provider_response;
+
+if (!providerResponse?.account_number) {
+  throw new Error("Fidelity virtual account number not returned in response.");
+}
+
+return {
+  accountNumber: providerResponse.account_number,
+  accountName: `Monieplug/${name}/Event`,
+  // accountName: providerResponse.account_name || `Monieplug/${name}/Event`,
+  bankName: providerResponse.bank_name || "Fidelity Bank",
+  bankCode: providerResponse.bank_code || "070",
+  rawResponse: providerResponse,
+};
+
+
+  } catch (error) {
+    console.error("Error creating Fidelity virtual account:", error.message);
+    if (error.response) {
+      console.error("Response:", error.response.data);
+    }
+    throw new Error(error.response?.data?.message || "Failed to create Fidelity virtual account.");
+  }
+};
+
+
 // Create Paid Event
 const createPaidEvent = async (req, res) => {
     try {
@@ -153,20 +253,59 @@ if (req.files && req.files.image) {
     fs.unlinkSync(tempPath); // Remove the temporary file
 }
 
+// before saving event
+const virtualAccount = await fidelityVirtualAccount({
+  name: `${title} - ${postedByBody}`,
+  email: schoolInfo.email,
+  phoneNumber: schoolInfo.phoneNumber || "08000000000",
+   schoolInfoId
+});
 
-        const event = new Event({
-            adminId,
-            schoolInfoId,
-            title,
-            description,
-            flyer:flyer,
-            // date: parsedDate, // Use the parsed date
-            price,
-            ticketsAvailable,
-            isPaid: true, // Paid event
-            postedBy: Roles.ADMIN, // Role of the creator
-            postedByBody, // Automatically determined
-        });
+// include in Event
+const event = new Event({
+  adminId,
+  schoolInfoId,
+  title,
+  description,
+  flyer,
+  price,
+  ticketsAvailable,
+  isPaid: true,
+  postedBy: Roles.ADMIN,
+  postedByBody,
+  virtualAccounts: {
+          // fcmb: {
+          //   accountNumber: fcmbAccount.accountNumber,
+          //   accountName: fcmbAccount.accountName,
+          //   bankName: fcmbAccount.bankName,
+          // },
+          fidelity: {
+            accountNumber: virtualAccount.accountNumber,
+            accountName: virtualAccount.accountName,
+            bankName: virtualAccount.bankName,
+          },
+        },
+  // virtualAccount: {
+  //   accountNumber: virtualAccount.accountNumber,
+  //   accountName: virtualAccount.accountName,
+  //   bankName: virtualAccount.bankName
+  // }
+});
+
+
+        // const event = new Event({
+        //     adminId,
+        //     schoolInfoId,
+        //     title,
+        //     description,
+        //     flyer:flyer,
+        //     // date: parsedDate, // Use the parsed date
+        //     price,
+        //     ticketsAvailable,
+        //     isPaid: true, // Paid event
+        //     postedBy: Roles.ADMIN, // Role of the creator
+        //     postedByBody, // Automatically determined
+        // });
 
         await event.save();
 
@@ -374,95 +513,6 @@ try {
 }
 };
 
-const API_URL = "https://api.paygateplus.ng/v2/transact";
-const FIDELITY_API_KEY = process.env.FIDELITY_API_KEY;
-const FIDELITY_API_SECRET = process.env.FIDELITY_API_SECRET;
-
-
-const fidelityVirtualAccount = async ({ name, email, phoneNumber }) => {
-  console.log("✅ Fidelity account name passed:", name);
-  const requestRef = `REQ-${Date.now()}`;
-  const transactionRef = `TXN-${Date.now()}`;
-
-  // Generating MD5 signature
-  const rawSignature = `${requestRef};${FIDELITY_API_SECRET}`;
-  const signatureHash = crypto.createHash("md5").update(rawSignature).digest("hex");
-
-  const payload = {
-    request_ref: requestRef,
-    request_type: "open_account",
-    auth: {
-      type: null,
-      secure: null,
-      auth_provider: "FidelityVirtual",
-      route_mode: null,
-    },
-    transaction: {
-      transaction_ref: transactionRef,
-      transaction_desc: "Virtual account for event payment",
-      transaction_ref_parent: null,
-      amount: 0,
-      customer: {
-        customer_ref: phoneNumber,
-        firstname: "Monieplug",
-        surname: `${name}/Event`,
-        email,
-        mobile_no: phoneNumber,
-      },
-      meta: {
-        a_key: "a_meta_value_1",
-        b_key: "a_meta_value_2",
-      },
-      details: {
-        name_on_account: `Monieplug/${name}/Event`,
-        middlename: "",
-        dob: "2000-01-01",
-        gender: "M",
-        title: "Mr",
-        address_line_1: "2, Akoka, Yaba",
-        address_line_2: "Ikorodu",
-        city: "Ikeja",
-        state: "Lagos",
-        country: "Nigeria",
-      },
-    },
-  };
-
-  try {
-    const response = await axios.post(API_URL, payload, {
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${FIDELITY_API_KEY}`,
-    Signature: signatureHash,
-  },
-});
-
-console.log("Fidelity Raw Data:", JSON.stringify(response.data, null, 2));
-console.log("Full Payload You Sent:", JSON.stringify(payload, null, 2));
-
-const providerResponse = response.data?.data?.provider_response;
-
-if (!providerResponse?.account_number) {
-  throw new Error("Fidelity virtual account number not returned in response.");
-}
-
-return {
-  accountNumber: providerResponse.account_number,
-  accountName: providerResponse.account_name || `Monieplug/${name}/Event`,
-  bankName: providerResponse.bank_name || "Fidelity Bank",
-  bankCode: providerResponse.bank_code || "070",
-  rawResponse: providerResponse,
-};
-
-
-  } catch (error) {
-    console.error("Error creating Fidelity virtual account:", error.message);
-    if (error.response) {
-      console.error("Response:", error.response.data);
-    }
-    throw new Error(error.response?.data?.message || "Failed to create Fidelity virtual account.");
-  }
-};
 
 
 const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
@@ -613,47 +663,47 @@ if (!school) {
   return res.status(404).json({ success: false, message: "Invalid schoolInfoId." });
 }
 
-const phoneNumber = req.body.phoneNumber || "08000000000"
-    const fidelityAccount = await fidelityVirtualAccount({
-  name: school.university, 
-  email: req.body.email,
-  phoneNumber, 
-});
+// const phoneNumber = req.body.phoneNumber || "08000000000"
+//     const fidelityAccount = await fidelityVirtualAccount({
+//   name: school.university, 
+//   email: req.body.email,
+//   phoneNumber, 
+// });
+const event = await Event.findById(eventId);
+if (!event) {
+  return res.status(404).json({ success: false, message: "Event not found." });
+}
+
+const virtualAccount = event.virtualAccounts;
+if (!virtualAccount) {
+  return res.status(500).json({ success: false, message: "Event does not have a virtual account assigned." });
+}
+
 
 
     const newPayment = await EventPayment.findOneAndUpdate(
-      { registrationNumber: regNo, eventId },
-      {
-        studentId: student._id,
-        registrationNumber: regNo,
-        paymentStatus: "pending",
-        eventId,
-        studentInfoId: student._id,
-        schoolInfoId,
-        amountPaid: 0,
-        firstName,
-        lastName,
-        department,
-        academicLevel,
-        email,
-        userId,
-        feeType,
-        feeAmount,
-        virtualAccounts: {
-          // fcmb: {
-          //   accountNumber: fcmbAccount.accountNumber,
-          //   accountName: fcmbAccount.accountName,
-          //   bankName: fcmbAccount.bankName,
-          // },
-          fidelity: {
-            accountNumber: fidelityAccount.accountNumber,
-            accountName: fidelityAccount.accountName,
-            bankName: fidelityAccount.bankName,
-          },
-        },
-      },
-      { new: true, upsert: true }
-    );
+  { registrationNumber: regNo, eventId },
+  {
+    studentId: student._id,
+    registrationNumber: regNo,
+    paymentStatus: "pending",
+    eventId,
+    studentInfoId: student._id,
+    schoolInfoId,
+    amountPaid: 0,
+    firstName,
+    lastName,
+    department,
+    academicLevel,
+    email,
+    userId,
+    feeType,
+    feeAmount,
+    virtualAccounts: virtualAccount,  // ✅ FIXED
+  },
+  { new: true, upsert: true }
+);
+
 
     return res.status(201).json({
       success: true,
@@ -672,72 +722,6 @@ const phoneNumber = req.body.phoneNumber || "08000000000"
   }
 };
 
-// const saveStudentDetails = async (req, res) => {
-//   const { userId, firstName, lastName, department, regNo, academicLevel, email, eventId, feeType, feeAmount, schoolInfoId } = req.body;
-
-//   if (!userId || !firstName || !lastName || !department || !regNo || !academicLevel || !email || !eventId || !feeType || !feeAmount || !schoolInfoId) {
-//     return res.status(422).json({ success: false, message: "All fields are required." });
-//   }
-
-//   if (!isValidRegNumber(regNo)) {
-//     return res.status(400).json({ success: false, message: "Invalid registration number format." });
-//   }
-
-//   try {
-//     const student = await Student.findOne({ registrationNumber: regNo });
-
-//     if (!student) {
-//       return res.status(404).json({ success: false, message: "Invalid registration number." });
-//     }
-
-//     const { accountNumber, accountName, bankName } = await generateFCMBVirtualAccount({
-//       email: req.body.email,
-//       phoneNumber: req.body.phoneNumber,
-//     });
-
-//     // 🔹 **Added `schoolInfoId` to `findOneAndUpdate`**
-//     const newPayment = await EventPayment.findOneAndUpdate(
-//       { registrationNumber: regNo, eventId }, 
-//       {
-//         studentId: student._id,
-//         registrationNumber: regNo,
-//         paymentStatus: "pending",
-//         eventId,
-//         studentInfoId: student._id,
-//         schoolInfoId,  
-//         amountPaid: 0, 
-//         firstName,
-//         lastName,
-//         department,
-//         academicLevel,
-//         email,
-//         userId,
-//         feeType,
-//         feeAmount,
-//         virtualAccount: {
-//           accountNumber,
-//           accountName,
-//           bankName,
-//         },
-//       },
-//       { new: true, upsert: true }
-//     );
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Student details saved successfully.",
-//       eventPayment: newPayment,
-//       studentId: student._id,
-//       userId,
-//     });
-//   } catch (error) {
-//     console.error("Error saving student details:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: "An error occurred while saving student details.",
-//     });
-//   }
-// };
 
 
 

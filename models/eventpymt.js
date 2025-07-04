@@ -54,11 +54,7 @@ const eventPaymentSchema = new mongoose.Schema({
   },
 },
 
-  // virtualAccount: {
-  //   accountNumber: String,
-  //   accountName: String,
-  //   bankName: String,
-  // },
+
 });
 
 module.exports = mongoose.model("EventPayment", eventPaymentSchema);

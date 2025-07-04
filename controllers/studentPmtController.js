@@ -571,27 +571,16 @@ const fidelityWebhook = async (req, res) => {
       });
     }
 
-    console.log(" Received Fidelity Webhook:", JSON.stringify(payload, null, 2));
+    console.log("Received Fidelity Webhook:", JSON.stringify(payload, null, 2));
 
     const details = payload.details || {};
     const data = details.data || {};
     const meta = details.meta || {};
 
     const senderAccountNumber = meta.originator_account_number || data.originatoraccountnumber;
-    const senderAccountName = meta.originator_account_name || data.originatorname;
-    const senderBank = meta.originator_bank_name || data.bankname;
     const accountNumber = meta.cr_account || data.craccount;
-    const accountName = meta.cr_account_name || data.craccountname;
-    const narration = meta.narration || data.narration;
     const reference = details.transaction_ref || data.paymentreference;
     const amount = String(details.amount || data.amount || "0");
-
-    const transactionType = details.transaction_type || "collect";
-    const status = details.status || data.statusmessage;
-    const provider = details.provider || payload.requester;
-    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
-    const customerEmail = details.customer_email || "N/A";
-    const transactionDesc = details.transaction_desc || data.narration;
 
     // Validate required fields
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
@@ -602,49 +591,26 @@ const fidelityWebhook = async (req, res) => {
       });
     }
 
-    // Save raw notification for auditing
+    // Save raw notification
     await FidelityNotification.create({
       amount,
-      narration,
-      accountNumber,
-      accountName,
       senderAccountNumber,
-      senderAccountName,
-      senderBank,
+      accountNumber,
       reference,
-      transactionType,
-      status,
-      provider,
-      customerRef,
-      customerEmail,
-      transactionDesc,
-      webhookRaw: payload, 
+      webhookRaw: payload,
     });
 
-    //  Determine what the payment is for
-    // … previous code …
-const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
-if (event) {
-  console.log(`Payment for event: ${event.title}`);
-  await EventPayment.updateOne(
-    { eventId: event._id, registrationNumber: customerRef },
-    { paymentStatus: "paid", amountPaid: amount }
-  );
-} else {
-  const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
-  if (studentPayment) {
-  console.log(`Payment for SUG dues: ${studentPayment._id}`);
-
-  studentPayment.paymentStatus = "paid";
-  studentPayment.amountPaid = amount;
-  await studentPayment.save();
-
-  await recordTransaction(senderAccountNumber);
-} else {
-  console.warn(`Unknown sender account number: ${senderAccountNumber}`);
-}
-
-}
+    const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
+    if (event) {
+      console.log(`Payment for event: ${event.title}`);
+      await EventPayment.updateOne(
+        { eventId: event._id, registrationNumber: customerRef },
+        { paymentStatus: "paid", amountPaid: amount }
+      );
+    } else {
+      console.log(`Payment for SUG dues`);
+      await recordTransaction(senderAccountNumber);
+    }
 
     return res.status(200).json({
       success: true,
@@ -654,10 +620,112 @@ if (event) {
     });
 
   } catch (error) {
-    console.error(" Fidelity webhook error:", error);
+    console.error("Fidelity webhook error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// const fidelityWebhook = async (req, res) => {
+//   try {
+//     const payload = req.body;
+//     const receivedSignature = req.headers["signature"];
+//     const requestRef = payload.request_ref;
+
+//     if (!verifyFidelitySignature(requestRef, receivedSignature, process.env.FIDELITY_API_SECRET)) {
+//       return res.status(401).json({
+//         code: "F01",
+//         description: "Invalid webhook signature from Fidelity",
+//         data: {},
+//       });
+//     }
+
+//     console.log(" Received Fidelity Webhook:", JSON.stringify(payload, null, 2));
+
+//     const details = payload.details || {};
+//     const data = details.data || {};
+//     const meta = details.meta || {};
+
+//     const senderAccountNumber = meta.originator_account_number || data.originatoraccountnumber;
+//     const senderAccountName = meta.originator_account_name || data.originatorname;
+//     const senderBank = meta.originator_bank_name || data.bankname;
+//     const accountNumber = meta.cr_account || data.craccount;
+//     const accountName = meta.cr_account_name || data.craccountname;
+//     const narration = meta.narration || data.narration;
+//     const reference = details.transaction_ref || data.paymentreference;
+//     const amount = String(details.amount || data.amount || "0");
+
+//     const transactionType = details.transaction_type || "collect";
+//     const status = details.status || data.statusmessage;
+//     const provider = details.provider || payload.requester;
+//     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
+//     const customerEmail = details.customer_email || "N/A";
+//     const transactionDesc = details.transaction_desc || data.narration;
+
+//     // Validate required fields
+//     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
+//       return res.status(400).json({
+//         code: "F05",
+//         description: "Missing required fields from Fidelity webhook",
+//         data: {},
+//       });
+//     }
+
+//     // Save raw notification for auditing
+//     await FidelityNotification.create({
+//       amount,
+//       narration,
+//       accountNumber,
+//       accountName,
+//       senderAccountNumber,
+//       senderAccountName,
+//       senderBank,
+//       reference,
+//       transactionType,
+//       status,
+//       provider,
+//       customerRef,
+//       customerEmail,
+//       transactionDesc,
+//       webhookRaw: payload, 
+//     });
+
+//     //  Determine what the payment is for
+//     // … previous code …
+// const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
+// if (event) {
+//   console.log(`Payment for event: ${event.title}`);
+//   await EventPayment.updateOne(
+//     { eventId: event._id, registrationNumber: customerRef },
+//     { paymentStatus: "paid", amountPaid: amount }
+//   );
+// } else {
+//   const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+//   if (studentPayment) {
+//   console.log(`Payment for SUG dues: ${studentPayment._id}`);
+
+//   studentPayment.paymentStatus = "paid";
+//   studentPayment.amountPaid = amount;
+//   await studentPayment.save();
+
+//   await recordTransaction(senderAccountNumber);
+// } else {
+//   console.warn(`Unknown sender account number: ${senderAccountNumber}`);
+// }
+
+// }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Fidelity transaction logged and recorded successfully",
+//       request_ref: requestRef,
+//       transaction_ref: reference,
+//     });
+
+//   } catch (error) {
+//     console.error(" Fidelity webhook error:", error);
+//     return res.status(500).json({ error: "Internal server error" });
+//   }
+// };
 
 // const fidelityWebhook = async (req, res) => {
 //   try {

@@ -33,4 +33,4 @@ const recordEventTransaction = async (eventId, regNo, reference, amount) => {
   return eventTransaction;
 };
 
-module.exports = recordEventTransaction;
+module.exports = {recordEventTransaction};

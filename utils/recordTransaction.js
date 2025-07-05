@@ -15,7 +15,7 @@ const recordTransaction = async (senderAccountNumber, regNo, reference) => {
       throw new Error("Fidelity notification not found.");
     }
 
-    const { amount, reference } = notification;
+    const { amount } = notification;
     const status = "successful"; // or notification.status if available
 
     // Get student payment info

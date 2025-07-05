@@ -15,7 +15,7 @@ const User = require('../models/signUp')
 const WebHookNotification = require('../models/webhook')
 const FidelityNotification = require('../models/fidelityWehook')
 const {recordTransaction} = require('../utils/recordTransaction')
-const {recordTransaction} = require('../utils/recordEventTransaction')
+const recordEventTransaction = require('../utils/recordEventTransaction')
 
 const generateReceiptDetails = require("../utils/generateReceiptDetails");
 
@@ -625,7 +625,7 @@ if (regNoMatch) {
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
       // console.log(`Payment for event: ${event.title}`);
-    await recordTransaction(event._id, customerRef, reference, amount);
+    await recordEventTransaction(event._id, customerRef, reference, amount);
       // console.log(`Payment for event: ${event.title}`);
       // await EventPayment.updateOne(
       //   { eventId: event._id, registrationNumber: customerRef },

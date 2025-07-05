@@ -7,7 +7,7 @@ const FidelityNotification = require('../models/fidelityWehook')
  * Links Student via regNo and stores data in Transaction collection.
  * @param {string} senderAccountNumber
  */
-const recordTransaction = async (senderAccountNumber) => {
+const recordTransaction = async (senderAccountNumber, regNo) => {
   try {
     // Get payment notification details
     const notification = await FidelityNotification.findOne({ senderAccountNumber });
@@ -19,7 +19,9 @@ const recordTransaction = async (senderAccountNumber) => {
     const status = "successful"; // or notification.status if available
 
     // Get student payment info
-    const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
+    const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo:narration  });
+
+    // const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
     if (!studentPayment) {
       throw new Error("StudentPayment not found.");
     }

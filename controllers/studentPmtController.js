@@ -581,6 +581,10 @@ const fidelityWebhook = async (req, res) => {
     const accountNumber = meta.cr_account || data.craccount;
     const reference = details.transaction_ref || data.paymentreference;
     const amount = String(details.amount || data.amount || "0");
+    const narration = meta.narration || data.narration || "";
+
+    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
+
 
     // Validate required fields
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
@@ -596,6 +600,7 @@ const fidelityWebhook = async (req, res) => {
       amount,
       senderAccountNumber,
       accountNumber,
+      narration,
       reference,
       webhookRaw: payload,
     });
@@ -609,7 +614,9 @@ const fidelityWebhook = async (req, res) => {
       );
     } else {
       console.log(`Payment for SUG dues`);
-      await recordTransaction(senderAccountNumber);
+      await recordTransaction(senderAccountNumber, narration);
+
+      // await recordTransaction(senderAccountNumber);
     }
 
     return res.status(200).json({

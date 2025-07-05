@@ -131,7 +131,7 @@ const generateFCMBVirtualAccount = async ({ name, email, phoneNumber }) => {
       url: "https://baas.dev.getrova.co.uk/virtual-account/static",
       headers: {
         "x-organization-id": "test_client",
-        "authorization": `Bearer ${token}`, // Use the dynamically generated token
+        "authorization": `Bearer ${token}`, 
       },
       data: payload,
     };

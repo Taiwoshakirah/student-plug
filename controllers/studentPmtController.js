@@ -603,7 +603,6 @@ if (regNoMatch) {
     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
 
 
-    // Validate required fields
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
       return res.status(400).json({
         code: "F05",

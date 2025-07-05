@@ -15,7 +15,7 @@ const User = require('../models/signUp')
 const WebHookNotification = require('../models/webhook')
 const FidelityNotification = require('../models/fidelityWehook')
 const {recordTransaction} = require('../utils/recordTransaction')
-const recordEventTransaction = require('../utils/recordEventTransaction')
+const {recordEventTransaction} = require('../utils/recordEventTransaction')
 
 const generateReceiptDetails = require("../utils/generateReceiptDetails");
 

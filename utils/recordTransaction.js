@@ -19,7 +19,14 @@ const recordTransaction = async (senderAccountNumber, regNo) => {
     const status = "successful"; // or notification.status if available
 
     // Get student payment info
-    const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo  });
+    const studentPayment = await StudentPayment.findOne({ 
+  $or: [
+    { senderAccountNumber, regNo: extractedRegNo },
+    { regNo: extractedRegNo }
+  ]
+});
+
+    // const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo  });
 
     // const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
     if (!studentPayment) {

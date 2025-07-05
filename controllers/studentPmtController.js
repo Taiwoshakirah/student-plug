@@ -616,7 +616,16 @@ const fidelityWebhook = async (req, res) => {
       );
     } else {
       console.log(`Payment for SUG dues`);
-      await recordTransaction(senderAccountNumber, narration);
+      const regNoMatch = narration.match(/\b[\w\-]+\/[\w\-]+\/[\w\-]+\b/i);
+const extractedRegNo = regNoMatch ? regNoMatch[0] : null;
+
+if (!extractedRegNo) {
+  throw new Error("Could not extract regNo from narration.");
+}
+
+await recordTransaction(senderAccountNumber, extractedRegNo);
+
+      // await recordTransaction(senderAccountNumber, narration);
 
       // await recordTransaction(senderAccountNumber);
     }

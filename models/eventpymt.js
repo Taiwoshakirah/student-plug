@@ -53,6 +53,7 @@ const eventPaymentSchema = new mongoose.Schema({
     bankName: String,
   },
 },
+  senderAccountNumber:{type:Number, required:true}
 
 
 });

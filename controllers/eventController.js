@@ -623,6 +623,7 @@ const saveStudentDetails = async (req, res) => {
     feeType,
     feeAmount,
     schoolInfoId,
+    senderAccountNumber
   } = req.body;
 
   if (
@@ -636,7 +637,8 @@ const saveStudentDetails = async (req, res) => {
     !eventId ||
     !feeType ||
     !feeAmount ||
-    !schoolInfoId
+    !schoolInfoId ||
+    !senderAccountNumber
   ) {
     return res.status(422).json({ success: false, message: "All fields are required." });
   }
@@ -699,7 +701,8 @@ if (!virtualAccount) {
     userId,
     feeType,
     feeAmount,
-    virtualAccounts: virtualAccount,  
+    virtualAccounts: virtualAccount,
+    senderAccountNumber  
   },
   { new: true, upsert: true }
 );

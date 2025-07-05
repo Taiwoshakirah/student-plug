@@ -26,7 +26,7 @@ const recordTransaction = async (senderAccountNumber, regNo) => {
       throw new Error("StudentPayment not found.");
     }
 
-    const { email, feeType, regNo } = studentPayment;
+    const { email, feeType } = studentPayment;
 
     // Get the actual Student by regNo
     const student = await Student.findOne({ registrationNumber: regNo });

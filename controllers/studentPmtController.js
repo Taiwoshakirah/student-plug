@@ -625,7 +625,7 @@ if (regNoMatch) {
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
       // console.log(`Payment for event: ${event.title}`);
-    await recordEventTransaction(event._id, customerRef, reference, amount);
+    await recordEventTransaction(event._id, extractedRegNo, reference, amount);
       // console.log(`Payment for event: ${event.title}`);
       // await EventPayment.updateOne(
       //   { eventId: event._id, registrationNumber: customerRef },

@@ -699,7 +699,7 @@ if (!virtualAccount) {
     userId,
     feeType,
     feeAmount,
-    virtualAccounts: virtualAccount,  // ✅ FIXED
+    virtualAccounts: virtualAccount,  
   },
   { new: true, upsert: true }
 );

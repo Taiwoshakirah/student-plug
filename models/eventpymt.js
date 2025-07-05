@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const eventPaymentSchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Student", // Reference to the Student model
+    ref: "Student",
     required: true,
   },
   registrationNumber: {
@@ -27,7 +27,7 @@ const eventPaymentSchema = new mongoose.Schema({
   academicLevel: { type: String, required: true },
   eventId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Event", // Reference to the Event model
+    ref: "Event",
     required: true,
   },
   email: { type: String, required: true },

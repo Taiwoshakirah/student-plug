@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const eventTransactionSchema = new mongoose.Schema({
   transactionId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "EventPayment",
     required: true,
   },
   amountPaid: {

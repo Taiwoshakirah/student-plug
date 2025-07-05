@@ -15,6 +15,7 @@ const User = require('../models/signUp')
 const WebHookNotification = require('../models/webhook')
 const FidelityNotification = require('../models/fidelityWehook')
 const {recordTransaction} = require('../utils/recordTransaction')
+const {recordEventTransaction} = require('../utils/recordEventTransaction')
 
 const generateReceiptDetails = require("../utils/generateReceiptDetails");
 
@@ -623,15 +624,17 @@ if (regNoMatch) {
 
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
-      console.log(`Payment for event: ${event.title}`);
-      await EventPayment.updateOne(
-        { eventId: event._id, registrationNumber: customerRef },
-        { paymentStatus: "paid", amountPaid: amount }
-      );
+      // console.log(`Payment for event: ${event.title}`);
+    await recordEventTransaction(event._id, customerRef, reference, amount);
+      // console.log(`Payment for event: ${event.title}`);
+      // await EventPayment.updateOne(
+      //   { eventId: event._id, registrationNumber: customerRef },
+      //   { paymentStatus: "paid", amountPaid: amount }
+      // );
     } else {
       console.log(`Payment for SUG dues`);
 
-await recordTransaction(senderAccountNumber, extractedRegNo, reference);
+    await recordTransaction(senderAccountNumber, extractedRegNo, reference);
 
       // await recordTransaction(senderAccountNumber, narration);
 
@@ -833,10 +836,11 @@ await recordTransaction(senderAccountNumber, extractedRegNo, reference);
 // };
 
 
-const getReceipt = async (req, res) => {
-  const { accountNumber } = req.params;
 
-  const receipt = await generateReceiptDetails(accountNumber);
+const getReceipt = async (req, res) => {
+  const { reference } = req.params;
+
+  const receipt = await generateReceiptDetails(reference);
 
   if (!receipt) {
     return res.status(404).json({ message: "Receipt not found" });
@@ -844,6 +848,20 @@ const getReceipt = async (req, res) => {
 
   res.json(receipt);
 };
+
+
+
+// const getReceipt = async (req, res) => {
+//   const { accountNumber } = req.params;
+
+//   const receipt = await generateReceiptDetails(accountNumber);
+
+//   if (!receipt) {
+//     return res.status(404).json({ message: "Receipt not found" });
+//   }
+
+//   res.json(receipt);
+// };
 
 
 

@@ -1,0 +1,36 @@
+const EventPayment = require("../models/eventpymt");
+const EventTransaction = require("../models/eventTransaction");
+
+const recordEventTransaction = async (eventId, regNo, reference, amount) => {
+  // Find the EventPayment record
+  const eventPayment = await EventPayment.findOne({
+    eventId,
+    registrationNumber: regNo,
+  });
+  if (!eventPayment) {
+    throw new Error("EventPayment record not found for student.");
+  }
+
+  // Update EventPayment fields
+  eventPayment.paymentStatus = "completed";
+  eventPayment.amountPaid = amount;
+
+  // Create EventTransaction
+  const eventTransaction = new EventTransaction({
+    eventPaymentId: eventPayment._id,
+    reference,
+    amount,
+    status: "successful",
+  });
+
+  await eventTransaction.save();
+
+  // Add the transaction to EventPayment's transactions array
+  eventPayment.transactions.push(eventTransaction._id);
+  await eventPayment.save();
+
+  console.log("Event transaction recorded successfully.");
+  return eventTransaction;
+};
+
+module.exports = recordEventTransaction;

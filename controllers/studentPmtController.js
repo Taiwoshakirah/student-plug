@@ -631,7 +631,7 @@ if (regNoMatch) {
     } else {
       console.log(`Payment for SUG dues`);
 
-await recordTransaction(senderAccountNumber, extractedRegNo);
+await recordTransaction(senderAccountNumber, extractedRegNo, reference);
 
       // await recordTransaction(senderAccountNumber, narration);
 

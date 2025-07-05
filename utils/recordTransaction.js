@@ -21,10 +21,11 @@ const recordTransaction = async (senderAccountNumber, regNo) => {
     // Get student payment info
     const studentPayment = await StudentPayment.findOne({ 
   $or: [
-    { senderAccountNumber, regNo: extractedRegNo },
-    { regNo: extractedRegNo }
+    { senderAccountNumber, regNo },
+    { regNo }
   ]
 });
+
 
     // const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo  });
 

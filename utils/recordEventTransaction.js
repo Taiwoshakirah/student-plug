@@ -1,11 +1,12 @@
 const EventPayment = require("../models/eventpymt");
 const EventTransaction = require("../models/eventTransaction");
+const mongoose = require("mongoose");
 
 const recordEventTransaction = async (eventId, regNo, reference, amount) => {
   // Find the EventPayment record
   const eventPayment = await EventPayment.findOne({
-    eventId,
-    registrationNumber: regNo,
+    eventId: new mongoose.Types.ObjectId(eventId),
+    registrationNumber: regNo.trim(),
   });
   if (!eventPayment) {
     throw new Error("EventPayment record not found for student.");

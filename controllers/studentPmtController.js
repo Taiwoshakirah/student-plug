@@ -582,6 +582,8 @@ const fidelityWebhook = async (req, res) => {
     const reference = details.transaction_ref || data.paymentreference;
     const amount = String(details.amount || data.amount || "0");
     const narration = meta.narration || data.narration || "";
+    console.log("NARRATION:", narration);
+
 
     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
 

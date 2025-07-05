@@ -584,6 +584,21 @@ const fidelityWebhook = async (req, res) => {
     const narration = meta.narration || data.narration || "";
     console.log("NARRATION:", narration);
 
+    let extractedRegNo;
+
+const regNoMatch = narration.match(/\b([A-Za-z]+\s\d+\s\d+)\b/) 
+                 || narration.match(/\b(\d+\/\d+\/\d+)\b/);
+
+if (regNoMatch) {
+  extractedRegNo = regNoMatch[1].includes(" ")
+    ? regNoMatch[1].replace(/\s/g, "/")
+    : regNoMatch[1];
+  console.log("Extracted regNo:", extractedRegNo);
+} else {
+  throw new Error("Could not extract regNo from narration.");
+}
+
+
 
     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
 
@@ -616,12 +631,12 @@ const fidelityWebhook = async (req, res) => {
       );
     } else {
       console.log(`Payment for SUG dues`);
-      const regNoMatch = narration.match(/\b[\w\-]+\/[\w\-]+\/[\w\-]+\b/i);
-const extractedRegNo = regNoMatch ? regNoMatch[0] : null;
+//       const regNoMatch = narration.match(/\b[\w\-]+\/[\w\-]+\/[\w\-]+\b/i);
+// const extractedRegNo = regNoMatch ? regNoMatch[0] : null;
 
-if (!extractedRegNo) {
-  throw new Error("Could not extract regNo from narration.");
-}
+// if (!extractedRegNo) {
+//   throw new Error("Could not extract regNo from narration.");
+// }
 
 await recordTransaction(senderAccountNumber, extractedRegNo);
 

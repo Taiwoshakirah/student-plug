@@ -31,6 +31,8 @@ const recordEventTransaction = async (eventId, regNo, reference, amount) => {
 
   // Add the transaction to EventPayment's transactions array
   eventPayment.transactions.push(eventTransaction._id);
+  // Add reference to EventPayment for easy lookup
+  eventPayment.reference = reference;
   await eventPayment.save();
 
   console.log("Event transaction recorded successfully.");

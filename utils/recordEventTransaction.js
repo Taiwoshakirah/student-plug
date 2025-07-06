@@ -18,10 +18,12 @@ const recordEventTransaction = async (eventId, regNo, reference, amount) => {
 
   // Create EventTransaction
   const eventTransaction = new EventTransaction({
-    eventPaymentId: eventPayment._id,
-    reference,
-    amount,
-    status: "successful",
+    transactionId: eventPayment._id,
+    studentId: eventPayment.studentId,
+    eventId: eventPayment.eventId,
+    amountPaid: amount,
+    paymentDate: new Date(),
+    paymentStatus: "completed",
   });
 
   await eventTransaction.save();

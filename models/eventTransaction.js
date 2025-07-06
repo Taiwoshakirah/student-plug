@@ -6,6 +6,10 @@ const eventTransactionSchema = new mongoose.Schema({
     ref: "EventPayment",
     required: true,
   },
+  reference: {
+    type: String,
+    required: true,  
+  },
   amountPaid: {
     type: Number,
     required: true,
@@ -15,9 +19,11 @@ const eventTransactionSchema = new mongoose.Schema({
     enum: ['pending', 'completed', 'failed'],
     default: 'pending',
   },
+   
   paymentDate: {
     type: Date,
     required: true,
+    default: Date.now,
   },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,

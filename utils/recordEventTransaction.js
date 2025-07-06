@@ -22,7 +22,8 @@ const recordEventTransaction = async (eventId, regNo, reference, amount) => {
     studentId: eventPayment.studentId,
     eventId: eventPayment.eventId,
     amountPaid: amount,
-    paymentDate: new Date(),
+    // paymentDate: new Date(),
+    reference,
     paymentStatus: "completed",
   });
 

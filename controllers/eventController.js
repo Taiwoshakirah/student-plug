@@ -766,7 +766,9 @@ const fetchPaymentDetail = async (req, res) => {
       });
     }
 
-    const { accountNumber, accountName, bankName } = studentDetails.virtualAccount;
+    const { accountNumber, accountName, bankName } =
+  studentDetails.virtualAccounts?.fidelity || {};
+
 
     const serviceCharge = 100;
     const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
@@ -806,103 +808,6 @@ const fetchPaymentDetail = async (req, res) => {
 
 
 
-
-const saveCardDetails = async (req, res) => {
-  const { bankName, cardNumber, cvv, expiryDate, email } = req.body; // Add email
-  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-
-  // 1. Validate Input Fields
-  if (!bankName || !cardNumber || !cvv || !expiryDate || !email) {
-    return res.status(400).json({ success: false, message: "All fields are required, including email." });
-  }
-
-  if (!/^\d{16}$/.test(cardNumber)) {
-    return res.status(400).json({ success: false, message: "Card number must be 16 digits." });
-  }
-
-  if (!/^\d{3}$/.test(cvv)) {
-    return res.status(400).json({ success: false, message: "CVV must be 3 digits." });
-  }
-
-  if (!/^\d{2}\/\d{2}$/.test(expiryDate)) {
-    return res.status(400).json({ success: false, message: "Expiry date must be in MM/YY format." });
-  }
-
-  try {
-    // 2. Tokenize Card using Paystack API
-    const response = await axios.post(
-      "https://api.paystack.co/charge/tokenize",
-      {
-        email: email,
-        card: {
-          number: cardNumber,
-          cvv: cvv,
-          expiry_month: expiryDate.split("/")[0],
-          expiry_year: `20${expiryDate.split("/")[1]}`,
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (response.data.status) {
-      const { authorization_code } = response.data.data; // Extract the token
-
-      // Save Tokenized Card in the CardDetails collection
-      // const newCardDetails = new EventCardDetails({
-      //   email: email,
-      //   token: authorization_code,
-      //   firstThree: cardNumber.slice(0, 3),
-      //   lastThree: cardNumber.slice(-3),
-      //   bankName: bankName,
-      // });
-      const newCardDetails = await EventCardDetails.findOneAndUpdate(
-        { email }, // Find the card by email
-        {
-          email: email,
-          token: authorization_code,
-          firstThree: cardNumber.slice(0, 3),
-          lastThree: cardNumber.slice(-3),
-          bankName: bankName,
-        },
-        { new: true, upsert: true } // Update the document if found or create a new one
-      );
-      
-
-      await newCardDetails.save(); // Save to the database
-
-      return res.status(200).json({
-        success: true,
-        message: "Card tokenized and saved successfully.",
-        data: {
-          token: authorization_code,
-          firstThree: cardNumber.slice(0, 3),
-          lastThree: cardNumber.slice(-3),
-          bankName: bankName,
-        },
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Failed to tokenize the card.",
-        error: response.data.message,
-      });
-    }
-  } catch (error) {
-    console.error("Error tokenizing card:", error.response?.data || error.message);
-    return res.status(500).json({
-      success: false,
-      message: "An error occurred while tokenizing the card.",
-      error: error.response?.data || error.message,
-    });
-  }
-};
-
-  
   
 const fetchConfirmationDetails = async (req, res) => {
   const { email } = req.params; // Retrieve the email from URL params
@@ -1264,4 +1169,4 @@ const verifyPayment = async (req, res) => {
 
   
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,fetchPaymentDetail,saveCardDetails,fetchConfirmationDetails,chargeCard,verifyPayment };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,fetchPaymentDetail,fetchConfirmationDetails,chargeCard,verifyPayment };

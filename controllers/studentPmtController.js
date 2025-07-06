@@ -581,7 +581,8 @@ const fidelityWebhook = async (req, res) => {
     const senderAccountNumber = meta.originator_account_number || data.originatoraccountnumber;
     const accountNumber = meta.cr_account || data.craccount;
     const reference = details.transaction_ref || data.paymentreference;
-    const amount = String(details.amount || data.amount || "0");
+    const amount = parseFloat(data.amount || details.amount || "0");
+    // const amount = String(details.amount || data.amount || "0");
     const narration = meta.narration || data.narration || "";
     console.log("NARRATION:", narration);
 
@@ -624,21 +625,14 @@ if (regNoMatch) {
 
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
-      // console.log(`Payment for event: ${event.title}`);
     await recordEventTransaction(event._id, extractedRegNo, reference, amount);
-      // console.log(`Payment for event: ${event.title}`);
-      // await EventPayment.updateOne(
-      //   { eventId: event._id, registrationNumber: customerRef },
-      //   { paymentStatus: "paid", amountPaid: amount }
-      // );
+     
     } else {
       console.log(`Payment for SUG dues`);
 
     await recordTransaction(senderAccountNumber, extractedRegNo, reference);
 
-      // await recordTransaction(senderAccountNumber, narration);
-
-      // await recordTransaction(senderAccountNumber);
+ 
     }
 
     return res.status(200).json({

@@ -16,6 +16,7 @@ const sendMail = require('../utils/sendMail')
 const { v4: uuidv4 } = require("uuid");
 const requestId = uuidv4(); // Generates a unique ID
 const crypto = require("crypto");
+const generateEventReceiptDetails = require('../utils/generateEventRecipt');
 
 
 
@@ -805,8 +806,134 @@ const fetchPaymentDetail = async (req, res) => {
   }
 };
 
+const getReceipt = async (req, res) => {
+  const { reference } = req.params;
+
+  const receipt = await generateEventReceiptDetails(reference);
+
+  if (!receipt) {
+    return res.status(404).json({ message: "Receipt not found" });
+  }
+
+  res.json(receipt);
+};
 
 
+// const schoolEventPaymentStatus = async (req, res) => {
+//     const { schoolInfoId } = req.params;
+//     const { page = 1, limit = 1 } = req.query; 
+
+//     try {
+//         // Retrieve school information and populate related faculties and students
+//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+//             .populate({
+//                 path: "faculties",
+//                 select: "facultyName",
+//             })
+//             .populate({
+//                 path: "students",
+//                 select: "registrationNumber faculty transactions",
+//                 populate: [
+//                     {
+//                         path: "faculty",
+//                         select: "facultyName",
+//                     },
+//                     {
+//                         path: "transactions",
+//                         select: "status",
+//                     },
+//                 ],
+//             });
+
+//         if (!schoolInfo) {
+//             return res.status(404).json({ message: "School information not found." });
+//         }
+
+//         const totalRegistrations = schoolInfo.students.length;
+//         let totalPaid = 0;
+
+//         // Create a dictionary to hold data grouped by faculty
+//         const facultyWiseData = {};
+
+//         schoolInfo.faculties.forEach((faculty) => {
+//             facultyWiseData[faculty._id] = {
+//                 facultyName: faculty.facultyName,
+//                 totalRegistrations: 0,
+//                 students: [],
+//             };
+//         });
+
+//         // Categorize students by faculty and payment status
+//         schoolInfo.students.forEach((student) => {
+//             const hasPaid = student.transactions.some(
+//                 (transaction) => transaction.status === "successful"
+//             );
+//             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
+//             const formattedRegNo = `${student.registrationNumber}`;
+
+//             if (student.faculty && facultyWiseData[student.faculty._id]) {
+//                 facultyWiseData[student.faculty._id].totalRegistrations++;
+//                 facultyWiseData[student.faculty._id].students.push({
+//                     registrationNumber: formattedRegNo,
+//                     status: paymentStatus,
+//                 });
+//             }
+
+//             if (hasPaid) {
+//                 totalPaid++;
+//             }
+//         });
+
+//         const totalUnpaid = totalRegistrations - totalPaid;
+
+//         // Implement pagination for faculties
+//         const facultyEntries = Object.values(facultyWiseData);
+//         const totalFaculties = facultyEntries.length;
+
+//         const startIndex = (page - 1) * limit; 
+//         const endIndex = startIndex + parseInt(limit, 10); 
+
+//         // Slice the faculty entries based on pagination indices
+//         const paginatedFaculties = facultyEntries.slice(
+//             Math.max(startIndex, 0), 
+//             Math.min(endIndex, totalFaculties)
+//         );
+
+//         // Handle case where no entries exist for the requested page
+//         if (paginatedFaculties.length === 0) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "No faculties found for the specified page.",
+//             });
+//         }
+
+//         // Format response
+//         const result = {
+//             totalRegistrations,
+//             totalPaid,
+//             totalUnpaid,
+//             facultyDetails: paginatedFaculties,
+//             pagination: {
+//                 currentPage: Number(page),
+//                 totalPages: Math.ceil(totalFaculties / limit),
+//                 hasNextPage: endIndex < totalFaculties,
+//                 hasPrevPage: startIndex > 0,
+//             },
+//         };
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "School payment status retrieved successfully.",
+//             data: result,
+//         });
+//     } catch (error) {
+//         console.error("Error retrieving school payment status:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "An error occurred while retrieving school payment status.",
+//         });
+//     }
+// };
 
   
 const fetchConfirmationDetails = async (req, res) => {
@@ -964,176 +1091,176 @@ const chargeCard = async (req, res) => {
 
 
 
-const handleTransactionVerification = async (verificationResponse) => {
-  if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
-    const transaction = verificationResponse.data;
-    const { reference, amount, status, metadata } = transaction;
+// const handleTransactionVerification = async (verificationResponse) => {
+//   if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
+//     const transaction = verificationResponse.data;
+//     const { reference, amount, status, metadata } = transaction;
 
-    console.log('Transaction Metadata:', metadata);
+//     console.log('Transaction Metadata:', metadata);
 
-    // Validate metadata fields
-    const requiredFields = ['userId', 'regNo', 'eventId', 'firstName', 'lastName', 'department', 'academicLevel', 'email'];
-    for (const field of requiredFields) {
-      if (!metadata[field]) {
-        console.error(`Missing field in metadata: ${field}`);
-        throw new Error(`Missing required metadata field: ${field}`);
-      }
-    }
+//     // Validate metadata fields
+//     const requiredFields = ['userId', 'regNo', 'eventId', 'firstName', 'lastName', 'department', 'academicLevel', 'email'];
+//     for (const field of requiredFields) {
+//       if (!metadata[field]) {
+//         console.error(`Missing field in metadata: ${field}`);
+//         throw new Error(`Missing required metadata field: ${field}`);
+//       }
+//     }
 
-    const amountPaid = amount / 100; // Convert from kobo to naira
+//     const amountPaid = amount / 100; // Convert from kobo to naira
 
-    // Find the existing payment document using userId and eventId
-    let paymentData = await EventPayment.findOne({
-      userId: metadata.userId, // Use userId here
-      eventId: metadata.eventId,
-    });
+//     // Find the existing payment document using userId and eventId
+//     let paymentData = await EventPayment.findOne({
+//       userId: metadata.userId, // Use userId here
+//       eventId: metadata.eventId,
+//     });
 
-    if (paymentData) {
-      // If paymentData exists, update it
-      if (paymentData.paymentStatus === 'pending') {
-        // Only update if it's still pending
-        paymentData.paymentStatus = 'completed';
-        paymentData.transactionId = reference;
-        paymentData.amountPaid = amountPaid;
-        paymentData.paymentDate = transaction.paid_at;
+//     if (paymentData) {
+//       // If paymentData exists, update it
+//       if (paymentData.paymentStatus === 'pending') {
+//         // Only update if it's still pending
+//         paymentData.paymentStatus = 'completed';
+//         paymentData.transactionId = reference;
+//         paymentData.amountPaid = amountPaid;
+//         paymentData.paymentDate = transaction.paid_at;
 
-        // Create a new EventTransaction document
-        const newTransaction = new EventTransaction({
-          transactionId: reference,
-          amountPaid,
-          paymentStatus: 'completed',
-          paymentDate: transaction.paid_at,
-          studentId: metadata.userId,
-          eventId: metadata.eventId,
-        });
+//         // Create a new EventTransaction document
+//         const newTransaction = new EventTransaction({
+//           transactionId: reference,
+//           amountPaid,
+//           paymentStatus: 'completed',
+//           paymentDate: transaction.paid_at,
+//           studentId: metadata.userId,
+//           eventId: metadata.eventId,
+//         });
 
-        try {
-          // Save the new transaction
-          const savedTransaction = await newTransaction.save();
+//         try {
+//           // Save the new transaction
+//           const savedTransaction = await newTransaction.save();
 
-          // Push the new transaction's ObjectId to the transactions array
-          paymentData.transactions.push(savedTransaction._id);
+//           // Push the new transaction's ObjectId to the transactions array
+//           paymentData.transactions.push(savedTransaction._id);
 
-          // Save the updated payment document
-          const updatedPayment = await paymentData.save();
+//           // Save the updated payment document
+//           const updatedPayment = await paymentData.save();
 
-          return {
-            success: true,
-            message: 'Transaction verified and payment details updated successfully.',
-            data: updatedPayment,
-          };
-        } catch (error) {
-          console.error('Error saving transaction or payment:', error);
-          return {
-            success: false,
-            message: 'Error saving payment details or transaction.',
-            error: error.message,
-          };
-        }
-      } else {
-        // If paymentStatus is already 'completed', don't update it
-        return {
-          success: false,
-          message: 'Payment has already been processed.',
-        };
-      }
-    } else {
-      // If no payment record exists, create a new payment document
-      paymentData = new EventPayment({
-        userId: metadata.userId, // Ensure this is correct
-        registrationNumber: metadata.regNo,
-        paymentStatus: 'completed',
-        amountPaid: amountPaid,
-        firstName: metadata.firstName,
-        lastName: metadata.lastName,
-        department: metadata.department,
-        academicLevel: metadata.academicLevel,
-        email: metadata.email,
-        eventId: metadata.eventId,
-        paymentDate: transaction.paid_at,
-        transactions: [], // Start with an empty transactions array
-        studentId: metadata.userId, // Pass studentId here
-      });
+//           return {
+//             success: true,
+//             message: 'Transaction verified and payment details updated successfully.',
+//             data: updatedPayment,
+//           };
+//         } catch (error) {
+//           console.error('Error saving transaction or payment:', error);
+//           return {
+//             success: false,
+//             message: 'Error saving payment details or transaction.',
+//             error: error.message,
+//           };
+//         }
+//       } else {
+//         // If paymentStatus is already 'completed', don't update it
+//         return {
+//           success: false,
+//           message: 'Payment has already been processed.',
+//         };
+//       }
+//     } else {
+//       // If no payment record exists, create a new payment document
+//       paymentData = new EventPayment({
+//         userId: metadata.userId, // Ensure this is correct
+//         registrationNumber: metadata.regNo,
+//         paymentStatus: 'completed',
+//         amountPaid: amountPaid,
+//         firstName: metadata.firstName,
+//         lastName: metadata.lastName,
+//         department: metadata.department,
+//         academicLevel: metadata.academicLevel,
+//         email: metadata.email,
+//         eventId: metadata.eventId,
+//         paymentDate: transaction.paid_at,
+//         transactions: [], // Start with an empty transactions array
+//         studentId: metadata.userId, // Pass studentId here
+//       });
 
-      try {
-        // Save the payment document first
-        const savedPayment = await paymentData.save();
+//       try {
+//         // Save the payment document first
+//         const savedPayment = await paymentData.save();
 
-        // Create a new EventTransaction document
-        const newTransaction = new EventTransaction({
-          transactionId: reference,
-          amountPaid,
-          paymentStatus: 'completed',
-          paymentDate: transaction.paid_at,
-          studentId: metadata.userId,
-          eventId: metadata.eventId,
-        });
+//         // Create a new EventTransaction document
+//         const newTransaction = new EventTransaction({
+//           transactionId: reference,
+//           amountPaid,
+//           paymentStatus: 'completed',
+//           paymentDate: transaction.paid_at,
+//           studentId: metadata.userId,
+//           eventId: metadata.eventId,
+//         });
 
-        // Save the new transaction
-        const savedTransaction = await newTransaction.save();
+//         // Save the new transaction
+//         const savedTransaction = await newTransaction.save();
 
-        // Add the transaction ObjectId to the payment document's transactions array
-        savedPayment.transactions.push(savedTransaction._id);
+//         // Add the transaction ObjectId to the payment document's transactions array
+//         savedPayment.transactions.push(savedTransaction._id);
 
-        // Save the updated payment document with the new transaction
-        const finalPayment = await savedPayment.save();
+//         // Save the updated payment document with the new transaction
+//         const finalPayment = await savedPayment.save();
 
-        return {
-          success: true,
-          message: 'Transaction verified and payment saved successfully.',
-          data: finalPayment,
-        };
-      } catch (error) {
-        console.error('Error saving payment or transaction:', error);
-        return {
-          success: false,
-          message: 'Error saving payment details or transaction.',
-          error: error.message,
-        };
-      }
-    }
-  } else {
-    console.error('Transaction verification failed:', verificationResponse.message);
-    return {
-      success: false,
-      message: 'Transaction verification failed.',
-    };
-  }
-};
+//         return {
+//           success: true,
+//           message: 'Transaction verified and payment saved successfully.',
+//           data: finalPayment,
+//         };
+//       } catch (error) {
+//         console.error('Error saving payment or transaction:', error);
+//         return {
+//           success: false,
+//           message: 'Error saving payment details or transaction.',
+//           error: error.message,
+//         };
+//       }
+//     }
+//   } else {
+//     console.error('Transaction verification failed:', verificationResponse.message);
+//     return {
+//       success: false,
+//       message: 'Transaction verification failed.',
+//     };
+//   }
+// };
 
 
 
-const verifyPayment = async (req, res) => {
-  const { reference } = req.params;
+// const verifyPayment = async (req, res) => {
+//   const { reference } = req.params;
 
-  try {
-    const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: {
-        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-      },
-    });
+//   try {
+//     const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+//       headers: {
+//         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+//       },
+//     });
 
-    if (response.data.status) {
-      // Pass the verification response to handleTransactionVerification
-      const result = await handleTransactionVerification(response.data);
+//     if (response.data.status) {
+//       // Pass the verification response to handleTransactionVerification
+//       const result = await handleTransactionVerification(response.data);
 
-      // Return the result from handleTransactionVerification
-      return res.status(result.success ? 200 : 400).json(result);
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Transaction verification failed.',
-      });
-    }
-  } catch (error) {
-    console.error('Error verifying payment:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while verifying the payment.',
-      error: error.message,
-    });
-  }
-};
+//       // Return the result from handleTransactionVerification
+//       return res.status(result.success ? 200 : 400).json(result);
+//     } else {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Transaction verification failed.',
+//       });
+//     }
+//   } catch (error) {
+//     console.error('Error verifying payment:', error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while verifying the payment.',
+//       error: error.message,
+//     });
+//   }
+// };
 
 
 
@@ -1169,4 +1296,4 @@ const verifyPayment = async (req, res) => {
 
   
 
-module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,fetchPaymentDetail,fetchConfirmationDetails,chargeCard,verifyPayment };
+module.exports = { createUnpaidEvent,createPaidEvent, getAllEvents, getEventById,getEventsByAdmin,saveStudentDetails,fetchPaymentDetail,fetchConfirmationDetails, getReceipt };

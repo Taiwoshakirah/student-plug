@@ -595,10 +595,14 @@ if (regNoMatch) {
   extractedRegNo = regNoMatch[1].includes(" ")
     ? regNoMatch[1].replace(/\s/g, "/")
     : regNoMatch[1];
-  console.log("Extracted regNo:", extractedRegNo);
+  console.log(" Extracted regNo from narration:", extractedRegNo);
+} else if (customerRef && customerRef !== "Unknown") {
+  extractedRegNo = customerRef;
+  console.log(" Using customer_ref as regNo fallback:", extractedRegNo);
 } else {
-  throw new Error("Could not extract regNo from narration.");
+  throw new Error("Could not extract regNo from narration or customer_ref.");
 }
+
 
 
 

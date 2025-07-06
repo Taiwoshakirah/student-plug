@@ -586,6 +586,7 @@ const fidelityWebhook = async (req, res) => {
     const narration = meta.narration || data.narration || "";
     console.log("NARRATION:", narration);
 
+    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
     let extractedRegNo;
 
 const regNoMatch = narration.match(/\b([A-Za-z]+\s\d+\s\d+)\b/) 
@@ -606,7 +607,6 @@ if (regNoMatch) {
 
 
 
-    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
 
 
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {

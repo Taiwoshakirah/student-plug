@@ -586,28 +586,36 @@ const fidelityWebhook = async (req, res) => {
     const narration = meta.narration || data.narration || "";
     console.log("NARRATION:", narration);
 
-    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
-    let extractedRegNo;
-
-const regNoMatch = narration.match(/\b([A-Za-z]+\s\d+\s\d+)\b/) 
-                 || narration.match(/\b(\d+\/\d+\/\d+)\b/);
-
-if (regNoMatch) {
-  extractedRegNo = regNoMatch[1].includes(" ")
-    ? regNoMatch[1].replace(/\s/g, "/")
-    : regNoMatch[1];
-  console.log(" Extracted regNo from narration:", extractedRegNo);
-} else if (customerRef && customerRef !== "Unknown") {
-  extractedRegNo = customerRef;
-  console.log(" Using customer_ref as regNo fallback:", extractedRegNo);
+const referenceMatch = narration.match(/TXN-[A-Z0-9]{8}/);
+if (referenceMatch) {
+   const reference = referenceMatch[0];
+   const studentPayment = await StudentPayment.findOne({ reference });
+   if (!studentPayment) {
+       throw new Error("StudentPayment not found for reference: " + reference);
+   }
+   // proceed to record transaction
 } else {
-  throw new Error("Could not extract regNo from narration or customer_ref.");
+   throw new Error("No valid payment reference found in narration.");
 }
 
 
+//     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
+//     let extractedRegNo;
 
+// const regNoMatch = narration.match(/\b([A-Za-z]+\s\d+\s\d+)\b/) 
+//                  || narration.match(/\b(\d+\/\d+\/\d+)\b/);
 
-
+// if (regNoMatch) {
+//   extractedRegNo = regNoMatch[1].includes(" ")
+//     ? regNoMatch[1].replace(/\s/g, "/")
+//     : regNoMatch[1];
+//   console.log(" Extracted regNo from narration:", extractedRegNo);
+// } else if (customerRef && customerRef !== "Unknown") {
+//   extractedRegNo = customerRef;
+//   console.log(" Using customer_ref as regNo fallback:", extractedRegNo);
+// } else {
+//   throw new Error("Could not extract regNo from narration or customer_ref.");
+// }
 
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
       return res.status(400).json({

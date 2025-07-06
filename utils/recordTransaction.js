@@ -2,9 +2,18 @@ const StudentPayment = require("../models/studentPayment");
 const Student = require('../models/studentRegNo')
 const Transaction = require('../models/transaction')
 const FidelityNotification = require('../models/fidelityWehook')
+
+
+const crypto = require("crypto");
+
+const generatePaymentReference = () => {
+  return "TXN-" + crypto.randomBytes(4).toString("hex").toUpperCase();  // e.g. TXN-A1B2C3D4
+}
+
 /**
  * Record a transaction once payment is received.
  * Links Student via regNo and stores data in Transaction collection.
+ * 
  * @param {string} senderAccountNumber
  */
 const recordTransaction = async (senderAccountNumber, regNo, reference) => {
@@ -57,7 +66,8 @@ const recordTransaction = async (senderAccountNumber, regNo, reference) => {
     studentPayment.transactions.push(transaction._id);
     student.transactions.push(transaction._id)
     // 🔷 Add reference to EventPayment for easy lookup
-    studentPayment.reference = reference;
+    studentPayment.reference = generatePaymentReference();
+    // studentPayment.reference = reference;
     await studentPayment.save();
     await student.save();
     

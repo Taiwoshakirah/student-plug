@@ -16,73 +16,51 @@ const generatePaymentReference = () => {
  * 
  * @param {string} senderAccountNumber
  */
-const recordTransaction = async (senderAccountNumber, regNo, reference) => {
-  try {
-    // Get payment notification details
-    const notification = await FidelityNotification.findOne({ senderAccountNumber, reference  });
-    if (!notification) {
-      throw new Error("Fidelity notification not found.");
-    }
-
-    const { amount } = notification;
-    const status = "successful"; // or notification.status if available
-
-    // Get student payment info
-//     const studentPayment = await StudentPayment.findOne({ 
-//   $or: [
-//     { senderAccountNumber, regNo },
-//     { regNo }
-//   ]
-// });
-const studentPayment = await StudentPayment.findOne({ 
-  senderAccountNumber,
-  status: 'pending'
-});
-
-
-
-    // const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo  });
-
-    // const studentPayment = await StudentPayment.findOne({ senderAccountNumber });
-    if (!studentPayment) {
-      throw new Error("StudentPayment not found.");
-    }
-
-    const { email, feeType } = studentPayment;
-
-    // Get the actual Student by regNo
-    const student = await Student.findOne({ registrationNumber: regNo });
-    if (!student) {
-      throw new Error("Student not found.");
-    }
-
-    // Create new transaction record
-    const transaction = new Transaction({
-      email,
-      amount,
-      feeType,
-      reference,
-      status,
-      student: student._id,
-    });
-
-    await transaction.save();
-    // Push transaction ID into studentPayment.transaction array
-    studentPayment.transactions.push(transaction._id);
-    student.transactions.push(transaction._id)
-    // 🔷 Add reference to studentPayment for easy lookup
-    studentPayment.status = 'paid';
-    studentPayment.reference = reference;
-    await studentPayment.save();
-    await student.save();
-    
-    console.log("Transaction recorded successfully.");
-    return transaction;
-
-  } catch (error) {
-    console.error("Error recording transaction:", error.message);
-    throw error;
+const recordTransaction = async (senderAccountNumber, reference) => {
+  const notification = await FidelityNotification.findOne({ senderAccountNumber, reference });
+  if (!notification) {
+    throw new Error("Fidelity notification not found.");
   }
+
+  const { amount } = notification;
+  const status = "successful";
+
+  const studentPayment = await StudentPayment.findOne({ 
+    senderAccountNumber,
+    status: 'pending'
+  });
+  if (!studentPayment) {
+    throw new Error("StudentPayment not found.");
+  }
+
+  const { email, feeType, regNo } = studentPayment;
+
+  const student = await Student.findOne({ registrationNumber: regNo });
+  if (!student) {
+    throw new Error("Student not found.");
+  }
+
+  const transaction = new Transaction({
+    email,
+    amount,
+    feeType,
+    reference,
+    status,
+    student: student._id,
+  });
+
+  await transaction.save();
+  studentPayment.transactions.push(transaction._id);
+  student.transactions.push(transaction._id);
+  studentPayment.status = 'paid';
+  studentPayment.reference = reference;
+
+  await studentPayment.save();
+  await student.save();
+
+  console.log("Transaction recorded successfully.");
+  return transaction;
 };
+
 
 module.exports = { recordTransaction };

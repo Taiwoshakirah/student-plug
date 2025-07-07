@@ -615,7 +615,8 @@ const fidelityWebhook = async (req, res) => {
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
 if (event) {
     console.log("Event payment detected.");
-    await recordEventTransaction(event._id, reference, amount, senderAccountNumber);
+    await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
+
 } else {
     const schoolInfo = await SchoolInfo.findOne({ "virtualAccount.fidelity.accountNumber": accountNumber });
     if (schoolInfo) {

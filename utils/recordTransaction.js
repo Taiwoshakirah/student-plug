@@ -26,8 +26,7 @@ const recordTransaction = async (senderAccountNumber, reference) => {
   const status = "successful";
 
   const studentPayment = await StudentPayment.findOne({ 
-    senderAccountNumber,
-    status: 'pending'
+    senderAccountNumber
   });
   if (!studentPayment) {
     throw new Error("StudentPayment not found.");
@@ -52,7 +51,7 @@ const recordTransaction = async (senderAccountNumber, reference) => {
   await transaction.save();
   studentPayment.transactions.push(transaction._id);
   student.transactions.push(transaction._id);
-  studentPayment.status = 'paid';
+  // studentPayment.status = 'paid';
   studentPayment.reference = reference;
 
   await studentPayment.save();

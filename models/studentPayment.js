@@ -38,7 +38,10 @@ const studentPymtSchema = new mongoose.Schema({
     bankName: String,
     accountName: String, // optional if needed
   },
-  senderAccountNumber:{type:Number, required:true},
+  senderAccountNumber: {
+  type: String,
+  required: true
+},
   reference: { type: String },
 }, { timestamps: true });
 

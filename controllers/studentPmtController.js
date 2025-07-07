@@ -24,6 +24,9 @@ const processedEvents = new Set();
 
 
  
+ const generatePaymentReference = () => {
+   return "TXN-" + crypto.randomBytes(4).toString("hex").toUpperCase();  // e.g. TXN-A1B2C3D4
+ }
 
 const isValidRegNumber = (regNum) => {
   const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
@@ -68,6 +71,8 @@ const studentPaymentDetails = async (req, res) => {
       });
     }
 
+    const paymentReference = generatePaymentReference();
+
     const newStudentPayment = await StudentPayment.findOneAndUpdate(
       { $or: [{ regNo }, { email }] },
       {
@@ -83,7 +88,8 @@ const studentPaymentDetails = async (req, res) => {
         schoolInfoId: schoolInfo._id, 
         virtualAccount: schoolInfo.virtualAccount,
         OtherVirtualAccount: schoolInfo.OtherVirtualAccount,
-        senderAccountNumber
+        senderAccountNumber,
+        reference: paymentReference
       },
       { new: true, upsert: true }
     );
@@ -96,6 +102,7 @@ const studentPaymentDetails = async (req, res) => {
       payment: newStudentPayment,
       virtualAccount: schoolInfo.virtualAccount,
       OtherVirtualAccount: schoolInfo.OtherVirtualAccount,
+      reference: paymentReference
     });
 
   } catch (error) {

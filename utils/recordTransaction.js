@@ -66,8 +66,7 @@ const recordTransaction = async (senderAccountNumber, regNo, reference) => {
     studentPayment.transactions.push(transaction._id);
     student.transactions.push(transaction._id)
     // 🔷 Add reference to EventPayment for easy lookup
-    studentPayment.reference = generatePaymentReference();
-    // studentPayment.reference = reference;
+    studentPayment.reference = reference;
     await studentPayment.save();
     await student.save();
     

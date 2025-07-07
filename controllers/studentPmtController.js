@@ -614,22 +614,23 @@ const fidelityWebhook = async (req, res) => {
 
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
 if (event) {
-    console.log("Event payment detected.");
-    await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
-
-} else {
-    const schoolInfo = await SchoolInfo.findOne({ "virtualAccount.fidelity.accountNumber": accountNumber });
-    if (schoolInfo) {
-        console.log("SUG payment detected.");
-        await recordTransaction(senderAccountNumber, reference);
-    } else {
-        console.log("Unknown payment destination.");
-        return res.status(400).json({
-            success: false,
-            message: "Unknown account number. Cannot process payment.",
-        });
-    }
+  console.log(" Payment matched an Event virtual account.");
+  await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
+  return;
 }
+
+// Check if this is SUG payment (SchoolInfo or StudentPayment virtual account)
+const studentPayment = await StudentPayment.findOne({
+  senderAccountNumber,
+  "OtherVirtualAccount.accountNumber": accountNumber,
+});
+if (studentPayment) {
+  console.log(" Payment matched SUG dues.");
+  await recordTransaction(senderAccountNumber, reference);
+  return;
+}
+
+console.log(" Unknown payment destination.");
 
     // const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     // if (event) {

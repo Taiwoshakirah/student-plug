@@ -28,12 +28,17 @@ const recordTransaction = async (senderAccountNumber, regNo, reference) => {
     const status = "successful"; // or notification.status if available
 
     // Get student payment info
-    const studentPayment = await StudentPayment.findOne({ 
-  $or: [
-    { senderAccountNumber, regNo },
-    { regNo }
-  ]
+//     const studentPayment = await StudentPayment.findOne({ 
+//   $or: [
+//     { senderAccountNumber, regNo },
+//     { regNo }
+//   ]
+// });
+const studentPayment = await StudentPayment.findOne({ 
+  senderAccountNumber,
+  status: 'pending'
 });
+
 
 
     // const studentPayment = await StudentPayment.findOne({ senderAccountNumber, regNo  });
@@ -65,7 +70,8 @@ const recordTransaction = async (senderAccountNumber, regNo, reference) => {
     // Push transaction ID into studentPayment.transaction array
     studentPayment.transactions.push(transaction._id);
     student.transactions.push(transaction._id)
-    // 🔷 Add reference to EventPayment for easy lookup
+    // 🔷 Add reference to studentPayment for easy lookup
+    studentPayment.status = 'paid';
     studentPayment.reference = reference;
     await studentPayment.save();
     await student.save();

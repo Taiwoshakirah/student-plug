@@ -24,9 +24,6 @@ const processedEvents = new Set();
 
 
  
- const generatePaymentReference = () => {
-   return "TXN-" + crypto.randomBytes(4).toString("hex").toUpperCase();  // e.g. TXN-A1B2C3D4
- }
 
 const isValidRegNumber = (regNum) => {
   const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
@@ -71,8 +68,6 @@ const studentPaymentDetails = async (req, res) => {
       });
     }
 
-    const paymentReference = generatePaymentReference();
-
     const newStudentPayment = await StudentPayment.findOneAndUpdate(
       { $or: [{ regNo }, { email }] },
       {
@@ -88,8 +83,7 @@ const studentPaymentDetails = async (req, res) => {
         schoolInfoId: schoolInfo._id, 
         virtualAccount: schoolInfo.virtualAccount,
         OtherVirtualAccount: schoolInfo.OtherVirtualAccount,
-        senderAccountNumber,
-        reference: paymentReference
+        senderAccountNumber
       },
       { new: true, upsert: true }
     );
@@ -102,7 +96,6 @@ const studentPaymentDetails = async (req, res) => {
       payment: newStudentPayment,
       virtualAccount: schoolInfo.virtualAccount,
       OtherVirtualAccount: schoolInfo.OtherVirtualAccount,
-      reference: paymentReference
     });
 
   } catch (error) {
@@ -593,36 +586,13 @@ const fidelityWebhook = async (req, res) => {
     const narration = meta.narration || data.narration || "";
     console.log("NARRATION:", narration);
 
-const referenceMatch = narration.match(/TXN-[A-Z0-9]{8}/);
-if (referenceMatch) {
-   const reference = referenceMatch[0];
-   const studentPayment = await StudentPayment.findOne({ reference });
-   if (!studentPayment) {
-       throw new Error("StudentPayment not found for reference: " + reference);
-   }
-   // proceed to record transaction
-} else {
-   throw new Error("No valid payment reference found in narration.");
-}
+    const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
+    // let extractedRegNo;
 
+    //  const extractedRegNo = null; // no longer needed
+// console.log("Relying on senderAccountNumber only:", senderAccountNumber);
+    await recordTransaction(senderAccountNumber, reference);
 
-//     const customerRef = details.customer_ref || data.customer_mobile_no || "Unknown";
-//     let extractedRegNo;
-
-// const regNoMatch = narration.match(/\b([A-Za-z]+\s\d+\s\d+)\b/) 
-//                  || narration.match(/\b(\d+\/\d+\/\d+)\b/);
-
-// if (regNoMatch) {
-//   extractedRegNo = regNoMatch[1].includes(" ")
-//     ? regNoMatch[1].replace(/\s/g, "/")
-//     : regNoMatch[1];
-//   console.log(" Extracted regNo from narration:", extractedRegNo);
-// } else if (customerRef && customerRef !== "Unknown") {
-//   extractedRegNo = customerRef;
-//   console.log(" Using customer_ref as regNo fallback:", extractedRegNo);
-// } else {
-//   throw new Error("Could not extract regNo from narration or customer_ref.");
-// }
 
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {
       return res.status(400).json({
@@ -644,12 +614,10 @@ if (referenceMatch) {
 
     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
-    await recordEventTransaction(event._id, extractedRegNo, reference, amount);
-     
+      await recordEventTransaction(event._id, reference, amount);
     } else {
       console.log(`Payment for SUG dues`);
-
-    await recordTransaction(senderAccountNumber, extractedRegNo, reference);
+      await recordTransaction(senderAccountNumber, reference);
 
  
     }

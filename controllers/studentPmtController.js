@@ -591,7 +591,7 @@ const fidelityWebhook = async (req, res) => {
 
     //  const extractedRegNo = null; // no longer needed
 // console.log("Relying on senderAccountNumber only:", senderAccountNumber);
-    await recordTransaction(senderAccountNumber, reference);
+    
 
 
     if (!senderAccountNumber || !accountNumber || !amount || !reference) {

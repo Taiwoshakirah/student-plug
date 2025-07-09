@@ -286,32 +286,14 @@ const event = new Event({
             bankName: virtualAccount.bankName,
           },
         },
-  // virtualAccount: {
-  //   accountNumber: virtualAccount.accountNumber,
-  //   accountName: virtualAccount.accountName,
-  //   bankName: virtualAccount.bankName
-  // }
+  
 });
 
-
-        // const event = new Event({
-        //     adminId,
-        //     schoolInfoId,
-        //     title,
-        //     description,
-        //     flyer:flyer,
-        //     // date: parsedDate, // Use the parsed date
-        //     price,
-        //     ticketsAvailable,
-        //     isPaid: true, // Paid event
-        //     postedBy: Roles.ADMIN, // Role of the creator
-        //     postedByBody, // Automatically determined
-        // });
 
         await event.save();
 
         const eventWithPicture = {
-            ...event.toObject(), // Convert Mongoose object to plain object
+            ...event.toObject(), 
             uniProfilePicture,
         };
 

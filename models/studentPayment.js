@@ -42,6 +42,8 @@ const studentPymtSchema = new mongoose.Schema({
   type: String,
   required: true
 },
+  // latestTransaction: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
+  // oldTransactions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' }],
   reference: { type: String },
 }, { timestamps: true });
 

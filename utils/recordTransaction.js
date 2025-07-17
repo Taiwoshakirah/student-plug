@@ -39,7 +39,13 @@ const recordTransaction = async (senderAccountNumber, reference) => {
     throw new Error("Student not found.");
   }
 
-  const transaction = new Transaction({
+  let transaction = await Transaction.findOne({ reference });
+  if (transaction) {
+    console.log("Transaction already recorded, skipping duplicate.");
+    return transaction; 
+  }
+
+  transaction = new Transaction({
     email,
     amount,
     feeType,

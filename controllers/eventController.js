@@ -666,60 +666,28 @@ if (!virtualAccount) {
 
 
 
-//     const newPayment = await EventPayment.findOneAndUpdate(
-//   { registrationNumber: regNo, eventId },
-//   {
-//     studentId: student._id,
-//     registrationNumber: regNo,
-//     paymentStatus: "pending",
-//     eventId,
-//     studentInfoId: student._id,
-//     schoolInfoId,
-//     amountPaid: 0,
-//     firstName,
-//     lastName,
-//     department,
-//     academicLevel,
-//     email,
-//     userId,
-//     feeType,
-//     feeAmount,
-//     virtualAccounts: virtualAccount,
-//     senderAccountNumber  
-//   },
-//   { new: true, upsert: true }
-// );
-const newPayment = await EventPayment.findOneAndUpdate(
+    const newPayment = await EventPayment.findOneAndUpdate(
   { registrationNumber: regNo, eventId },
   {
-    $set: {
-      // These fields can be updated on existing documents
-      firstName,
-      lastName,
-      department,
-      academicLevel,
-      email,
-      virtualAccounts: virtualAccount,
-    },
-    $setOnInsert: {
-      // These fields are only set when creating a new document
-      studentId: student._id,
-      registrationNumber: regNo,
-      paymentStatus: "pending",
-      eventId,
-      studentInfoId: student._id,
-      schoolInfoId,
-      amountPaid: 0,
-      userId,
-      feeType,
-      feeAmount,
-      senderAccountNumber
-    }
+    studentId: student._id,
+    registrationNumber: regNo,
+    paymentStatus: "pending",
+    eventId,
+    studentInfoId: student._id,
+    schoolInfoId,
+    amountPaid: 0,
+    firstName,
+    lastName,
+    department,
+    academicLevel,
+    email,
+    userId,
+    feeType,
+    feeAmount,
+    virtualAccounts: virtualAccount,
+    senderAccountNumber  
   },
-  { 
-    new: true, 
-    upsert: true
-  }
+  { new: true, upsert: true }
 );
 
 
@@ -743,6 +711,83 @@ const newPayment = await EventPayment.findOneAndUpdate(
 
 
 
+// const fetchPaymentDetail = async (req, res) => {
+//   const { email, eventId } = req.query;
+
+//   if (!email || !eventId) {
+//     return res.status(400).json({ error: "Email and eventId are required" });
+//   }
+
+//   try {
+//     const studentDetails = await EventPayment.findOne({ email, eventId });
+
+//     console.log("Found student payment:", studentDetails ? {
+//       email: studentDetails.email,
+//       eventId: studentDetails.eventId,
+//       schoolInfoId: studentDetails.schoolInfoId
+//     } : "not found");
+
+//     if (!studentDetails) {
+//       return res.status(404).json({ error: "Student payment details not found for this event" });
+//     }
+
+//     if (!studentDetails.schoolInfoId) {
+//       return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
+//     }
+
+//     const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
+
+//     console.log("Found schoolInfo:", schoolInfo ? {
+//       _id: schoolInfo._id,
+//       university: schoolInfo.university
+//     } : "not found");
+
+//     if (!schoolInfo) {
+//       return res.status(404).json({ 
+//         error: "School information not found",
+//         searchedId: studentDetails.schoolInfoId
+//       });
+//     }
+
+//     const { accountNumber, accountName, bankName } =
+//   studentDetails.virtualAccounts?.fidelity || {};
+
+
+//     const serviceCharge = 100;
+//     const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
+
+//     res.status(200).json({
+//       success: true,
+//       student: {
+//         firstName: studentDetails.firstName,
+//         lastName: studentDetails.lastName,
+//         department: studentDetails.department,
+//         regNo: studentDetails.registrationNumber,
+//         academicLevel: studentDetails.academicLevel,
+//         email: studentDetails.email,
+//         feeType: studentDetails.feeType,
+//         virtualAccount: {
+//           accountNumber,
+//           accountName,
+//           bankName,
+//         },
+//         paymentDetails: {
+//           paymentMethod: "Bank Transfer",
+//           paymentAmount: totalFee,
+//           originalAmount: studentDetails.feeAmount,
+//           serviceCharge,
+//         },
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error fetching student payment details:", error);
+//     res.status(500).json({ 
+//       error: "An error occurred while fetching details",
+//       details: error.message
+//     });
+//   }
+// };
+
 const fetchPaymentDetail = async (req, res) => {
   const { email, eventId } = req.query;
 
@@ -751,12 +796,15 @@ const fetchPaymentDetail = async (req, res) => {
   }
 
   try {
-    const studentDetails = await EventPayment.findOne({ email, eventId });
+    const studentDetails = await EventPayment.findOne({ email, eventId })
+      .populate('transactions'); // Populate transactions if you need transaction details
 
     console.log("Found student payment:", studentDetails ? {
       email: studentDetails.email,
       eventId: studentDetails.eventId,
-      schoolInfoId: studentDetails.schoolInfoId
+      schoolInfoId: studentDetails.schoolInfoId,
+      paymentStatus: studentDetails.paymentStatus,
+      reference: studentDetails.reference
     } : "not found");
 
     if (!studentDetails) {
@@ -782,8 +830,7 @@ const fetchPaymentDetail = async (req, res) => {
     }
 
     const { accountNumber, accountName, bankName } =
-  studentDetails.virtualAccounts?.fidelity || {};
-
+      studentDetails.virtualAccounts?.fidelity || {};
 
     const serviceCharge = 100;
     const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
@@ -808,6 +855,10 @@ const fetchPaymentDetail = async (req, res) => {
           paymentAmount: totalFee,
           originalAmount: studentDetails.feeAmount,
           serviceCharge,
+          paymentStatus: studentDetails.paymentStatus, // Include payment status
+          amountPaid: studentDetails.amountPaid,        // Include amount paid
+          reference: studentDetails.reference,          // Include payment reference
+          paymentDate: studentDetails.paymentDate,      // Include payment date
         },
       },
     });

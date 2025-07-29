@@ -666,28 +666,60 @@ if (!virtualAccount) {
 
 
 
-    const newPayment = await EventPayment.findOneAndUpdate(
+//     const newPayment = await EventPayment.findOneAndUpdate(
+//   { registrationNumber: regNo, eventId },
+//   {
+//     studentId: student._id,
+//     registrationNumber: regNo,
+//     paymentStatus: "pending",
+//     eventId,
+//     studentInfoId: student._id,
+//     schoolInfoId,
+//     amountPaid: 0,
+//     firstName,
+//     lastName,
+//     department,
+//     academicLevel,
+//     email,
+//     userId,
+//     feeType,
+//     feeAmount,
+//     virtualAccounts: virtualAccount,
+//     senderAccountNumber  
+//   },
+//   { new: true, upsert: true }
+// );
+const newPayment = await EventPayment.findOneAndUpdate(
   { registrationNumber: regNo, eventId },
   {
-    studentId: student._id,
-    registrationNumber: regNo,
-    paymentStatus: "pending",
-    eventId,
-    studentInfoId: student._id,
-    schoolInfoId,
-    amountPaid: 0,
-    firstName,
-    lastName,
-    department,
-    academicLevel,
-    email,
-    userId,
-    feeType,
-    feeAmount,
-    virtualAccounts: virtualAccount,
-    senderAccountNumber  
+    $set: {
+      // These fields can be updated on existing documents
+      firstName,
+      lastName,
+      department,
+      academicLevel,
+      email,
+      virtualAccounts: virtualAccount,
+    },
+    $setOnInsert: {
+      // These fields are only set when creating a new document
+      studentId: student._id,
+      registrationNumber: regNo,
+      paymentStatus: "pending",
+      eventId,
+      studentInfoId: student._id,
+      schoolInfoId,
+      amountPaid: 0,
+      userId,
+      feeType,
+      feeAmount,
+      senderAccountNumber
+    }
   },
-  { new: true, upsert: true }
+  { 
+    new: true, 
+    upsert: true
+  }
 );
 
 

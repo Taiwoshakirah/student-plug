@@ -3,6 +3,7 @@ const express = require('express')
 const StudentPayment = require("../models/studentPayment");
 const Event= require('../models/event')
 const Student = require('../models/studentRegNo')
+const studentSchema = require("../models/studentRegNo").schema;
 const axios = require("axios");
 require("dotenv").config();
 const Transaction = require('../models/transaction')
@@ -535,6 +536,10 @@ const verifyFidelitySignature = (requestRef, receivedSignature, secretKey) => {
   return computedHash.toLowerCase() === receivedSignature.toLowerCase();
 };
 
+const getSchoolStudentModel = (universityName) => {
+  const collectionName = `students_${universityName.toLowerCase().replace(/\s+/g, "_")}`;
+  return mongoose.models[collectionName] || mongoose.model(collectionName, studentSchema, collectionName);
+};
 
 const fidelityWebhook = async (req, res) => {
   try {

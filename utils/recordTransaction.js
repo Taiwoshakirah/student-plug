@@ -48,7 +48,7 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
       return transaction;
     }
 
-    // Create new transaction
+    // Create new transaction with proper references
     transaction = new Transaction({
       email,
       amount,
@@ -56,21 +56,47 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
       reference,
       status,
       student: student._id,
+      studentModel: SchoolStudent.modelName, // This will be like 'students_ikoyi'
+      schoolName: SchoolStudent.collection.name.replace('students_', ''), // Extract school name
+      studentPayment: studentPayment._id, // Reference to the payment record
     });
 
     await transaction.save();
 
     // Update both StudentPayment and the school-specific Student with transaction ID
+    // Method 1: Mark the array as modified (most reliable)
     studentPayment.transactions.push(transaction._id);
+    studentPayment.markModified('transactions'); // This ensures Mongoose knows the array changed
     student.transactions.push(transaction._id);
+    student.markModified('transactions');
     studentPayment.reference = reference;
 
     // Save both documents
     await studentPayment.save();
     await student.save();
 
+    // Alternative Method 2: Use findByIdAndUpdate (more reliable for arrays)
+    // await StudentPayment.findByIdAndUpdate(
+    //   studentPayment._id,
+    //   { 
+    //     $push: { transactions: transaction._id },
+    //     $set: { reference: reference }
+    //   },
+    //   { new: true }
+    // );
+    
+    // await SchoolStudent.findByIdAndUpdate(
+    //   student._id,
+    //   { $push: { transactions: transaction._id } },
+    //   { new: true }
+    // );
+
     console.log("Transaction recorded successfully.");
     console.log(`Updated student in collection: ${SchoolStudent.collection.name}`);
+    console.log(`StudentPayment transactions before update: ${studentPayment.transactions.length}`);
+    console.log(`StudentPayment transactions after update: ${studentPayment.transactions.length}`);
+    console.log(`Student transactions after update: ${student.transactions.length}`);
+    console.log(`Transaction ID added: ${transaction._id}`);
     
     return transaction;
   } catch (error) {

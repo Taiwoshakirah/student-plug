@@ -82,14 +82,12 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
   const student = await SchoolStudent.findOne({ registrationNumber: regNo });
   if (!student) throw new Error("Student not found.");
 
-  // Check for existing transaction
   let transaction = await Transaction.findOne({ reference });
   if (transaction) {
-    console.log("Transaction already recorded, skipping duplicate.");
+    console.log("Transaction already recorded.");
     return transaction;
   }
 
-  // Create new transaction
   transaction = new Transaction({
     email,
     amount,
@@ -98,36 +96,35 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
     status,
     student: student._id,
   });
-
   await transaction.save();
 
-  // Push transaction ID to both records
+  // Defensive: ensure arrays exist
   studentPayment.transactions = studentPayment.transactions || [];
   student.transactions = student.transactions || [];
 
   studentPayment.transactions.push(transaction._id);
-  studentPayment.markModified("transactions");
-
   student.transactions.push(transaction._id);
-  student.markModified("transactions");
-
   studentPayment.reference = reference;
 
+  console.log("💾 Saving StudentPayment and Student...");
+
   try {
-    await studentPayment.save();
+    const sp = await studentPayment.save();
+    console.log("✅ StudentPayment saved:", sp.transactions);
   } catch (err) {
-    console.error("❌ Failed to save studentPayment:", err);
+    console.error("❌ Error saving StudentPayment:", err);
   }
 
   try {
-    await student.save();
+    const std = await student.save();
+    console.log("✅ Student saved:", std.transactions);
   } catch (err) {
-    console.error("❌ Failed to save student:", err);
+    console.error("❌ Error saving Student:", err);
   }
 
-  console.log("✅ Transaction recorded and linked successfully.");
   return transaction;
 };
+
 
 
 

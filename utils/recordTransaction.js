@@ -98,32 +98,27 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
   });
   await transaction.save();
 
-  // Defensive: ensure arrays exist
-  studentPayment.transactions = studentPayment.transactions || [];
-  student.transactions = student.transactions || [];
+  // Safely update using $addToSet
+  const [spUpdate, stdUpdate] = await Promise.all([
+    StudentPayment.updateOne(
+      { _id: studentPayment._id },
+      {
+        $addToSet: { transactions: transaction._id },
+        $set: { reference },
+      }
+    ),
+    SchoolStudent.updateOne(
+      { _id: student._id },
+      {
+        $addToSet: { transactions: transaction._id },
+      }
+    ),
+  ]);
 
-  studentPayment.transactions.push(transaction._id);
-  student.transactions.push(transaction._id);
-  studentPayment.reference = reference;
-
-  console.log("💾 Saving StudentPayment and Student...");
-
-  try {
-    const sp = await studentPayment.save();
-    console.log("✅ StudentPayment saved:", sp.transactions);
-  } catch (err) {
-    console.error("❌ Error saving StudentPayment:", err);
-  }
-
-  try {
-    const std = await student.save();
-    console.log("✅ Student saved:", std.transactions);
-  } catch (err) {
-    console.error("❌ Error saving Student:", err);
-  }
-
+  console.log("✅ Updates:", { spUpdate, stdUpdate });
   return transaction;
 };
+
 
 
 

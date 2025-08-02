@@ -353,11 +353,7 @@ const googleSignIn = async (req, res) => {
       user = await User.findOne({ googleId: uid }).populate("schoolInfoId");
     }
 
-     // Update the user's FCM token
-  // if (fcmToken) {
-  //   user.fcmToken = fcmToken;
-  //   await user.save();
-  // }
+   
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
   const redirectUrl = `/dashboard/school/${user.schoolInfoId?.university}`;

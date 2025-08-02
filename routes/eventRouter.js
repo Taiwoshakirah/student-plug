@@ -10,14 +10,9 @@ router.route('/get-event/:eventId').get(getEventById).all(methodNotAllowed)
 router.route('/eventbyadmin/:adminId').get(getEventsByAdmin).all(methodNotAllowed)
 router.route('/saveStudent').post(saveStudentDetails).all(methodNotAllowed)
 router.route('/get-eventPaidDetails').get(fetchPaymentDetail).all(methodNotAllowed)
-// router.route('/purchase/:eventId').post(purchaseTicket).all(methodNotAllowed)
 router.route('/fetch-details/:email').get(fetchConfirmationDetails).all(methodNotAllowed)
-// router.route('/charging').post(chargeCard).all(methodNotAllowed)
 router.route('/receipt/:reference').get(getReceipt).all(methodNotAllowed)
 
-// router.route('/verify/:reference').get(verifyPayment).all(methodNotAllowed)
-// router.route('/savetransact').post(handleTransactionVerification).all(methodNotAllowed)
-// router.route('/update-payment').post(updatePaymentStatus).all(methodNotAllowed)
 
 
 module.exports = router

@@ -23,7 +23,17 @@ const schoolInfoSchema = new mongoose.Schema({
     required: true,
   },
   faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], 
-  students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
+  // students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
+  students: [{ type: String }],
+  collectionKey: { type: String },
+  studentCount: { 
+    type: Number, 
+    default: 0 
+  },
+  lastStudentUpload: {
+    type: Date,
+    default: null
+  },
   virtualAccount: {
     accountNumber: String,
     accountName: String,

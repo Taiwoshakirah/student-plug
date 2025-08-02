@@ -31,13 +31,12 @@ const eventPaymentSchema = new mongoose.Schema({
     required: true,
   },
   email: { type: String, required: true },
-  // Use only ObjectId references to EventTransaction here
   transactions: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "EventTransaction", 
   }],
   studentInfoId: { type: mongoose.Schema.Types.ObjectId, ref: "StudentInfo" },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Add userId here
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, 
   feeType: { type: String, required: true },
   feeAmount:Number,
     schoolInfoId:{type: mongoose.Schema.Types.ObjectId, ref: "SchoolInfo", required: true},

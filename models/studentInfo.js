@@ -11,9 +11,7 @@ const studentInfoSchema = new mongoose.Schema({
     required: true,
   },
   faculty: {
-    // type: mongoose.Schema.Types.ObjectId,
-    // ref: "Faculty", 
-    // required: true,
+   
     type: String,
     required: true,
   },

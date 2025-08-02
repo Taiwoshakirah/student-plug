@@ -38,7 +38,6 @@ const sugPostSchema = new mongoose.Schema({
         ref: "SchoolInfo",
         required: true
     },
-    // trending: { type: Boolean, default: false }, // New field
 });
 
 

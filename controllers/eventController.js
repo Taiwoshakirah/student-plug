@@ -9,7 +9,7 @@ const User = require("../models/signUp"); // Import User model
 const Student = require("../models/studentRegNo"); // Import Student model
 const EventPayment = require('../models/eventpymt')
 require("dotenv").config();
-const EventCardDetails = require('../models/eventCardDetails')
+// const EventCardDetails = require('../models/eventCardDetails')
 const StudentInfo = require('../models/studentInfo')
 const EventTransaction = require('../models/eventTransaction')
 const sendMail = require('../utils/sendMail')
@@ -711,82 +711,6 @@ if (!virtualAccount) {
 
 
 
-// const fetchPaymentDetail = async (req, res) => {
-//   const { email, eventId } = req.query;
-
-//   if (!email || !eventId) {
-//     return res.status(400).json({ error: "Email and eventId are required" });
-//   }
-
-//   try {
-//     const studentDetails = await EventPayment.findOne({ email, eventId });
-
-//     console.log("Found student payment:", studentDetails ? {
-//       email: studentDetails.email,
-//       eventId: studentDetails.eventId,
-//       schoolInfoId: studentDetails.schoolInfoId
-//     } : "not found");
-
-//     if (!studentDetails) {
-//       return res.status(404).json({ error: "Student payment details not found for this event" });
-//     }
-
-//     if (!studentDetails.schoolInfoId) {
-//       return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
-//     }
-
-//     const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
-
-//     console.log("Found schoolInfo:", schoolInfo ? {
-//       _id: schoolInfo._id,
-//       university: schoolInfo.university
-//     } : "not found");
-
-//     if (!schoolInfo) {
-//       return res.status(404).json({ 
-//         error: "School information not found",
-//         searchedId: studentDetails.schoolInfoId
-//       });
-//     }
-
-//     const { accountNumber, accountName, bankName } =
-//   studentDetails.virtualAccounts?.fidelity || {};
-
-
-//     const serviceCharge = 100;
-//     const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
-
-//     res.status(200).json({
-//       success: true,
-//       student: {
-//         firstName: studentDetails.firstName,
-//         lastName: studentDetails.lastName,
-//         department: studentDetails.department,
-//         regNo: studentDetails.registrationNumber,
-//         academicLevel: studentDetails.academicLevel,
-//         email: studentDetails.email,
-//         feeType: studentDetails.feeType,
-//         virtualAccount: {
-//           accountNumber,
-//           accountName,
-//           bankName,
-//         },
-//         paymentDetails: {
-//           paymentMethod: "Bank Transfer",
-//           paymentAmount: totalFee,
-//           originalAmount: studentDetails.feeAmount,
-//           serviceCharge,
-//         },
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error fetching student payment details:", error);
-//     res.status(500).json({ 
-//       error: "An error occurred while fetching details",
-//       details: error.message
-//     });
-//   }
-// };
 
 const fetchPaymentDetail = async (req, res) => {
   const { email, eventId } = req.query;
@@ -797,7 +721,7 @@ const fetchPaymentDetail = async (req, res) => {
 
   try {
     const studentDetails = await EventPayment.findOne({ email, eventId })
-      .populate('transactions'); // Populate transactions if you need transaction details
+      .populate('transactions'); 
 
     console.log("Found student payment:", studentDetails ? {
       email: studentDetails.email,
@@ -855,10 +779,10 @@ const fetchPaymentDetail = async (req, res) => {
           paymentAmount: totalFee,
           originalAmount: studentDetails.feeAmount,
           serviceCharge,
-          paymentStatus: studentDetails.paymentStatus, // Include payment status
-          amountPaid: studentDetails.amountPaid,        // Include amount paid
-          reference: studentDetails.reference,          // Include payment reference
-          paymentDate: studentDetails.paymentDate,      // Include payment date
+          paymentStatus: studentDetails.paymentStatus, 
+          amountPaid: studentDetails.amountPaid,       
+          reference: studentDetails.reference,         
+          paymentDate: studentDetails.paymentDate,      
         },
       },
     });
@@ -884,121 +808,6 @@ const getReceipt = async (req, res) => {
 };
 
 
-// const schoolEventPaymentStatus = async (req, res) => {
-//     const { schoolInfoId } = req.params;
-//     const { page = 1, limit = 1 } = req.query; 
-
-//     try {
-//         // Retrieve school information and populate related faculties and students
-//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-//             .populate({
-//                 path: "faculties",
-//                 select: "facultyName",
-//             })
-//             .populate({
-//                 path: "students",
-//                 select: "registrationNumber faculty transactions",
-//                 populate: [
-//                     {
-//                         path: "faculty",
-//                         select: "facultyName",
-//                     },
-//                     {
-//                         path: "transactions",
-//                         select: "status",
-//                     },
-//                 ],
-//             });
-
-//         if (!schoolInfo) {
-//             return res.status(404).json({ message: "School information not found." });
-//         }
-
-//         const totalRegistrations = schoolInfo.students.length;
-//         let totalPaid = 0;
-
-//         // Create a dictionary to hold data grouped by faculty
-//         const facultyWiseData = {};
-
-//         schoolInfo.faculties.forEach((faculty) => {
-//             facultyWiseData[faculty._id] = {
-//                 facultyName: faculty.facultyName,
-//                 totalRegistrations: 0,
-//                 students: [],
-//             };
-//         });
-
-//         // Categorize students by faculty and payment status
-//         schoolInfo.students.forEach((student) => {
-//             const hasPaid = student.transactions.some(
-//                 (transaction) => transaction.status === "successful"
-//             );
-//             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
-//             const formattedRegNo = `${student.registrationNumber}`;
-
-//             if (student.faculty && facultyWiseData[student.faculty._id]) {
-//                 facultyWiseData[student.faculty._id].totalRegistrations++;
-//                 facultyWiseData[student.faculty._id].students.push({
-//                     registrationNumber: formattedRegNo,
-//                     status: paymentStatus,
-//                 });
-//             }
-
-//             if (hasPaid) {
-//                 totalPaid++;
-//             }
-//         });
-
-//         const totalUnpaid = totalRegistrations - totalPaid;
-
-//         // Implement pagination for faculties
-//         const facultyEntries = Object.values(facultyWiseData);
-//         const totalFaculties = facultyEntries.length;
-
-//         const startIndex = (page - 1) * limit; 
-//         const endIndex = startIndex + parseInt(limit, 10); 
-
-//         // Slice the faculty entries based on pagination indices
-//         const paginatedFaculties = facultyEntries.slice(
-//             Math.max(startIndex, 0), 
-//             Math.min(endIndex, totalFaculties)
-//         );
-
-//         // Handle case where no entries exist for the requested page
-//         if (paginatedFaculties.length === 0) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "No faculties found for the specified page.",
-//             });
-//         }
-
-//         // Format response
-//         const result = {
-//             totalRegistrations,
-//             totalPaid,
-//             totalUnpaid,
-//             facultyDetails: paginatedFaculties,
-//             pagination: {
-//                 currentPage: Number(page),
-//                 totalPages: Math.ceil(totalFaculties / limit),
-//                 hasNextPage: endIndex < totalFaculties,
-//                 hasPrevPage: startIndex > 0,
-//             },
-//         };
-
-//         return res.status(200).json({
-//             success: true,
-//             message: "School payment status retrieved successfully.",
-//             data: result,
-//         });
-//     } catch (error) {
-//         console.error("Error retrieving school payment status:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "An error occurred while retrieving school payment status.",
-//         });
-//     }
-// };
 
   
 const fetchConfirmationDetails = async (req, res) => {
@@ -1029,7 +838,7 @@ const fetchConfirmationDetails = async (req, res) => {
     if (!cardDetails) {
       return res.status(404).json({ success: false, message: "Card details not found." });
     }
-    console.log("Card details found:", cardDetails); // Log card details
+    console.log("Card details found:", cardDetails); 
 
     // Prepare the confirmation details
     const confirmationDetails = {
@@ -1059,305 +868,21 @@ const fetchConfirmationDetails = async (req, res) => {
 
 
 
-const chargeCard = async (req, res) => {
-  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
-  const { amount, eventId, email } = req.body;
-
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ success: false, message: "Invalid amount." });
-  }
-
-  if (!eventId) {
-    return res.status(400).json({ success: false, message: "Event ID is required." });
-  }
-
-  try {
-    // Fetch student details from EventPayment collection
-    const eventPayment = await EventPayment.findOne({ email, eventId });
-
-    if (!eventPayment) {
-      return res.status(404).json({ success: false, message: "Student details not found." });
-    }
-
-    // Fetch the admin user from SugUser based on the role or any criteria
-    const adminUser = await SugUser.findOne({ role: "admin" });
-
-    if (!adminUser || !adminUser.email) {
-        return res.status(404).json({ success: false, message: "Admin email not found." });
-    }
-
-    // Send email to the admin once payment is processed
-    const mailOptions = {
-        email: adminUser.email, // Admin email for the school
-        subject: `Payment Received for Event ${eventId}`,
-        text: `A payment of ₦${amount} has been successfully made for event with ID: ${eventId}. Student Details:\nName: ${eventPayment.firstName} ${eventPayment.lastName}\nDepartment: ${eventPayment.department}\nRegistration No: ${eventPayment.registrationNumber}\nEmail: ${eventPayment.email}`,
-    };
-
-    // Call sendMail function to notify the admin
-    await sendMail(mailOptions);
-
-    const paymentData = {
-      amount: amount * 100, // Convert to kobo
-      email: eventPayment.email,
-      metadata: {
-        email: eventPayment.email,
-        userId: eventPayment.userId,
-        firstName: eventPayment.firstName,
-        lastName: eventPayment.lastName,
-        department: eventPayment.department,
-        academicLevel: eventPayment.academicLevel,
-        regNo: eventPayment.registrationNumber,
-        eventId: eventId,
-      },
-      callback_url: "http://localhost:5173/home/eventreceipt", // Add your callback URL
-      // callback_url: "https://school-plug.vercel.app/home/eventreceipt", // Add your callback URL
-    };
-
-    console.log("Payment Metadata:", paymentData.metadata);
-
-  //   // Send email to the admin once payment is processed
-  //   const mailOptions = {
-  //     email: process.env.ADMIN_EMAIL, // Admin email address
-  //     subject: `Payment Received for Event ${eventId}`,
-  //     text: `A payment of ₦${amount} has been successfully made for event with ID: ${eventId}. Student Details:\nName: ${eventPayment.firstName} ${eventPayment.lastName}\nDepartment: ${eventPayment.department}\nRegistration No: ${eventPayment.registrationNumber}\nEmail: ${eventPayment.email}`,
-  // };
-
-  // // Call sendMail function to notify the admin
-  // await sendMail(mailOptions);
-
-    const response = await axios.post(
-      "https://api.paystack.co/transaction/initialize",
-      paymentData,
-      {
-        headers: {
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (response.data.status) {
-      // Return the payment URL to the client for redirection
-      return res.status(200).json({
-        success: true,
-        message: "Payment initiated successfully.",
-        paymentUrl: response.data.data.authorization_url,
-        reference: response.data.data.reference,
-      });
-    } else {
-      return res.status(400).json({ success: false, message: "Failed to initiate payment." });
-    }
-  } catch (error) {
-    console.error("Error charging card:", error.response?.data || error.message);
-    return res.status(500).json({ success: false, message: "An error occurred while charging the card." });
-  }
-};
-
-
-
-
-// const handleTransactionVerification = async (verificationResponse) => {
-//   if (verificationResponse.status === true && verificationResponse.data.status === 'success') {
-//     const transaction = verificationResponse.data;
-//     const { reference, amount, status, metadata } = transaction;
-
-//     console.log('Transaction Metadata:', metadata);
-
-//     // Validate metadata fields
-//     const requiredFields = ['userId', 'regNo', 'eventId', 'firstName', 'lastName', 'department', 'academicLevel', 'email'];
-//     for (const field of requiredFields) {
-//       if (!metadata[field]) {
-//         console.error(`Missing field in metadata: ${field}`);
-//         throw new Error(`Missing required metadata field: ${field}`);
-//       }
-//     }
-
-//     const amountPaid = amount / 100; // Convert from kobo to naira
-
-//     // Find the existing payment document using userId and eventId
-//     let paymentData = await EventPayment.findOne({
-//       userId: metadata.userId, // Use userId here
-//       eventId: metadata.eventId,
-//     });
-
-//     if (paymentData) {
-//       // If paymentData exists, update it
-//       if (paymentData.paymentStatus === 'pending') {
-//         // Only update if it's still pending
-//         paymentData.paymentStatus = 'completed';
-//         paymentData.transactionId = reference;
-//         paymentData.amountPaid = amountPaid;
-//         paymentData.paymentDate = transaction.paid_at;
-
-//         // Create a new EventTransaction document
-//         const newTransaction = new EventTransaction({
-//           transactionId: reference,
-//           amountPaid,
-//           paymentStatus: 'completed',
-//           paymentDate: transaction.paid_at,
-//           studentId: metadata.userId,
-//           eventId: metadata.eventId,
-//         });
-
-//         try {
-//           // Save the new transaction
-//           const savedTransaction = await newTransaction.save();
-
-//           // Push the new transaction's ObjectId to the transactions array
-//           paymentData.transactions.push(savedTransaction._id);
-
-//           // Save the updated payment document
-//           const updatedPayment = await paymentData.save();
-
-//           return {
-//             success: true,
-//             message: 'Transaction verified and payment details updated successfully.',
-//             data: updatedPayment,
-//           };
-//         } catch (error) {
-//           console.error('Error saving transaction or payment:', error);
-//           return {
-//             success: false,
-//             message: 'Error saving payment details or transaction.',
-//             error: error.message,
-//           };
-//         }
-//       } else {
-//         // If paymentStatus is already 'completed', don't update it
-//         return {
-//           success: false,
-//           message: 'Payment has already been processed.',
-//         };
-//       }
-//     } else {
-//       // If no payment record exists, create a new payment document
-//       paymentData = new EventPayment({
-//         userId: metadata.userId, // Ensure this is correct
-//         registrationNumber: metadata.regNo,
-//         paymentStatus: 'completed',
-//         amountPaid: amountPaid,
-//         firstName: metadata.firstName,
-//         lastName: metadata.lastName,
-//         department: metadata.department,
-//         academicLevel: metadata.academicLevel,
-//         email: metadata.email,
-//         eventId: metadata.eventId,
-//         paymentDate: transaction.paid_at,
-//         transactions: [], // Start with an empty transactions array
-//         studentId: metadata.userId, // Pass studentId here
-//       });
-
-//       try {
-//         // Save the payment document first
-//         const savedPayment = await paymentData.save();
-
-//         // Create a new EventTransaction document
-//         const newTransaction = new EventTransaction({
-//           transactionId: reference,
-//           amountPaid,
-//           paymentStatus: 'completed',
-//           paymentDate: transaction.paid_at,
-//           studentId: metadata.userId,
-//           eventId: metadata.eventId,
-//         });
-
-//         // Save the new transaction
-//         const savedTransaction = await newTransaction.save();
-
-//         // Add the transaction ObjectId to the payment document's transactions array
-//         savedPayment.transactions.push(savedTransaction._id);
-
-//         // Save the updated payment document with the new transaction
-//         const finalPayment = await savedPayment.save();
-
-//         return {
-//           success: true,
-//           message: 'Transaction verified and payment saved successfully.',
-//           data: finalPayment,
-//         };
-//       } catch (error) {
-//         console.error('Error saving payment or transaction:', error);
-//         return {
-//           success: false,
-//           message: 'Error saving payment details or transaction.',
-//           error: error.message,
-//         };
-//       }
-//     }
-//   } else {
-//     console.error('Transaction verification failed:', verificationResponse.message);
-//     return {
-//       success: false,
-//       message: 'Transaction verification failed.',
-//     };
-//   }
-// };
-
-
-
-// const verifyPayment = async (req, res) => {
-//   const { reference } = req.params;
-
-//   try {
-//     const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
-//       headers: {
-//         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
-//       },
-//     });
-
-//     if (response.data.status) {
-//       // Pass the verification response to handleTransactionVerification
-//       const result = await handleTransactionVerification(response.data);
-
-//       // Return the result from handleTransactionVerification
-//       return res.status(result.success ? 200 : 400).json(result);
-//     } else {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Transaction verification failed.',
-//       });
-//     }
-//   } catch (error) {
-//     console.error('Error verifying payment:', error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: 'An error occurred while verifying the payment.',
-//       error: error.message,
-//     });
-//   }
-// };
 
 
 
 
 
-// const updatePaymentStatus = async (req, res) => {
-//   const { transactionId, paymentStatus } = req.body;
 
-//   try {
-//     // Find the payment record by transaction ID
-//     const payment = await EventPayment.findOne({ transactionId });
 
-//     if (!payment) {
-//       return res.status(404).json({ success: false, message: "Payment record not found." });
-//     }
 
-//     // Update the payment status
-//     payment.paymentStatus = paymentStatus; // e.g., 'completed' or 'failed'
-//     await payment.save();
 
-//     return res.status(200).json({
-//       success: true,
-//       message: "Payment status updated successfully.",
-//     });
-//   } catch (error) {
-//     console.error("Error updating payment status:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: "An error occurred while updating the payment status.",
-//     });
-//   }
-// };
+
+
+
+
+
+
 
   
 

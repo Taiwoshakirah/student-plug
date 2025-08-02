@@ -1,5 +1,4 @@
 const SugPost = require("../models/sugPost");
-const SugPostComment = require("../models/sugComment");
 const { promisify } = require("util");
 const cloudinary = require("cloudinary");
 const { uploadToCloudinary } = require("../config/cloudinaryConfig");
@@ -13,7 +12,6 @@ const {
 } = require("mongoose");
 const SchoolInfo = require("../models/schoolInfo");
 const UserPost = require("../models/post");
-const UserComment = require("../models/comment");
 const { sendNotification } = require("../utils/websocket");
 const Comment = require("../models/allComment");
 const { extractHashtags } = require("./trendingController");
@@ -87,9 +85,6 @@ const createSugPost = async (req, res) => {
       },
     });
 
-    // const populatedPost = await SugPost.findById(post._id)
-    //     .populate("schoolInfoId", "university uniProfilePicture")
-    //     .populate("adminId", "sugFullName email");
 
     res.status(201).json({ message: "Post created", post: populatedPost });
   } catch (error) {
@@ -98,259 +93,14 @@ const createSugPost = async (req, res) => {
   }
 };
 
-// const createSugPost = async (req, res) => {
-//     const { adminId, text, schoolInfoId } = req.body;
-//     if (!adminId || !text || !schoolInfoId) {
-//         return res.status(400).json({ message: "Admin ID, text, and schoolInfoId are required" });
-//     }
-
-//     try {
-//         let imageUrls = [];
-
-//         if (req.files && req.files.image) {
-//             const images = Array.isArray(req.files.image) ? req.files.image : [req.files.image];
-//             console.log("Images received in request:", images);
-
-//             for (const image of images) {
-//                 const tempFilePath = `uploads/${image.name}`;
-
-//                 await image.mv(tempFilePath);
-//                 console.log(`File moved to temporary path: ${tempFilePath}`);
-
-//                 const result = await uploadToCloudinary(tempFilePath);
-//                 console.log("Cloudinary upload result:", result);
-
-//                 if (result && result.secure_url) {
-//                     imageUrls.push(result.secure_url);
-//                 } else {
-//                     console.error("Failed to upload image to Cloudinary:", result);
-//                 }
-
-//                 // Temporary file deletion
-//                 fs.unlink(tempFilePath, (unlinkErr) => {
-//                     if (unlinkErr) {
-//                         console.error("Error deleting temporary file:", unlinkErr);
-//                     }
-//                 });
-//             }
-//         }
-//         console.log("Final image URLs to be saved:", imageUrls);
-
-//         //post Created with all image URLs and schoolInfoId
-//         const post = new SugPost({ adminId, text, images: imageUrls, schoolInfoId });
-//         await post.save();
-
-//         const populatedPost = await SugPost.findById(post._id)
-//             .populate({
-//                 path: "schoolInfoId",
-//                 select: "university uniProfilePicture",
-//                 model: "SchoolInfo"
-//             })
-//             .populate("adminId", "sugFullName email");
-
-//         res.status(201).json({ message: "Post created", post: populatedPost });
-//     } catch (error) {
-//         console.error("Error creating post:", error);
-//         res.status(500).json({ message: "Error creating post", error });
-//     }
-// };
 
 const isValidObjectId = (id) => {
   return ObjectId.isValid(id) && new ObjectId(id).equals(id);
 };
 
-// const toggleLike = async (req, res) => {
-//     try {
-//         const { postId } = req.params;
-//         const { userId, adminId } = req.body;
-
-//         console.log("userId:", userId, "adminId:", adminId);
-
-//         if (!userId && !adminId) {
-//             return res.status(400).json({ message: "Invalid liker ID" });
-//         }
-
-//         const likerId = userId || adminId;
-
-//         const post = await UserPost.findById(postId) || await SugPost.findById(postId);
-//         if (!post) {
-//             return res.status(404).json({ message: "Post not found" });
-//         }
-
-//         const alreadyLikedIndex = post.likes.findIndex(like => like && like._id && like._id.toString && like._id.toString() === likerId);
-
-//         if (alreadyLikedIndex !== -1) {
-//             post.likes.splice(alreadyLikedIndex, 1);
-//         } else {
-//             post.likes.push({ _id: likerId, fullName: "Unknown Liker",createdAt: new Date() });
-//         }
-
-//         await post.save();
-
-//         const postOwnerId = post.user && post.user._id ? post.user._id.toString() : post.adminId && post.adminId._id ? post.adminId._id.toString() : null;
-
-//         if (!postOwnerId) {
-//             return res.status(400).json({ message: "Post owner not found" });
-//         }
-
-//         console.log("Post Owner ID: ", postOwnerId);
-
-//         // Send notification to the post owner if liked by someone else(websocket here also)
-//         if (postOwnerId && postOwnerId !== likerId) {
-//             sendNotification(postOwnerId, {
-//                 type: "like",
-//                 message: `Your post was ${alreadyLikedIndex !== -1 ? "unliked" : "liked"}`,
-//                 postId: post._id,
-//                 likerId: likerId
-//             });
-
-//             if (req.io) {
-//                 req.io.to(postOwnerId).emit("post_like_toggled", {
-//                     postId,
-//                     likerId,
-//                     action: alreadyLikedIndex !== -1 ? "unlike" : "like",
-//                 });
-//             } else {
-//                 console.error("Socket.IO instance not found");
-//             }
-
-//         }
-
-//         // Updated likes array
-//         const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
-//         const users = await User.find({ _id: { $in: likerIds } });
-//         const admins = await SugUser.find({ _id: { $in: likerIds } });
-
-//         const userMap = new Map(users.map(user => [user._id.toString(), user.fullName]));
-//         const adminMap = new Map(admins.map(admin => [admin._id.toString(), admin.sugFullName]));
-
-//         // Map likes to include fullName if it's available, or "Unknown Liker" if missing
-//         const updatedLikes = post.likes.map(like => {
-//             if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true, createdAt: null };
-
-//             const likeId = like._id.toString();
-//             const fullName = userMap.get(likeId) || adminMap.get(likeId) || "Unknown Liker";
-
-//             return {
-//                 userId: like._id,
-//                 fullName,
-//                 liked: true,
-//                 createdAt: like.createdAt || null, // Include createdAt if available
-//             };
-//         });
-
-//         console.log(`Updated likes for post ${post._id}:`, post.likes);
-//         console.log(`Post ${post._id} now has ${post.likes.length} likes.`);
-
-//         // Emit a real-time event to update all clients
-//         req.io.emit("post_likes_updated", {
-//             postId,
-//             likesCount: post.likes.length,
-//             updatedLikes,
-//         });
-
-//         res.status(200).json({
-//             message: "Post like toggled",
-//             likesCount: post.likes.length,
-//             likesArray: updatedLikes,
-//             userLiked: !!userId && alreadyLikedIndex === -1,
-//             adminLiked: !!adminId && alreadyLikedIndex === -1,
-//             allLikes: updatedLikes,
-//         });
-//     } catch (error) {
-//         console.error("Error toggling like:", error);
-//         res.status(500).json({ message: "Internal server error" });
-//     }
-// };
-
 const { Notification } = require("../models/notification");
 const { sendNotificationToPostOwner } = require("../utils/websocket");
 
-// const toggleLike = async (req, res) => {
-//     try {
-//         const { postId } = req.params;
-//         const { userId, adminId } = req.body;
-
-//         if (!userId && !adminId) {
-//             return res.status(400).json({ message: "Invalid liker ID" });
-//         }
-
-//         const likerId = userId || adminId;
-
-//         const post = await UserPost.findById(postId) || await SugPost.findById(postId);
-//         if (!post) {
-//             return res.status(404).json({ message: "Post not found" });
-//         }
-
-//         const alreadyLikedIndex = post.likes.findIndex(like => like && like._id && like._id.toString && like._id.toString() === likerId);
-
-//         if (alreadyLikedIndex !== -1) {
-//             post.likes.splice(alreadyLikedIndex, 1);
-//         } else {
-//             post.likes.push({ _id: likerId, fullName: "Unknown Liker", createdAt: new Date() });
-//         }
-
-//         await post.save();
-
-//         const postOwnerId = post.user && post.user._id ? post.user._id.toString() : post.adminId && post.adminId._id ? post.adminId._id.toString() : null;
-
-//         if (!postOwnerId) {
-//             return res.status(400).json({ message: "Post owner not found" });
-//         }
-
-//         // Send notification to the post owner if liked/unliked by someone else
-//         if (postOwnerId && postOwnerId !== likerId) {
-//             const notification = {
-//                 userId: postOwnerId,
-//                 title: `Your post was ${alreadyLikedIndex !== -1 ? "unliked" : "liked"}!`,
-//                 body: `A user has ${alreadyLikedIndex !== -1 ? "unliked" : "liked"} your post.`,
-//                 postId: post._id,
-//                 read: false, // Mark as unread
-//             };
-
-//             // Send notification immediately via WebSocket
-//             sendNotificationToPostOwner(postOwnerId, notification);
-
-//             // Save the notification for later if the post owner is offline
-//             const newNotification = new Notification(notification);
-//             await newNotification.save();
-//         }
-
-//         const likerIds = post.likes.map(like => like && like._id).filter(Boolean);
-//         const users = await User.find({ _id: { $in: likerIds } });
-//         const admins = await SugUser.find({ _id: { $in: likerIds } });
-
-//         const userMap = new Map(users.map(user => [user._id.toString(), user.fullName]));
-//         const adminMap = new Map(admins.map(admin => [admin._id.toString(), admin.sugFullName]));
-
-//         const updatedLikes = post.likes.map(like => {
-//             if (!like || !like._id) return { userId: null, fullName: "Unknown Liker", liked: true, createdAt: null };
-//             const likeId = like._id.toString();
-//             const fullName = userMap.get(likeId) || adminMap.get(likeId) || "Unknown Liker";
-
-//             return {
-//                 userId: like._id,
-//                 fullName,
-//                 liked: true,
-//                 createdAt: like.createdAt || null,
-//             };
-//         });
-
-//         console.log(`Updated likes for post ${post._id}:`, post.likes);
-
-//         res.status(200).json({
-//             message: "Post like toggled",
-//             likesCount: post.likes.length,
-//             likesArray: updatedLikes,
-//             userLiked: !!userId && alreadyLikedIndex === -1,
-//             adminLiked: !!adminId && alreadyLikedIndex === -1,
-//             allLikes: updatedLikes,
-//         });
-//     } catch (error) {
-//         console.error("Error toggling like:", error);
-//         res.status(500).json({ message: "Internal server error" });
-//     }
-// };
 
 const toggleLike = async (req, res) => {
   try {
@@ -458,15 +208,6 @@ const toggleLike = async (req, res) => {
 }
 }
 
-//    console.log("Notification object:", notification);
-
-
-//       // Send notification immediately via WebSocket
-//       sendNotificationToPostOwner(postOwnerId, notification);
-
-//       // Save the notification for later if the post owner is offline
-//       const newNotification = new Notification(notification);
-//       await newNotification.save();
     }
 
     // Fetch liker details to update response
@@ -542,265 +283,10 @@ const toggleLike = async (req, res) => {
   }
 };
 
-// const addComment = async (req, res) => {
-//     const { postId } = req.params;
-//     const { postType, text, userId, parentCommentId } = req.body;
-
-//     try {
-//         if (!postId || !userId || !text) {
-//             return res.status(400).json({ message: "postId, userId, and text are required" });
-//         }
-
-//         let newComment;
-
-//         if (postType === "admin") {
-//             newComment = await SugPostComment.create({
-//                 post: postId,
-//                 text,
-//                 admin: userId,
-//                 parentComment: parentCommentId || null,
-//                 createdAt: new Date(),
-//             });
-//         } else if (postType === "user") {
-//             newComment = await SugPostComment.create({
-//                 post: postId,
-//                 text,
-//                 user: userId,
-//                 parentComment: parentCommentId || null,
-//                 createdAt: new Date(),
-//             });
-//         } else {
-//             return res.status(400).json({ message: "Invalid post type" });
-//         }
-
-//         if (parentCommentId) {
-//             await SugPostComment.findByIdAndUpdate(parentCommentId, {
-//                 $push: { replies: newComment._id },
-//             });
-//         }
-
-//         const populatedComment = await newComment.populate(postType === "admin" ? {
-//     path: 'admin',
-//     select: 'sugfullName uniProfilePicture',
-// } : {
-//     path: 'user',
-//     select: 'fullName profilePhoto',
-// });
-
-//         res.status(201).json({ message: "Comment added", comment: populatedComment });
-//     } catch (error) {
-//         console.error("Error adding comment:", error);
-//         res.status(500).json({ message: "Error adding comment", error });
-//     }
-// };
-
-// const fetchComments = async (req, res) => {
-//     const { postId } = req.params;
-//     const { postType } = req.query;
-
-//     try {
-//         let comments;
-
-//         if (postType === "admin") {
-//             comments = await SugPostComment.find({ post: postId })
-//                 .populate({
-//                     path: "user",
-//                     select: "fullName profilePhoto",
-//                     transform: (doc) => {
-//                         if (doc) {
-//                             console.log("Profile Photo for User:", doc.profilePhoto); // Log the actual profile photo URL
-//                             return {
-//                                 _id: doc._id,
-//                                 fullName: doc.fullName,
-//                                 profilePhoto: doc.profilePhoto, // Remove fallback temporarily for testing
-//                             };
-//                         }
-//                         return null; // Handle missing user
-//                     },
-//                 });
-//         } else if (postType === "user") {
-//             comments = await UserComment.find({ post: postId })
-//                 .populate({
-//                     path: "user",
-//                     select: "fullName profilePhoto",
-//                     transform: (doc) => {
-//                         if (doc) {
-//                             console.log("Profile Photo for User:", doc.profilePhoto); // Log for verification
-//                             return {
-//                                 _id: doc._id,
-//                                 fullName: doc.fullName,
-//                                 profilePhoto: doc.profilePhoto,
-//                             };
-//                         }
-//                         return null;
-//                     },
-//                 });
-//         } else {
-//             return res.status(400).json({ message: "Invalid post type" });
-//         }
-
-//         if (!comments.length) {
-//             return res.status(404).json({ message: "No comments found for this post." });
-//         }
-
-//         // Build comment tree
-//         const commentTree = comments.reduce((tree, comment) => {
-//             const commentObj = { ...comment.toObject(), replies: [] };
-//             if (!comment.parentComment) {
-//                 tree.push(commentObj);
-//             } else {
-//                 const parent = tree.find(c => c._id.equals(comment.parentComment));
-//                 if (parent) {
-//                     parent.replies.push(commentObj);
-//                 }
-//             }
-//             return tree;
-//         }, []);
-
-//         res.status(200).json({ comments: commentTree });
-//     } catch (error) {
-//         console.error("Error fetching comments:", error);
-//         res.status(500).json({ message: "Error fetching comments", error });
-//     }
-// };
-
-// const addComment = async (req, res) => {
-//     const { postId } = req.params;
-//     const { text, userId, isAdmin, parentCommentId } = req.body;
-
-//     try {
-//         if (!postId || !userId || !text) {
-//             return res.status(400).json({ message: "postId, userId, and text are required." });
-//         }
-
-//         const isAdminFlag = isAdmin === true || isAdmin === "true"; // Handle different types
-//         const commentData = {
-//             post: postId,
-//             text,
-//             parentComment: parentCommentId || null,
-//             isAdmin: isAdminFlag,
-//             ...(isAdminFlag ? { admin: userId } : { user: userId }),
-//         };
-
-//         const newComment = await Comment.create(commentData);
-
-//         if (parentCommentId) {
-//             await Comment.findByIdAndUpdate(parentCommentId, {
-//                 $push: { replies: newComment._id },
-//             });
-//         }
-
-//         // Determine if the post is a UserPost or SugPost
-//         let post;
-//         let populatedComment;
-//         if (isAdminFlag) {
-//             // Fetch SugPost and populate admin details
-//             post = await SugPost.findById(postId)
-//                 .populate("adminId", "fullName profilePhoto") // Use correct field: adminId
-//                 .populate("schoolInfoId", "uniProfilePicture");
-
-//             populatedComment = await newComment.populate([
-//                 {
-//                     path: "user",
-//                     model: "User",
-//                     select: "fullName profilePhoto",
-//                 },
-//                 {
-//                     path: "admin", // Use the correct field from the Comment schema
-//                     model: "SugUser",  // Populate admin details from SugUser
-//                     select: "fullName profilePhoto", // Adjust fields if necessary
-//                 },
-//             ]);
-
-//         } else {
-//             // Fetch UserPost and populate user details
-//             post = await UserPost.findById(postId)
-//                 .populate("user", "fullName profilePhoto")
-//                 .populate("schoolInfoId", "uniProfilePicture");
-
-//             populatedComment = await newComment.populate([
-//                 {
-//                     path: "user",
-//                     model: "User",
-//                     select: "fullName profilePhoto",
-//                 },
-//             ]);
-//         }
-
-//         if (!post) {
-//             return res.status(404).json({ message: "Post not found." });
-//         }
-
-//         // Check if the user and admin are populated correctly
-//         const commenterName = populatedComment.user ? populatedComment.user.fullName : "Someone";
-//         const commenterPhoto = populatedComment.user ? populatedComment.user.profilePhoto : "";
-//         const adminName = populatedComment.admin ? populatedComment.admin.fullName : "Admin"; // Adjusted to use populated admin
-//         const adminPhoto = populatedComment.admin ? populatedComment.admin.profilePhoto : ""; // Adjusted to use populated admin
-
-//         console.log("Commenter Name:", commenterName);
-//         console.log("Commenter Photo:", commenterPhoto);
-//         console.log("Admin Name:", adminName);
-//         console.log("Admin Photo:", adminPhoto);
-
-//         // Now proceed with creating the notification
-//         const commentNotification = {
-//             userId: post.user || post.adminId,  // Send notification to post owner
-//             postId,
-//             title: "New Comment",
-//             body: `${commenterName} commented on your post.`,
-//             likerName: commenterName,
-//             likerPhoto: commenterPhoto,  // Add commenter's photo
-//             type: "comment",  // Set the type as "comment"
-//             commentId: newComment._id,  // Store the comment's ObjectId
-//             createdAt: new Date(),
-//         };
-
-//         const newCommentNotification = await Notification.create(commentNotification);
-
-//         // Send WebSocket notification to the post owner
-//         if (post.user) {
-//             sendNotificationToPostOwner(post.user, newCommentNotification);
-//         }
-
-//         // Send WebSocket notification to the parent comment owner (if applicable)
-//         if (parentCommentId) {
-//             const parentComment = await Comment.findById(parentCommentId).select("user admin");
-//             const ownerId = parentComment.admin || parentComment.user;
-
-//             if (ownerId && ownerId.toString() !== userId) {
-//                 const replyNotification = {
-//                     userId: ownerId,
-//                     postId,
-//                     title: "New Reply",
-//                     body: `${populatedComment.user.fullName || "Someone"} replied to your comment.`,
-//                     likerName: populatedComment.user.fullName || "Someone",
-//                     likerPhoto: populatedComment.user.profilePhoto || "",  // Add commenter's photo
-//                     type: "comment",  // Set the type as "comment"
-//                     commentId: newComment._id,  // Store the comment's ObjectId
-//                     createdAt: new Date(),
-//                 };
-
-//                 await Notification.create(replyNotification);  // Store the reply notification in the Notification collection
-//                 sendNotificationToPostOwner(ownerId, replyNotification);
-//             }
-//         }
-
-//         res.status(201).json({
-//             message: "Comment added successfully",
-//             comment: populatedComment,
-//         });
-//     } catch (error) {
-//         console.error("Error adding comment:", error.message || error);
-//         res.status(500).json({
-//             message: "Error adding comment",
-//             error: error.message || error,
-//         });
-//     }
-// };
 
 const addComment = async (req, res) => {
   const { postId } = req.params;
-  const { text, userId, parentCommentId, isAdmin } = req.body; // Destructure isAdmin from the body
+  const { text, userId, parentCommentId, isAdmin } = req.body;
 
   try {
     if (!postId || !userId || !text) {
@@ -870,21 +356,21 @@ const addComment = async (req, res) => {
         };
 
     const commenterPhoto = isCommenterAdmin
-      ? commenter.schoolInfo?.uniProfilePicture || "" // Fallback to empty string if no photo
-      : commenter.profilePhoto || ""; // Fallback to empty string if no photo
+      ? commenter.schoolInfo?.uniProfilePicture || "" 
+      : commenter.profilePhoto || ""; 
 
       if (post.user && post.user.toString() !== userId) {
     const commentNotification = {
-      userId: post.user || post.adminId, // Send notification to post owner
+      userId: post.user || post.adminId, 
       postId,
       title: "New Comment",
       body: `${
         commenter.fullName || commenter.sugFullName
       } commented on your post.`,
-      likerName: commenter.fullName || commenter.sugFullName, // Use likerName for full name
-      likerPhoto: commenterPhoto || "", // Use likerPhoto for the commenter's photo
-      type: "comment", // Set the type as "comment"
-      commentId: newComment._id, // Store the comment's ObjectId
+      likerName: commenter.fullName || commenter.sugFullName, 
+      likerPhoto: commenterPhoto || "", 
+      type: "comment", 
+      commentId: newComment._id, 
       createdAt: new Date(),
     };
 
@@ -911,14 +397,14 @@ const addComment = async (req, res) => {
           postId,
           title: "New Reply",
           body: `${commenter.fullName || "Someone"} replied to your comment.`,
-          likerName: commenter.fullName || "Someone", // Use likerName for full name
-          likerPhoto: commenterPhoto || "", // Use likerPhoto for the commenter's photo
-          type: "comment", // Set the type as "comment"
-          commentId: newComment._id, // Store the comment's ObjectId
+          likerName: commenter.fullName || "Someone", 
+          likerPhoto: commenterPhoto || "", 
+          type: "comment",
+          commentId: newComment._id, 
           createdAt: new Date(),
         };
 
-        await Notification.create(replyNotification); // Store the reply notification in the Notification collection
+        await Notification.create(replyNotification); 
         sendNotificationToPostOwner(ownerId, replyNotification);
       }
     }
@@ -930,7 +416,7 @@ const addComment = async (req, res) => {
         post: newComment.post,
         text: newComment.text,
         user: commenterDetails,
-        isAdmin, // Post owner's role from request body
+        isAdmin, 
         parentComment: newComment.parentComment,
         replies: newComment.replies,
         _id: newComment._id,
@@ -1141,15 +627,15 @@ const fetchPostDetails = async (req, res) => {
 };
 
 const fetchPostsForSchool = async (req, res) => {
-    console.log("req.user:", req.user); // Log req.user
+    console.log("req.user:", req.user); 
   const { schoolInfoId } = req.params;
-  const { page = 1, limit = 10 } = req.query; // Default to page 1, 6 posts per page
+  const { page = 1, limit = 10 } = req.query; 
 
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized: User not authenticated" });
 }
 
-  const currentUserId = req.user.userId; // Ensure req.user is available
+  const currentUserId = req.user.userId; 
 if (!currentUserId) {
   console.warn("currentUserId is not defined. Make sure authentication middleware is in place.");
   return res.status(401).json({ message: "Unauthorized: User not authenticated" });
@@ -1231,20 +717,7 @@ if (!currentUserId) {
         },
       }));
       
-    // const adminPostsWithDetails = adminPosts.map((post) => ({
-    //   ...post,
-    //   postType: "admin",
-    //   isAdmin: post.adminId?.role === "admin",
-    //   userId: {
-    //     id: post.adminId?._id || "",
-    //     university: post.adminId?.schoolInfo?.university || "",
-    //     schoolInfo: {
-    //       id: post.adminId?.schoolInfo?._id || "",
-    //       university: post.adminId?.schoolInfo?.university || "",
-    //     },
-    //     profilePicture: post.adminId?.schoolInfo?.uniProfilePicture || "",
-    //   },
-    // }));
+    
 
     // Fetch student posts (no pagination applied here)
     const studentPosts = await UserPost.find({ schoolInfoId })
@@ -1325,7 +798,7 @@ if (!currentUserId) {
     // Response
     res.json({
       schoolInfo,
-      posts: paginatedPosts, // Only send paginated posts
+      posts: paginatedPosts, 
       totalPosts,
       currentPage: pageNumber,
       totalPages: Math.ceil(totalPosts / limitNumber),

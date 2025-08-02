@@ -8,14 +8,13 @@ const eventSchema = new mongoose.Schema({
     schoolInfoId: { type: String, required: true },
     title: { type: String, required: true },
     description: { type: String },
-    flyer: { type: [String], default: [] },// Array of image URLs
-    // date: { type: Date, required: true },
+    flyer: { type: [String], default: [] },
     isPaid: { type: Boolean, required: true },
-    price: { type: Number, default: 0 }, // Only required for paid events
+    price: { type: Number, default: 0 }, 
     ticketsAvailable: { type: Number, default: 0 },
-    postedBy: { type: String, enum: Object.values(Roles), required: true }, // Accepts "admin", "user", etc.
+    postedBy: { type: String, enum: Object.values(Roles), required: true }, 
     createdAt: { type: Date, default: Date.now },
-    postedByBody: { type: String, enum: ["sug", "faculty", "department"], required: true }, // Body
+    postedByBody: { type: String, enum: ["sug", "faculty", "department"], required: true }, 
     virtualAccounts: {
   fcmb: {
     accountNumber: String,
@@ -31,30 +30,7 @@ const eventSchema = new mongoose.Schema({
 });
 
 
-// const eventSchema = new mongoose.Schema({
-//     adminId: {
-//         type: mongoose.Schema.Types.ObjectId,
-//         ref: "SugUser", 
-//         required: true,
-//     },
-//     text: { 
-//         type: String, 
-//         required: false 
-//     },
-//     images: [
-//         String
-//     ],
-//     createdAt: { 
-//         type: Date, 
-//         default: Date.now 
-//     },
-//     schoolInfoId: {  
-//         type: mongoose.Schema.Types.ObjectId,
-//         ref: "SchoolInfo",
-//         required: true
-//     },
-    
-// });
+
 
 
 

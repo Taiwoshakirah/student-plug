@@ -27,7 +27,6 @@ const studentPymtSchema = new mongoose.Schema({
   feeType: { type: String, required: true },
   feeAmount:Number,
   schoolInfoId:{type: mongoose.Schema.Types.ObjectId, ref: "SchoolInfo", required: true},
-//   schoolInfo: { type: mongoose.Schema.Types.ObjectId, ref: 'SchoolInfo', required: true },
   transactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Transaction" }],
   virtualAccount: {
     accountNumber: { type: String, required: true },
@@ -36,14 +35,13 @@ const studentPymtSchema = new mongoose.Schema({
   OtherVirtualAccount: {
     accountNumber: String,
     bankName: String,
-    accountName: String, // optional if needed
+    accountName: String, 
   },
   senderAccountNumber: {
   type: String,
   required: true
 },
-  // latestTransaction: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' },
-  // oldTransactions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' }],
+ 
   reference: { type: String },
 }, { timestamps: true });
 

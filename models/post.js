@@ -12,8 +12,8 @@ const userPostSchema = new mongoose.Schema({
     },
     images: [String],
     likes: [{ 
-        _id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },  // Store userId
-        fullName: String,  // Store fullName
+        _id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },  
+        fullName: String,  
         createdAt: { type: Date, default: Date.now }
     }],
     likeCount: { 
@@ -37,7 +37,6 @@ const userPostSchema = new mongoose.Schema({
         type: Date, 
         default: Date.now 
     },
-    // trending: { type: Boolean, default: false }, // New field
 });
 
 module.exports = mongoose.models.UserPost || mongoose.model('UserPost', userPostSchema);

@@ -7,7 +7,7 @@ const FidelityNotification = require('../models/fidelityWehook')
 const crypto = require("crypto");
 
 const generatePaymentReference = () => {
-  return "TXN-" + crypto.randomBytes(4).toString("hex").toUpperCase();  // e.g. TXN-A1B2C3D4
+  return "TXN-" + crypto.randomBytes(4).toString("hex").toUpperCase();  
 }
 
 /**
@@ -16,7 +16,7 @@ const generatePaymentReference = () => {
  * 
  * @param {string} senderAccountNumber
  */
-const recordTransaction = async (senderAccountNumber, reference) => {
+const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) => {
   const notification = await FidelityNotification.findOne({ senderAccountNumber, reference });
   if (!notification) {
     throw new Error("Fidelity notification not found.");
@@ -34,7 +34,7 @@ const recordTransaction = async (senderAccountNumber, reference) => {
 
   const { email, feeType, regNo } = studentPayment;
 
-  const student = await Student.findOne({ registrationNumber: regNo });
+  const student = await SchoolStudent.findOne({ registrationNumber: regNo });
   if (!student) {
     throw new Error("Student not found.");
   }

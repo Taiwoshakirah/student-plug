@@ -360,7 +360,7 @@ const verifyWebhookSignature = (rawBody, receivedHash, secretKey) => {
   }
 
   const payloadString = Buffer.isBuffer(rawBody) ? rawBody.toString('utf8') : rawBody;
-  const compactPayload = JSON.stringify(JSON.parse(payloadString)); // Strip formatting
+  const compactPayload = JSON.stringify(JSON.parse(payloadString)); 
 
   const computedHashFormatted = crypto
     .createHmac('sha256', secretKey)
@@ -598,11 +598,24 @@ const studentPayment = await StudentPayment.findOne({
   senderAccountNumber,
   "OtherVirtualAccount.accountNumber": accountNumber,
 });
+// if (studentPayment) {
+//   console.log(" Payment matched SUG dues.");
+//   await recordTransaction(senderAccountNumber, reference);
+//   return;
+// }
 if (studentPayment) {
   console.log(" Payment matched SUG dues.");
-  await recordTransaction(senderAccountNumber, reference);
+  const schoolInfo = await SchoolInfo.findById(studentPayment.schoolInfoId);
+  if (!schoolInfo) {
+    console.error("SchoolInfo not found for studentPayment.");
+    return;
+  }
+
+  const SchoolStudent = getSchoolStudentModel(schoolInfo.university); // 🔥 dynamically get model
+  await recordTransaction(senderAccountNumber, reference, SchoolStudent);
   return;
 }
+
 
 console.log(" Unknown payment destination.");
 
@@ -635,100 +648,6 @@ const getReceipt = async (req, res) => {
 };
 
 
-
-
-
-
-
-
-
-
-// const recordPayment = async (req, res) => {
-//     const { email, amount, feeType, reference, status, gatewayResponse } = req.body;
-  
-//     try {
-//       // Find the student payment by email
-//       const studentPayment = await StudentPayment.findOne({ email });
-//       if (!studentPayment) {
-//         return res.status(404).json({ success: false, message: "Student payment record not found." });
-//       }
-  
-//       console.log("Student Payment Record:", studentPayment);
-  
-//       // Find the student by registration number
-//       const registrationNumber = studentPayment.regNo.trim(); 
-//       const student = await Student.findOne({
-//         registrationNumber: { $regex: `^${registrationNumber}$`, $options: "i" },
-//       });
-  
-//       if (!student) {
-//         console.log("No student found for regNo:", registrationNumber);
-//         return res.status(404).json({ success: false, message: "Student record not found." });
-//       }
-  
-//       console.log("Student Record Found:", student);
-  
-//       // Check if the transaction already exists
-//       let transaction = await Transaction.findOne({ reference });
-//       if (transaction) {
-//         console.log("Transaction already exists:", transaction);
-  
-//         // Ensure the transaction is linked to the student payment and student
-//         if (!studentPayment.transactions.includes(transaction._id)) {
-//           studentPayment.transactions.push(transaction._id);
-//           await studentPayment.save();
-//         }
-  
-//         if (!student.transactions.includes(transaction._id)) {
-//           student.transactions.push(transaction._id);
-//           await student.save();
-//         }
-  
-//         return res.status(200).json({
-//           success: true,
-//           message: "Payment already recorded and linked successfully.",
-//           data: transaction,
-//         });
-//       }
-  
-//       // Create a new transaction if it doesn't exist
-//       transaction = new Transaction({
-//         email,
-//         amount,
-//         feeType,
-//         reference,
-//         status,
-//         gatewayResponse,
-//         student: studentPayment._id, 
-//       });
-  
-//       const savedTransaction = await transaction.save();
-  
-//       // Update the StudentPayment transactions array
-//       studentPayment.transactions.push(savedTransaction._id);
-//       await studentPayment.save();
-  
-//       // Update the Student transactions array
-//       student.transactions.push(savedTransaction._id);
-//       await student.save();
-  
-//       return res.status(200).json({
-//         success: true,
-//         message: "Payment recorded and linked successfully.",
-//         data: savedTransaction,
-//       });
-//     } catch (error) {
-//       console.error("Error recording payment:", error.stack || error);
-//       return res.status(500).json({
-//         success: false,
-//         message: "An error occurred while recording the payment.",
-//       });
-//     }
-//   };
-  
-
-
-  
 
 
 const retrieveStudentDetails = async (req, res) => {
@@ -935,113 +854,6 @@ const searchStudentByRegistrationNumber = async (req, res) => {
 };
 
 
-// const schoolPaymentStatus = async (req, res) => { 
-//     const { schoolInfoId } = req.params;
-
-//     try {
-//         // Retrieve school information and populate related faculties and students
-//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-//             .populate({
-//                 path: "faculties",
-//                 select: "facultyName",
-//             })
-//             .populate({
-//                 path: "students",
-//                 select: "registrationNumber faculty transactions",
-//                 populate: [
-//                     {
-//                         path: "faculty",
-//                         select: "facultyName",
-//                     },
-//                     {
-//                         path: "transactions",
-//                         select: "status",
-//                     },
-//                 ],
-//             });
-
-//         if (!schoolInfo) {
-//             return res.status(404).json({ message: "School information not found." });
-//         }
-
-//         console.log("School Info:", schoolInfo);
-
-//         const totalRegistrations = schoolInfo.students.length;
-
-//         // Create a dictionary to hold data grouped by faculty
-//         const facultyWiseData = {};
-
-//         // Initialize each faculty entry based on the school info
-//         schoolInfo.faculties.forEach((faculty) => {
-//             facultyWiseData[faculty._id] = {
-//                 facultyName: faculty.facultyName,
-//                 totalRegistrations: 0,
-//                 students: {
-//                     paid: [],
-//                     unpaid: [],
-//                 },
-//             };
-//         });
-
-//         let totalPaid = 0;
-
-//         // Iterate over the students and categorize them by faculty
-//         schoolInfo.students.forEach((student) => {
-//             console.log("Student:", student);
-//             console.log("Transactions:", student.transactions);
-
-//             // Check if the student has paid
-//             const hasPaid = student.transactions.some(
-//                 (transaction) => transaction.status === "success"
-//             );
-//             console.log(`Has Paid (${student.registrationNumber}):`, hasPaid);
-
-//             // Categorize the student as 'paid' or 'unpaid'
-//             const category = hasPaid ? "paid" : "unpaid";
-
-//             // Ensure the student is assigned to the correct faculty using faculty _id
-//             if (student.faculty && facultyWiseData[student.faculty._id]) {
-//                 facultyWiseData[student.faculty._id].totalRegistrations++;
-//                 facultyWiseData[student.faculty._id].students[category].push(
-//                     student.registrationNumber
-//                 );
-//             } else {
-//                 console.warn(
-//                     `Student ${student.registrationNumber} has an invalid or unlinked faculty.`
-//                 );
-//             }
-
-//             if (hasPaid) {
-//                 totalPaid++;
-//             }
-//         });
-
-//         const totalUnpaid = totalRegistrations - totalPaid;
-
-//         // Format response
-//         const result = {
-//             totalRegistrations,
-//             totalPaid,
-//             totalUnpaid,
-//             facultyDetails: Object.values(facultyWiseData),
-//         };
-
-//         return res.status(200).json({
-//             success: true,
-//             message: "School payment status retrieved successfully.",
-//             data: result,
-//         });
-//     } catch (error) {
-//         console.error("Error retrieving school payment status:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "An error occurred while retrieving school payment status.",
-//         });
-//     }
-// };
-
-
-
 
   
 
@@ -1049,125 +861,6 @@ const searchStudentByRegistrationNumber = async (req, res) => {
 
   
 
-
-// const schoolPaymentStatus = async (req, res) => {
-//     const { schoolInfoId } = req.params;
-
-//     try {
-//         // Retrieve school information and populate related faculties and students
-//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-//             .populate({
-//                 path: "faculties",
-//                 select: "facultyName", // Only fetch faculty name
-//             })
-//             .populate({
-//                 path: "students",
-//                 select: "registrationNumber faculty transactions",
-//                 populate: [
-//                     {
-//                         path: "faculty",
-//                         select: "facultyName",  // Ensure we are populating facultyName
-//                     },
-//                     {
-//                         path: "transactions",
-//                         select: "status", 
-//                     },
-//                 ],
-//             });
-
-//         if (!schoolInfo) {
-//             return res.status(404).json({ message: "School information not found." });
-//         }
-
-//         console.log("School Info:", schoolInfo); // Debugging: Check if school info and students are populated
-//         console.log("Students:", schoolInfo.students); // Debugging: Check students data
-
-//         const totalRegistrations = schoolInfo.students.length;
-//         console.log("Total Registrations:", totalRegistrations); // Debug: Check the count of students
-
-//         const facultyWiseData = {};
-//         schoolInfo.faculties.forEach((faculty) => {
-//             facultyWiseData[faculty._id] = {
-//                 facultyName: faculty.facultyName,
-//                 students: {
-//                     paid: [],
-//                     unpaid: [],
-//                 },
-//             };
-//         });
-
-//         let totalPaid = 0;
-
-//         schoolInfo.students.forEach((student) => {
-//             console.log("Student Registration:", student.registrationNumber);
-//             console.log("Student Faculty:", student.faculty); // Check faculty
-//             console.log("Student Transactions:", student.transactions); // Check transactions
-
-//             // Ensure transactions exist
-//             if (student.transactions && Array.isArray(student.transactions)) {
-//                 student.transactions.forEach((transaction) => {
-//                     console.log(`Transaction status for ${student.registrationNumber}: ${transaction.status}`);
-//                 });
-//             }
-
-//             // Check if the student has paid
-//             const hasPaid = student.transactions.some(
-//                 (transaction) => transaction.status.toLowerCase() === "success" // Ensure case-insensitive match
-//             );
-//             console.log(`Has Paid (${student.registrationNumber}):`, hasPaid); // Debugging if payment status is correct
-
-//             if (hasPaid) {
-//                 totalPaid++;
-//             }
-
-//             // Categorize the student as 'paid' or 'unpaid'
-//             const category = hasPaid ? "paid" : "unpaid";
-
-//             // Make sure that the student has a valid faculty and faculty data exists
-//             if (student.faculty && facultyWiseData[student.faculty._id]) {
-//                 facultyWiseData[student.faculty._id].students[category].push(student.registrationNumber);
-//             } else {
-//                 console.log(`Faculty data missing for student ${student.registrationNumber}`);
-//             }
-//         });
-
-//         const totalUnpaid = totalRegistrations - totalPaid;
-
-//         // Format response
-//         const result = {
-//             totalRegistrations,
-//             totalPaid,
-//             totalUnpaid,
-//             facultyDetails: Object.values(facultyWiseData),
-//         };
-
-//         return res.status(200).json({
-//             success: true,
-//             message: "School payment status retrieved successfully.",
-//             data: result,
-//         });
-//     } catch (error) {
-//         console.error("Error retrieving school payment status:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "An error occurred while retrieving school payment status.",
-//         });
-//     }
-// };
-
-
-
-
-
-
-  
-  
-  
-  
-  
-  
-  
-  
   
   
 

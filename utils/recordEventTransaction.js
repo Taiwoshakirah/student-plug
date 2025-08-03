@@ -54,7 +54,7 @@ const mongoose = require("mongoose");
 // };
 
 
-const recordEventTransaction = async (eventId, senderAccountNumber, reference, amount) => {
+const recordEventTransaction = async (eventId, senderAccountNumber, reference, amount, SchoolStudent) => {
   try {
     // Find the event payment record
     const eventPayment = await EventPayment.findOne({
@@ -79,8 +79,8 @@ const recordEventTransaction = async (eventId, senderAccountNumber, reference, a
       throw new Error("SchoolInfo not found for eventPayment.");
     }
 
-    // Get the school-specific student model
-    const SchoolStudent = getSchoolStudentModel(schoolInfo.university);
+    // Use the passed SchoolStudent model (school-specific)
+    // const SchoolStudent = getSchoolStudentModel(schoolInfo.university); // Remove this line
     
     // Find the associated student in the correct school collection
     const student = await SchoolStudent.findById(eventPayment.studentId);

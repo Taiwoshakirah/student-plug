@@ -63,9 +63,7 @@ const recordTransaction = async (senderAccountNumber, reference, SchoolStudent) 
 
     await transaction.save();
 
-    // Update both StudentPayment and the school-specific Student with transaction ID
-    // Use database-level updates for more reliability
-    
+
     // Update StudentPayment using findByIdAndUpdate with $push
     const updatedStudentPayment = await StudentPayment.findByIdAndUpdate(
       studentPayment._id,

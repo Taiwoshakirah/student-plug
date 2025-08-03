@@ -591,23 +591,63 @@ const fidelityWebhook = async (req, res) => {
       webhookRaw: payload,
     });
 
-    const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
-if (event) {
-  console.log(" Payment matched an Event virtual account.");
-  await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
-  return;
-}
+//     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
+// if (event) {
+//   console.log(" Payment matched an Event virtual account.");
+//   await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
+//   return;
+// }
+
+const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
+    if (event) {
+      console.log("Payment matched an Event virtual account.");
+      
+      // Find the EventPayment record to get school info
+      const eventPayment = await EventPayment.findOne({
+        eventId: event._id,
+        senderAccountNumber: senderAccountNumber,
+      });
+      
+      if (!eventPayment) {
+        console.error("EventPayment not found for this event and sender.");
+        return res.status(400).json({
+          code: "F07",
+          description: "Event payment record not found",
+          data: {},
+        });
+      }
+
+      // Get school info to determine which student collection to use
+      const schoolInfo = await SchoolInfo.findById(eventPayment.schoolInfoId);
+      if (!schoolInfo) {
+        console.error("SchoolInfo not found for eventPayment.");
+        return res.status(400).json({
+          code: "F08", 
+          description: "School information not found",
+          data: {},
+        });
+      }
+
+      // Get the school-specific student model
+      const SchoolStudent = getSchoolStudentModel(schoolInfo.university);
+      
+      // Record the event transaction with the correct student model
+      await recordEventTransaction(event._id, senderAccountNumber, reference, amount, SchoolStudent);
+      
+      return res.status(200).json({
+        success: true,
+        message: "Event transaction recorded successfully",
+        request_ref: requestRef,
+        transaction_ref: reference,
+      });
+    }
 
 // Check if this is SUG payment (SchoolInfo or StudentPayment virtual account)
 const studentPayment = await StudentPayment.findOne({
   senderAccountNumber,
   "OtherVirtualAccount.accountNumber": accountNumber,
 });
-// if (studentPayment) {
-//   console.log(" Payment matched SUG dues.");
-//   await recordTransaction(senderAccountNumber, reference);
-//   return;
-// }
+
 if (studentPayment) {
   console.log(" Payment matched SUG dues.");
   const schoolInfo = await SchoolInfo.findById(studentPayment.schoolInfoId);
@@ -616,7 +656,7 @@ if (studentPayment) {
     return;
   }
 
-  const SchoolStudent = getSchoolStudentModel(schoolInfo.university); // 🔥 dynamically get model
+  const SchoolStudent = getSchoolStudentModel(schoolInfo.university); 
   await recordTransaction(senderAccountNumber, reference, SchoolStudent);
   return;
 }

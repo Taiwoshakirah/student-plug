@@ -1,4 +1,5 @@
 const fs = require('fs')
+const mongoose = require("mongoose");
 const Event = require("../models/event");
 const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const axios = require('axios')
@@ -17,6 +18,7 @@ const { v4: uuidv4 } = require("uuid");
 const requestId = uuidv4(); // Generates a unique ID
 const crypto = require("crypto");
 const generateEventReceiptDetails = require('../utils/generateEventRecipt');
+const studentSchema = require("../models/studentRegNo").schema;
 
 
 
@@ -593,6 +595,126 @@ const isValidRegNumber = (regNum) => {
   return regNum && regNumberPattern.test(regNum);
 };
 
+// const saveStudentDetails = async (req, res) => {
+//   const {
+//     userId,
+//     firstName,
+//     lastName,
+//     department,
+//     regNo,
+//     academicLevel,
+//     email,
+//     eventId,
+//     feeType,
+//     feeAmount,
+//     schoolInfoId,
+//     senderAccountNumber
+//   } = req.body;
+
+//   if (
+//     !userId ||
+//     !firstName ||
+//     !lastName ||
+//     !department ||
+//     !regNo ||
+//     !academicLevel ||
+//     !email ||
+//     !eventId ||
+//     !feeType ||
+//     !feeAmount ||
+//     !schoolInfoId ||
+//     !senderAccountNumber
+//   ) {
+//     return res.status(422).json({ success: false, message: "All fields are required." });
+//   }
+
+//   if (!isValidRegNumber(regNo)) {
+//     return res.status(400).json({ success: false, message: "Invalid registration number format." });
+//   }
+
+//   try {
+//     const student = await Student.findOne({ registrationNumber: regNo });
+
+//     if (!student) {
+//       return res.status(404).json({ success: false, message: "Invalid registration number." });
+//     }
+
+//     // const fcmbAccount = await generateFCMBVirtualAccount({
+//     //   email: req.body.email,
+//     //   phoneNumber: req.body.phoneNumber, 
+//     // });
+
+//     // Fetch school info
+// const school = await SchoolInfo.findById(schoolInfoId);
+// if (!school) {
+//   return res.status(404).json({ success: false, message: "Invalid schoolInfoId." });
+// }
+
+// // const phoneNumber = req.body.phoneNumber || "08000000000"
+// //     const fidelityAccount = await fidelityVirtualAccount({
+// //   name: school.university, 
+// //   email: req.body.email,
+// //   phoneNumber, 
+// // });
+// const event = await Event.findById(eventId);
+// if (!event) {
+//   return res.status(404).json({ success: false, message: "Event not found." });
+// }
+
+// const virtualAccount = event.virtualAccounts;
+// if (!virtualAccount) {
+//   return res.status(500).json({ success: false, message: "Event does not have a virtual account assigned." });
+// }
+
+
+
+//     const newPayment = await EventPayment.findOneAndUpdate(
+//   { registrationNumber: regNo, eventId },
+//   {
+//     studentId: student._id,
+//     registrationNumber: regNo,
+//     paymentStatus: "pending",
+//     eventId,
+//     studentInfoId: student._id,
+//     schoolInfoId,
+//     amountPaid: 0,
+//     firstName,
+//     lastName,
+//     department,
+//     academicLevel,
+//     email,
+//     userId,
+//     feeType,
+//     feeAmount,
+//     virtualAccounts: virtualAccount,
+//     senderAccountNumber  
+//   },
+//   { new: true, upsert: true }
+// );
+
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Student details saved successfully.",
+//       eventPayment: newPayment,
+//       virtualAccounts: newPayment.virtualAccounts,
+//       studentId: student._id,
+//       userId,
+//     });
+//   } catch (error) {
+//     console.error("Error saving student details:", error.message);
+//     return res.status(500).json({
+//       success: false,
+//       message: "An error occurred while saving student details.",
+//     });
+//   }
+// };
+
+const getSchoolStudentModel = (universityName) => {
+  const collectionName = `students_${universityName.toLowerCase().replace(/\s+/g, "_")}`;
+  return mongoose.models[collectionName] || mongoose.model(collectionName, studentSchema, collectionName);
+};
+
 const saveStudentDetails = async (req, res) => {
   const {
     userId,
@@ -631,84 +753,91 @@ const saveStudentDetails = async (req, res) => {
   }
 
   try {
-    const student = await Student.findOne({ registrationNumber: regNo });
-
-    if (!student) {
-      return res.status(404).json({ success: false, message: "Invalid registration number." });
+    // Fetch school info first to get the correct student collection
+    const school = await SchoolInfo.findById(schoolInfoId);
+    if (!school) {
+      return res.status(404).json({ success: false, message: "Invalid schoolInfoId." });
     }
 
-    // const fcmbAccount = await generateFCMBVirtualAccount({
-    //   email: req.body.email,
-    //   phoneNumber: req.body.phoneNumber, 
-    // });
+    // Get the school-specific student model
+    const SchoolStudent = getSchoolStudentModel(school.university);
+    
+    // Find student in the school-specific collection
+    const schoolStudent = await SchoolStudent.findOne({ registrationNumber: regNo });
 
-    // Fetch school info
-const school = await SchoolInfo.findById(schoolInfoId);
-if (!school) {
-  return res.status(404).json({ success: false, message: "Invalid schoolInfoId." });
-}
+    if (!schoolStudent) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Invalid registration number for ${school.university}.` 
+      });
+    }
 
-// const phoneNumber = req.body.phoneNumber || "08000000000"
-//     const fidelityAccount = await fidelityVirtualAccount({
-//   name: school.university, 
-//   email: req.body.email,
-//   phoneNumber, 
-// });
-const event = await Event.findById(eventId);
-if (!event) {
-  return res.status(404).json({ success: false, message: "Event not found." });
-}
+    // Fetch event details
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found." });
+    }
 
-const virtualAccount = event.virtualAccounts;
-if (!virtualAccount) {
-  return res.status(500).json({ success: false, message: "Event does not have a virtual account assigned." });
-}
+    // Check if event has virtual accounts
+    const virtualAccount = event.virtualAccounts;
+    if (!virtualAccount) {
+      return res.status(500).json({ 
+        success: false, 
+        message: "Event does not have a virtual account assigned." 
+      });
+    }
 
-
-
+    // Create or update EventPayment record
     const newPayment = await EventPayment.findOneAndUpdate(
-  { registrationNumber: regNo, eventId },
-  {
-    studentId: student._id,
-    registrationNumber: regNo,
-    paymentStatus: "pending",
-    eventId,
-    studentInfoId: student._id,
-    schoolInfoId,
-    amountPaid: 0,
-    firstName,
-    lastName,
-    department,
-    academicLevel,
-    email,
-    userId,
-    feeType,
-    feeAmount,
-    virtualAccounts: virtualAccount,
-    senderAccountNumber  
-  },
-  { new: true, upsert: true }
-);
+      { registrationNumber: regNo, eventId },
+      {
+        studentId: schoolStudent._id, // Use school-specific student ID
+        registrationNumber: regNo,
+        paymentStatus: "pending",
+        eventId,
+        studentInfoId: schoolStudent._id, // Use school-specific student ID
+        schoolInfoId,
+        amountPaid: 0,
+        firstName,
+        lastName,
+        department,
+        academicLevel,
+        email,
+        userId,
+        feeType,
+        feeAmount,
+        virtualAccounts: virtualAccount,
+        senderAccountNumber,
+        schoolName: school.university, // Add school name for tracking
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      { new: true, upsert: true }
+    );
 
+    console.log(`✅ Event payment details saved for student in ${SchoolStudent.collection.name}`);
+    console.log(`✅ Student ID: ${schoolStudent._id}`);
+    console.log(`✅ Event ID: ${eventId}`);
 
     return res.status(201).json({
       success: true,
       message: "Student details saved successfully.",
       eventPayment: newPayment,
       virtualAccounts: newPayment.virtualAccounts,
-      studentId: student._id,
+      studentId: schoolStudent._id,
       userId,
+      schoolName: school.university
     });
+    
   } catch (error) {
     console.error("Error saving student details:", error.message);
     return res.status(500).json({
       success: false,
       message: "An error occurred while saving student details.",
+      error: error.message
     });
   }
 };
-
-
 
 
 

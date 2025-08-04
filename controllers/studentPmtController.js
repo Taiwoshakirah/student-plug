@@ -19,7 +19,7 @@ const FidelityNotification = require('../models/fidelityWehook')
 const {recordTransaction} = require('../utils/recordTransaction')
 const {recordEventTransaction} = require('../utils/recordEventTransaction')
 
-const generateReceiptDetails = require("../utils/generateReceiptDetails");
+const {generateReceiptDetails} = require("../utils/generateReceiptDetails");
 
 const crypto = require('crypto')
 const processedEvents = new Set();
@@ -721,37 +721,154 @@ const retrieveStudentDetails = async (req, res) => {
 };
 
 
+// const schoolPaymentStatus = async (req, res) => {
+//     const { schoolInfoId } = req.params;
+//     const { page = 1, limit = 1 } = req.query; 
+
+//     try {
+//         // Retrieve school information and populate related faculties and students
+//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
+//             .populate({
+//                 path: "faculties",
+//                 select: "facultyName",
+//             })
+//             .populate({
+//                 path: "students",
+//                 select: "registrationNumber faculty transactions",
+//                 populate: [
+//                     {
+//                         path: "faculty",
+//                         select: "facultyName",
+//                     },
+//                     {
+//                         path: "transactions",
+//                         select: "status",
+//                     },
+//                 ],
+//             });
+
+//         if (!schoolInfo) {
+//             return res.status(404).json({ message: "School information not found." });
+//         }
+
+//         const totalRegistrations = schoolInfo.students.length;
+//         let totalPaid = 0;
+
+//         // Create a dictionary to hold data grouped by faculty
+//         const facultyWiseData = {};
+
+//         schoolInfo.faculties.forEach((faculty) => {
+//             facultyWiseData[faculty._id] = {
+//                 facultyName: faculty.facultyName,
+//                 totalRegistrations: 0,
+//                 students: [],
+//             };
+//         });
+
+//         // Categorize students by faculty and payment status
+//         schoolInfo.students.forEach((student) => {
+//             const hasPaid = student.transactions.some(
+//                 (transaction) => transaction.status === "successful"
+//             );
+//             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
+//             const formattedRegNo = `${student.registrationNumber}`;
+
+//             if (student.faculty && facultyWiseData[student.faculty._id]) {
+//                 facultyWiseData[student.faculty._id].totalRegistrations++;
+//                 facultyWiseData[student.faculty._id].students.push({
+//                     registrationNumber: formattedRegNo,
+//                     status: paymentStatus,
+//                 });
+//             }
+
+//             if (hasPaid) {
+//                 totalPaid++;
+//             }
+//         });
+
+//         const totalUnpaid = totalRegistrations - totalPaid;
+
+//         // Implement pagination for faculties
+//         const facultyEntries = Object.values(facultyWiseData);
+//         const totalFaculties = facultyEntries.length;
+
+//         const startIndex = (page - 1) * limit; 
+//         const endIndex = startIndex + parseInt(limit, 10); 
+
+//         // Slice the faculty entries based on pagination indices
+//         const paginatedFaculties = facultyEntries.slice(
+//             Math.max(startIndex, 0), 
+//             Math.min(endIndex, totalFaculties)
+//         );
+
+//         // Handle case where no entries exist for the requested page
+//         if (paginatedFaculties.length === 0) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "No faculties found for the specified page.",
+//             });
+//         }
+
+//         // Format response
+//         const result = {
+//             totalRegistrations,
+//             totalPaid,
+//             totalUnpaid,
+//             facultyDetails: paginatedFaculties,
+//             pagination: {
+//                 currentPage: Number(page),
+//                 totalPages: Math.ceil(totalFaculties / limit),
+//                 hasNextPage: endIndex < totalFaculties,
+//                 hasPrevPage: startIndex > 0,
+//             },
+//         };
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "School payment status retrieved successfully.",
+//             data: result,
+//         });
+//     } catch (error) {
+//         console.error("Error retrieving school payment status:", error);
+//         return res.status(500).json({
+//             success: false,
+//             message: "An error occurred while retrieving school payment status.",
+//         });
+//     }
+// };
+
 const schoolPaymentStatus = async (req, res) => {
     const { schoolInfoId } = req.params;
     const { page = 1, limit = 1 } = req.query; 
 
     try {
-        // Retrieve school information and populate related faculties and students
+        // Retrieve school information and populate related faculties
         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
             .populate({
                 path: "faculties",
                 select: "facultyName",
-            })
-            .populate({
-                path: "students",
-                select: "registrationNumber faculty transactions",
-                populate: [
-                    {
-                        path: "faculty",
-                        select: "facultyName",
-                    },
-                    {
-                        path: "transactions",
-                        select: "status",
-                    },
-                ],
             });
 
         if (!schoolInfo) {
             return res.status(404).json({ message: "School information not found." });
         }
 
-        const totalRegistrations = schoolInfo.students.length;
+        // Get the university name to use the correct student collection
+        const universityName = schoolInfo.university; // Assuming this field exists
+        const StudentModel = getSchoolStudentModel(universityName);
+
+        // Find students for this school and populate faculty and transactions
+        const students = await StudentModel.find({ schoolInfo: schoolInfoId })
+            .populate({
+                path: "faculty",
+                select: "facultyName",
+            })
+            .populate({
+                path: "transactions",
+                select: "status",
+            });
+
+        const totalRegistrations = students.length;
         let totalPaid = 0;
 
         // Create a dictionary to hold data grouped by faculty
@@ -766,10 +883,12 @@ const schoolPaymentStatus = async (req, res) => {
         });
 
         // Categorize students by faculty and payment status
-        schoolInfo.students.forEach((student) => {
-            const hasPaid = student.transactions.some(
-                (transaction) => transaction.status === "successful"
-            );
+        students.forEach((student) => {
+            // Check if transactions exist and is an array before calling some()
+            const hasPaid = student.transactions && Array.isArray(student.transactions) 
+                ? student.transactions.some((transaction) => transaction.status === "successful")
+                : false;
+            
             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
             const formattedRegNo = `${student.registrationNumber}`;
 

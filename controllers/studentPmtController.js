@@ -1,6 +1,7 @@
 // routes/student.js
 const express = require('express')
 const StudentPayment = require("../models/studentPayment");
+const EventPayment = require("../models/eventpymt");
 const Event= require('../models/event')
 const Student = require('../models/studentRegNo')
 const studentSchema = require("../models/studentRegNo").schema;

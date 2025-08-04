@@ -1,5 +1,6 @@
 const EventPayment = require("../models/eventpymt");
 const EventTransaction = require("../models/eventTransaction");
+const SchoolInfo = require("../models/schoolInfo");
 const Student = require("../models/studentRegNo"); 
 const mongoose = require("mongoose");
 

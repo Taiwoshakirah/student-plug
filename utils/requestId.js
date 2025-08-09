@@ -1,8 +1,8 @@
 // Function to generate a requestId
 function generateRequestId() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; // Allowed characters
-    const minLength = 12; // Minimum length
-    const maxLength = 16; // Maximum length
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; 
+    const minLength = 12; 
+    const maxLength = 16; 
   
     // Generate a random length between 12 and 16
     const requestIdLength = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
@@ -16,6 +16,6 @@ function generateRequestId() {
     return requestId;
   }
   
-  // Export the function
+  
   module.exports = generateRequestId;
   

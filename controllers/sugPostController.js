@@ -53,9 +53,9 @@ const createSugPost = async (req, res) => {
     }
 
     // Extract hashtags and check for trending hashtags
-    const processedText = text || ""; // Ensure `text` is a string
+    const processedText = text || ""; 
     const hashtags = extractHashtags(processedText);
-    const trendingHashtags = ["#trending", "#viral"]; // Define trending hashtags
+    const trendingHashtags = ["#trending", "#viral"]; 
     const isTrending = hashtags.some((hashtag) =>
       trendingHashtags.includes(hashtag.toLowerCase())
     );
@@ -66,7 +66,7 @@ const createSugPost = async (req, res) => {
       text: processedText,
       images: imageUrls,
       schoolInfoId,
-      trending: processedText.includes("#"), // Set trending based on hashtags
+      trending: processedText.includes("#"), 
     });
     await post.save();
 

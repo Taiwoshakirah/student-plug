@@ -6,16 +6,15 @@ const axios = require('axios')
 const Roles = require("../middlewares/role");
 const SugUser = require('../models/schoolSug')
 const SchoolInfo = require('../models/schoolInfo')
-const User = require("../models/signUp"); // Import User model
-const Student = require("../models/studentRegNo"); // Import Student model
+const User = require("../models/signUp"); 
+const Student = require("../models/studentRegNo"); 
 const EventPayment = require('../models/eventpymt')
 require("dotenv").config();
-// const EventCardDetails = require('../models/eventCardDetails')
 const StudentInfo = require('../models/studentInfo')
 const EventTransaction = require('../models/eventTransaction')
 const sendMail = require('../utils/sendMail')
 const { v4: uuidv4 } = require("uuid");
-const requestId = uuidv4(); // Generates a unique ID
+const requestId = uuidv4(); 
 const crypto = require("crypto");
 const generateEventReceiptDetails = require('../utils/generateEventRecipt');
 const studentSchema = require("../models/studentRegNo").schema;
@@ -71,27 +70,27 @@ const createUnpaidEvent = async (req, res) => {
                 if (result && result.secure_url) {
                     flyer.push(result.secure_url);
                 }
-                fs.unlinkSync(tempPath); // Clean up temporary file
+                fs.unlinkSync(tempPath); 
             }
         }
 
         const event = new Event({
-            adminId, // Traceability
+            adminId, 
             schoolInfoId,
             title,
             description,
             flyer,
             ticketsAvailable,
-            isPaid: false, // Unpaid event
-            postedBy: Roles.ADMIN, // Role
-            postedByBody, // Automatically determined
+            isPaid: false, 
+            postedBy: Roles.ADMIN, 
+            postedByBody, 
         });
 
         await event.save();
 
         // Attach uniProfilePicture to the event object
         const eventWithPicture = {
-            ...event.toObject(), // Convert Mongoose object to plain object
+            ...event.toObject(), 
             uniProfilePicture,
         };
 
@@ -116,7 +115,7 @@ const FIDELITY_API_SECRET = process.env.FIDELITY_API_SECRET;
 
 
 const fidelityVirtualAccount = async ({ name, email, phoneNumber, schoolInfoId }) => {
-  console.log("✅ Fidelity account name passed:", name);
+  // console.log("✅ Fidelity account name passed:", name);
   const requestRef = `REQ-${Date.now()}`;
   const transactionRef = `TXN-${Date.now()}`;
 
@@ -140,19 +139,13 @@ const fidelityVirtualAccount = async ({ name, email, phoneNumber, schoolInfoId }
       transaction_ref_parent: null,
       amount: 0,
       customer: {
-      customer_ref: customerRef, //  unique
+      customer_ref: customerRef, 
       firstname: "Monieplug",
       surname: `${name}/Event`,
       email,
       mobile_no: phoneNumber,
     },
-      // customer: {
-      //   customer_ref: phoneNumber,
-      //   firstname: "Monieplug",
-      //   surname: `${name}/Event`,
-      //   email,
-      //   mobile_no: phoneNumber,
-      // },
+    
       meta: {
         a_key: "a_meta_value_1",
         b_key: "a_meta_value_2",
@@ -181,8 +174,8 @@ const fidelityVirtualAccount = async ({ name, email, phoneNumber, schoolInfoId }
   },
 });
 
-console.log("Fidelity Raw Data:", JSON.stringify(response.data, null, 2));
-console.log("Full Payload You Sent:", JSON.stringify(payload, null, 2));
+// console.log("Fidelity Raw Data:", JSON.stringify(response.data, null, 2));
+// console.log("Full Payload You Sent:", JSON.stringify(payload, null, 2));
 
 const providerResponse = response.data?.data?.provider_response;
 
@@ -193,7 +186,6 @@ if (!providerResponse?.account_number) {
 return {
   accountNumber: providerResponse.account_number,
   accountName: `Monieplug/${name}/Event`,
-  // accountName: providerResponse.account_name || `Monieplug/${name}/Event`,
   bankName: providerResponse.bank_name || "Fidelity Bank",
   bankCode: providerResponse.bank_code || "070",
   rawResponse: providerResponse,
@@ -244,16 +236,16 @@ const createPaidEvent = async (req, res) => {
        }
        const uniProfilePicture = schoolInfo.uniProfilePicture;
 
-        const flyer = []; // Initialize an empty array for the flyer
+        const flyer = []; 
 if (req.files && req.files.image) {
     const image = req.files.image;
     const tempPath = `./tmp/${image.name}`;
-    await image.mv(tempPath); // Save the image temporarily
-    const result = await uploadToCloudinary(tempPath); // Upload to Cloudinary
+    await image.mv(tempPath); 
+    const result = await uploadToCloudinary(tempPath); 
     if (result && result.secure_url) {
-        flyer.push(result.secure_url); // Add the URL to the flyer array
+        flyer.push(result.secure_url); 
     }
-    fs.unlinkSync(tempPath); // Remove the temporary file
+    fs.unlinkSync(tempPath); 
 }
 
 // before saving event
@@ -312,7 +304,7 @@ const event = new Event({
 
 // Get all events
 const getAllEvents = async (req, res) => {
-    const { schoolInfoId } = req.params; // Extract schoolInfoId from params
+    const { schoolInfoId } = req.params; 
 
     if (!schoolInfoId) {
         return res.status(400).json({ success: false, message: "schoolInfoId is required." });
@@ -336,7 +328,7 @@ const getAllEvents = async (req, res) => {
 
         // Attach uniProfilePicture to each event
         const eventsWithPicture = events.map(event => ({
-            ...event.toObject(), // Convert Mongoose object to plain object
+            ...event.toObject(), 
             uniProfilePicture,
         }));
 
@@ -362,7 +354,7 @@ const getEventById = async (req, res) => {
         }
 
         // Fetch the schoolInfo to get the uniProfilePicture
-        const schoolInfo = await SchoolInfo.findById(event.schoolInfoId); // Use event's schoolInfoId
+        const schoolInfo = await SchoolInfo.findById(event.schoolInfoId); 
         if (!schoolInfo) {
             return res.status(404).json({ success: false, message: "School information not found." });
         }
@@ -371,8 +363,8 @@ const getEventById = async (req, res) => {
 
         // Include the uniProfilePicture in the event response
         const eventWithPicture = {
-            ...event.toObject(), // Convert Mongoose object to plain object
-            uniProfilePicture,  // Add the picture to the response
+            ...event.toObject(), 
+            uniProfilePicture,  
         };
 
         res.status(200).json({ success: true, event: eventWithPicture });
@@ -385,7 +377,7 @@ const getEventById = async (req, res) => {
 
 const getEventsByAdmin = async (req, res) => {
     try {
-        const { adminId } = req.params; // Get adminId from request params
+        const { adminId } = req.params; 
 
         // Find events posted by the specific admin and sort by createdAt in descending order
         const events = await Event.find({ adminId }).sort({ createdAt: -1 });
@@ -408,8 +400,8 @@ const getEventsByAdmin = async (req, res) => {
 
         // Attach the uniProfilePicture to each event
         const eventsWithPictures = events.map(event => ({
-            ...event.toObject(), // Convert Mongoose document to plain object
-            uniProfilePicture: schoolInfoMap[event.schoolInfoId] || null, // Add profile picture or null
+            ...event.toObject(), 
+            uniProfilePicture: schoolInfoMap[event.schoolInfoId] || null, 
         }));
 
         res.status(200).json({ success: true, events: eventsWithPictures });
@@ -595,120 +587,6 @@ const isValidRegNumber = (regNum) => {
   return regNum && regNumberPattern.test(regNum);
 };
 
-// const saveStudentDetails = async (req, res) => {
-//   const {
-//     userId,
-//     firstName,
-//     lastName,
-//     department,
-//     regNo,
-//     academicLevel,
-//     email,
-//     eventId,
-//     feeType,
-//     feeAmount,
-//     schoolInfoId,
-//     senderAccountNumber
-//   } = req.body;
-
-//   if (
-//     !userId ||
-//     !firstName ||
-//     !lastName ||
-//     !department ||
-//     !regNo ||
-//     !academicLevel ||
-//     !email ||
-//     !eventId ||
-//     !feeType ||
-//     !feeAmount ||
-//     !schoolInfoId ||
-//     !senderAccountNumber
-//   ) {
-//     return res.status(422).json({ success: false, message: "All fields are required." });
-//   }
-
-//   if (!isValidRegNumber(regNo)) {
-//     return res.status(400).json({ success: false, message: "Invalid registration number format." });
-//   }
-
-//   try {
-//     const student = await Student.findOne({ registrationNumber: regNo });
-
-//     if (!student) {
-//       return res.status(404).json({ success: false, message: "Invalid registration number." });
-//     }
-
-//     // const fcmbAccount = await generateFCMBVirtualAccount({
-//     //   email: req.body.email,
-//     //   phoneNumber: req.body.phoneNumber, 
-//     // });
-
-//     // Fetch school info
-// const school = await SchoolInfo.findById(schoolInfoId);
-// if (!school) {
-//   return res.status(404).json({ success: false, message: "Invalid schoolInfoId." });
-// }
-
-// // const phoneNumber = req.body.phoneNumber || "08000000000"
-// //     const fidelityAccount = await fidelityVirtualAccount({
-// //   name: school.university, 
-// //   email: req.body.email,
-// //   phoneNumber, 
-// // });
-// const event = await Event.findById(eventId);
-// if (!event) {
-//   return res.status(404).json({ success: false, message: "Event not found." });
-// }
-
-// const virtualAccount = event.virtualAccounts;
-// if (!virtualAccount) {
-//   return res.status(500).json({ success: false, message: "Event does not have a virtual account assigned." });
-// }
-
-
-
-//     const newPayment = await EventPayment.findOneAndUpdate(
-//   { registrationNumber: regNo, eventId },
-//   {
-//     studentId: student._id,
-//     registrationNumber: regNo,
-//     paymentStatus: "pending",
-//     eventId,
-//     studentInfoId: student._id,
-//     schoolInfoId,
-//     amountPaid: 0,
-//     firstName,
-//     lastName,
-//     department,
-//     academicLevel,
-//     email,
-//     userId,
-//     feeType,
-//     feeAmount,
-//     virtualAccounts: virtualAccount,
-//     senderAccountNumber  
-//   },
-//   { new: true, upsert: true }
-// );
-
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Student details saved successfully.",
-//       eventPayment: newPayment,
-//       virtualAccounts: newPayment.virtualAccounts,
-//       studentId: student._id,
-//       userId,
-//     });
-//   } catch (error) {
-//     console.error("Error saving student details:", error.message);
-//     return res.status(500).json({
-//       success: false,
-//       message: "An error occurred while saving student details.",
-//     });
-//   }
-// };
 
 const getSchoolStudentModel = (universityName) => {
   const collectionName = `students_${universityName.toLowerCase().replace(/\s+/g, "_")}`;
@@ -791,11 +669,11 @@ const saveStudentDetails = async (req, res) => {
     const newPayment = await EventPayment.findOneAndUpdate(
       { registrationNumber: regNo, eventId },
       {
-        studentId: schoolStudent._id, // Use school-specific student ID
+        studentId: schoolStudent._id, 
         registrationNumber: regNo,
         paymentStatus: "pending",
         eventId,
-        studentInfoId: schoolStudent._id, // Use school-specific student ID
+        studentInfoId: schoolStudent._id,
         schoolInfoId,
         amountPaid: 0,
         firstName,
@@ -808,16 +686,16 @@ const saveStudentDetails = async (req, res) => {
         feeAmount,
         virtualAccounts: virtualAccount,
         senderAccountNumber,
-        schoolName: school.university, // Add school name for tracking
+        schoolName: school.university, 
         createdAt: new Date(),
         updatedAt: new Date()
       },
       { new: true, upsert: true }
     );
 
-    console.log(`✅ Event payment details saved for student in ${SchoolStudent.collection.name}`);
-    console.log(`✅ Student ID: ${schoolStudent._id}`);
-    console.log(`✅ Event ID: ${eventId}`);
+    console.log(` Event payment details saved for student in ${SchoolStudent.collection.name}`);
+    console.log(` Student ID: ${schoolStudent._id}`);
+    console.log(` Event ID: ${eventId}`);
 
     return res.status(201).json({
       success: true,
@@ -940,7 +818,7 @@ const getReceipt = async (req, res) => {
 
   
 const fetchConfirmationDetails = async (req, res) => {
-  const { email } = req.params; // Retrieve the email from URL params
+  const { email } = req.params; 
 
   try {
     // Ensure email is passed correctly
@@ -953,14 +831,14 @@ const fetchConfirmationDetails = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "Student not found." });
     }
-    console.log("User found:", user); // Log user details
+    console.log("User found:", user); 
 
     // Fetch student details from EventPayment collection
     const eventPayment = await EventPayment.findOne({ email });
     if (!eventPayment) {
       return res.status(404).json({ success: false, message: "Event payment details not found." });
     }
-    console.log("Event payment found:", eventPayment); // Log event payment details
+    console.log("Event payment found:", eventPayment); 
 
     // Fetch card details from EventCardDetails collection
     const cardDetails = await EventCardDetails.findOne({ email });

@@ -3,7 +3,6 @@ const SchoolInfo = require("../models/schoolInfo");
 const jwt = require("jsonwebtoken");
 const { parsePhoneNumberFromString } = require("libphonenumber-js");
 const crypto = require("crypto");
-// const cloudinary = require("../config/cloudinaryConfig");
 const cloudinary = require("../config/cloudinaryConfig");
 const { uploadToCloudinary } = require("../config/cloudinaryConfig");
 const fs = require("fs");
@@ -337,10 +336,7 @@ return {
 };
 
 
-// const isValidRegNumber = (regNum) => {
-//   const regNumberPattern = /^ND\/\d{3}\/\d{3}$/;
-//   return regNum && regNumberPattern.test(regNum);
-// };
+
 
 const isValidRegNumber = (regNum) => {
   if (!regNum || typeof regNum !== 'string') {
@@ -351,9 +347,9 @@ const isValidRegNumber = (regNum) => {
   
   // More flexible patterns to match your actual data
   const validPatterns = [
-    /^ND\/\d{2,4}\/\d{2,4}$/,        // ND/XX/XX to ND/XXXX/XXXX
-    /^[A-Z]{2,3}\/\d{2,4}\/\d{2,4}$/,  // Any 2-3 letter prefix
-    /^\d{2,3}\/\d{2,4}\/\d{2,4}$/     // Without letter prefix
+    /^ND\/\d{2,4}\/\d{2,4}$/,        
+    /^[A-Z]{2,3}\/\d{2,4}\/\d{2,4}$/,  
+    /^\d{2,3}\/\d{2,4}\/\d{2,4}$/     
   ];
   
   const isValid = validPatterns.some(pattern => pattern.test(trimmedRegNum));
@@ -379,11 +375,11 @@ const isValidRegNumber = (regNum) => {
   return false;
 };
 
-// Test your validation
-console.log('Testing validation:');
-console.log('ND/126/199:', isValidRegNumber('ND/126/199'));   // Should be true
-console.log('ND/126/1999:', isValidRegNumber('ND/126/1999')); // Should be true
-console.log('ND/001/001:', isValidRegNumber('ND/001/001'));   // Should be true
+// // Test your validation
+// console.log('Testing validation:');
+// console.log('ND/126/199:', isValidRegNumber('ND/126/199'));   // Should be true
+// console.log('ND/126/1999:', isValidRegNumber('ND/126/1999')); // Should be true
+// console.log('ND/001/001:', isValidRegNumber('ND/001/001'));   // Should be true
 
 const extractFacultyNameFromLine = (line, faculties) => {
   console.log(`Extracting faculty from line: "${line}"`);
@@ -399,113 +395,7 @@ const extractFacultyNameFromLine = (line, faculties) => {
   return extractedFaculty;
 };
 
-// const processFacultyRegistrationNumbers = async (
-//   facultyRegMap,
-//   faculties,
-//   schoolInfoId,
-//   tempPath,
-//   res,
-//   schoolData
-// ) => {
-//   try {
-//     // Ensure all faculties are included, even if no registration numbers are found
-//     faculties.forEach((faculty) => {
-//       facultyRegMap[faculty.facultyName] =
-//         facultyRegMap[faculty.facultyName] || [];
-//     });
 
-//     // Log results for debugging
-//     faculties.forEach((faculty) => {
-//       const facultyName = faculty.facultyName;
-//       const registrationNumbers = facultyRegMap[facultyName];
-//       console.log(
-//         `Processed ${registrationNumbers.length} registration numbers for ${facultyName}`
-//       );
-//     });
-
-//     const addedFaculties = []; // Keep track of faculties added to the school
-
-//     // Create or update students in the database
-//     for (const facultyName in facultyRegMap) {
-//       const faculty = faculties.find((f) => f.facultyName === facultyName);
-
-//       if (faculty) {
-//         const registrationNumbers = facultyRegMap[facultyName];
-
-//         // Add the faculty ID to the school's faculties array if not already present
-//         addedFaculties.push(faculty._id);
-
-//         for (const regNum of registrationNumbers) {
-//           // Check if the student already exists
-//           const existingStudent = await Student.findOne({
-//             registrationNumber: regNum,
-//           });
-
-//           if (!existingStudent) {
-//             // Create a new student document
-//             const newStudent = new Student({
-//               registrationNumber: regNum,
-//               faculty: faculty._id, // Reference to the faculty
-//               schoolInfo: schoolInfoId, // Reference to the schoolInfo
-//             });
-
-//             const savedStudent = await newStudent.save();
-
-//             // Add the new student to the school's students array
-//             await SchoolInfo.findByIdAndUpdate(
-//               schoolInfoId,
-//               { $push: { students: savedStudent._id } },
-//               { new: true } // Return updated document
-//             );
-//           }
-//         }
-
-//         console.log(
-//           `Processed ${registrationNumbers.length} registration numbers for ${facultyName}`
-//         );
-//       }
-//     }
-
-//     // Update the school's faculties array with unique faculties
-//     await SchoolInfo.findByIdAndUpdate(
-//       schoolInfoId,
-//       { $addToSet: { faculties: { $each: addedFaculties } } },
-//       { new: true } // Return the updated document
-//     );
-
-//     // Clean up the temporary file
-//     fs.unlinkSync(tempPath);
-
-//     // Respond with processed data
-//     return res.status(200).json({
-//       message: "Registration numbers processed successfully.",
-//       school: {
-//         ...schoolData.toObject(),
-//         students: schoolData.students.filter((student) => student !== null),
-//       },
-//       faculties: faculties.map((faculty) => ({
-//         id: faculty._id,
-//         name: faculty.facultyName,
-//       })),
-//       data: facultyRegMap,
-//     });
-//   } catch (error) {
-//     console.error("Error processing faculty registration numbers:", error);
-
-//     // Handle cleanup in case of an error
-//     if (fs.existsSync(tempPath)) {
-//       fs.unlinkSync(tempPath);
-//     }
-
-//     return res
-//       .status(500)
-//       .json({ message: "Error processing registration numbers." });
-//   }
-// };
-
-// Approach 1: Dynamic Collection Creation (Recommended)
-
-// Helper function to get school-specific student model
 const getSchoolStudentModel = (schoolName) => {
   const collectionName = `students_${schoolName.toLowerCase().replace(/\s+/g, '_')}`;
 
@@ -634,7 +524,7 @@ const processFacultyRegistrationNumbers = async (
       } else {
         // For smaller datasets, process all at once
         savedStudents = await SchoolStudent.insertMany(newStudents, { 
-          ordered: false // Continue even if some fail
+          ordered: false 
         });
         
         console.log(`Successfully created ${savedStudents.length} students`);
@@ -657,8 +547,8 @@ await SchoolInfo.findByIdAndUpdate(
       await SchoolInfo.findByIdAndUpdate(
         schoolInfoId,
         { 
-          $inc: { studentCount: savedStudents.length }, // Track total count
-          $set: { lastStudentUpload: new Date() } // Track last upload
+          $inc: { studentCount: savedStudents.length }, 
+          $set: { lastStudentUpload: new Date() } 
         },
         { new: true }
       );
@@ -699,7 +589,7 @@ await SchoolInfo.findByIdAndUpdate(
       existingStudentsFound: existingRegNumbers.size,
       school: {
         ...updatedSchoolData.toObject(),
-        collectionName: `students_${schoolInfoId}` // Include collection name in response
+        collectionName: `students_${schoolInfoId}` 
       },
       faculties: faculties.map((faculty) => ({
         id: faculty._id,
@@ -723,168 +613,6 @@ await SchoolInfo.findByIdAndUpdate(
   }
 };
 
-// const processFacultyRegistrationNumbers = async (
-//   facultyRegMap,
-//   faculties,
-//   schoolInfoId,
-//   tempPath,
-//   res,
-//   schoolData
-// ) => {
-//   try {
-//     console.log('Starting optimized bulk processing...');
-    
-//     // Ensure all faculties are included
-//     faculties.forEach((faculty) => {
-//       facultyRegMap[faculty.facultyName] = facultyRegMap[faculty.facultyName] || [];
-//     });
-
-//     // Collect ALL registration numbers for bulk checking
-//     const allRegNumbers = [];
-//     Object.values(facultyRegMap).forEach(regNums => {
-//       allRegNumbers.push(...regNums);
-//     });
-
-//     console.log(`Processing ${allRegNumbers.length} total registration numbers...`);
-
-//     // BULK CHECK: Find all existing students in one query
-//     const existingStudents = await Student.find({
-//       registrationNumber: { $in: allRegNumbers }
-//     }).select('registrationNumber');
-
-//     const existingRegNumbers = new Set(
-//       existingStudents.map(student => student.registrationNumber)
-//     );
-
-//     console.log(`Found ${existingRegNumbers.size} existing students`);
-
-//     // Prepare bulk operations
-//     const newStudents = [];
-//     const newStudentIds = [];
-//     const addedFaculties = [];
-
-//     // Process each faculty
-//     for (const facultyName in facultyRegMap) {
-//       const faculty = faculties.find((f) => f.facultyName === facultyName);
-      
-//       if (faculty) {
-//         const registrationNumbers = facultyRegMap[facultyName];
-//         addedFaculties.push(faculty._id);
-
-//         // Filter out existing students
-//         const newRegNumbers = registrationNumbers.filter(
-//           regNum => !existingRegNumbers.has(regNum)
-//         );
-
-//         console.log(`${facultyName}: ${newRegNumbers.length} new students out of ${registrationNumbers.length} total`);
-
-//         // Prepare new student documents
-//         newRegNumbers.forEach(regNum => {
-//           const studentData = {
-//             registrationNumber: regNum,
-//             faculty: faculty._id,
-//             schoolInfo: schoolInfoId,
-//           };
-//           newStudents.push(studentData);
-//         });
-//       }
-//     }
-
-//     console.log(`Preparing to create ${newStudents.length} new students...`);
-
-//     let savedStudentIds = [];
-
-//     if (newStudents.length > 0) {
-//       // BULK INSERT: Handle large datasets with chunking
-//       if (newStudents.length > 5000) {
-//         const chunkSize = 5000;
-//         console.log(`Large dataset detected. Processing ${newStudents.length} students in chunks...`);
-        
-//         for (let i = 0; i < newStudents.length; i += chunkSize) {
-//           const chunk = newStudents.slice(i, i + chunkSize);
-//           const savedChunk = await Student.insertMany(chunk, { ordered: false });
-//           savedStudentIds.push(...savedChunk.map(s => s._id));
-          
-//           console.log(`Processed chunk ${Math.floor(i/chunkSize) + 1}/${Math.ceil(newStudents.length/chunkSize)}: ${savedChunk.length} students`);
-//         }
-//       } else {
-//         // For smaller datasets, process all at once
-//         const savedStudents = await Student.insertMany(newStudents, { 
-//           ordered: false // Continue even if some fail
-//         });
-        
-//         savedStudentIds = savedStudents.map(student => student._id);
-//         console.log(`Successfully created ${savedStudents.length} students`);
-//       }
-
-//       // BULK UPDATE: Add all students to school in one operation
-//       if (savedStudentIds.length > 0) {
-//         await SchoolInfo.findByIdAndUpdate(
-//           schoolInfoId,
-//           { 
-//             $push: { 
-//               students: { $each: savedStudentIds } 
-//             } 
-//           },
-//           { new: true }
-//         );
-//         console.log(`Added ${savedStudentIds.length} students to school`);
-//       }
-//     }
-
-//     // Update school's faculties array
-//     if (addedFaculties.length > 0) {
-//       await SchoolInfo.findByIdAndUpdate(
-//         schoolInfoId,
-//         { $addToSet: { faculties: { $each: addedFaculties } } },
-//         { new: true }
-//       );
-//       console.log(`Updated school with ${addedFaculties.length} faculties`);
-//     }
-
-//     // Log final results
-//     Object.keys(facultyRegMap).forEach(facultyName => {
-//       console.log(`Final: ${facultyName} - ${facultyRegMap[facultyName].length} registration numbers`);
-//     });
-
-//     // Clean up the temporary file
-//     if (fs.existsSync(tempPath)) {
-//       fs.unlinkSync(tempPath);
-//     }
-
-//     console.log('Bulk processing completed successfully!');
-
-//     // Respond with processed data
-//     return res.status(200).json({
-//       message: "Registration numbers processed successfully.",
-//       totalProcessed: allRegNumbers.length,
-//       newStudentsCreated: savedStudentIds.length,
-//       existingStudentsFound: existingRegNumbers.size,
-//       school: {
-//         ...schoolData.toObject(),
-//         students: schoolData.students.filter((student) => student !== null),
-//       },
-//       faculties: faculties.map((faculty) => ({
-//         id: faculty._id,
-//         name: faculty.facultyName,
-//       })),
-//       data: facultyRegMap,
-//     });
-
-//   } catch (error) {
-//     console.error("Error processing faculty registration numbers:", error);
-
-//     // Handle cleanup in case of an error
-//     if (fs.existsSync(tempPath)) {
-//       fs.unlinkSync(tempPath);
-//     }
-
-//     return res.status(500).json({ 
-//       message: "Error processing registration numbers.",
-//       error: error.message 
-//     });
-//   }
-// }; 
 
 const mergeFacultyLines = (lines) => {
   const mergedLines = [];
@@ -1029,14 +757,14 @@ const uploadStudentsRegNo = async (req, res) => {
 
   // More flexible regex patterns - try multiple patterns
   const regNoPatterns = [
-    /ND\/\d{3}\/\d{3}/g,           // Your current pattern
-    /ND\/\d{2,4}\/\d{2,4}/g,      // More flexible digit count
-    /[A-Z]{2,3}\/\d{2,4}\/\d{2,4}/g, // Different prefix
-    /\b\d{2,3}\/\d{2,4}\/\d{2,4}\b/g, // Without prefix
+    /ND\/\d{3}\/\d{3}/g,           
+    /ND\/\d{2,4}\/\d{2,4}/g,      
+    /[A-Z]{2,3}\/\d{2,4}\/\d{2,4}/g, 
+    /\b\d{2,3}\/\d{2,4}\/\d{2,4}\b/g, 
   ];
 
   let totalMatches = 0;
-  let processedRegNums = new Set(); // Track processed to avoid duplicates
+  let processedRegNums = new Set(); 
 
   lines.forEach((line, lineIndex) => {
     console.log(`\nProcessing line ${lineIndex + 1}: "${line}"`);
@@ -1464,36 +1192,7 @@ const getAllRegisteredSchools = async (req, res) => {
   }
 };
 
- // } else if (file.mimetype === "application/pdf") {
-    //   const dataBuffer = fs.readFileSync(tempPath);
-    //   const pdfData = await pdfParse(dataBuffer);
-    //   let lines = pdfData.text.split("\n");
 
-    //   // Merge faculty lines before processing
-    //   lines = mergeFacultyLines(lines);
-    //   console.log("PDF Parsed Lines:", lines);
-
-    //   const regNoPattern = /ND\/\d{3}\/\d{3}/;
-    //   lines.forEach((line) => {
-    //     const match = line.match(regNoPattern);
-    //     if (match) {
-    //       const regNum = match[0].trim();
-    //       const facultyName = extractFacultyNameFromLine(line, faculties);
-
-    //       if (isValidRegNumber(regNum) && facultyName) {
-    //         facultyRegMap[facultyName].push(regNum);
-    //       }
-    //     }
-    //   });
-    //   await processFacultyRegistrationNumbers(
-    //     facultyRegMap,
-    //     faculties,
-    //     schoolInfoId,
-    //     tempPath,
-    //     res,
-    //     schoolData
-    //   );
-    // } else if (
 
 module.exports = {
   schoolSugSignup,

@@ -1,5 +1,4 @@
 const UserPost = require('../models/post')
-// const UserComment = require('../models/comment')
 const SugPost = require('../models/sugPost')
 const {uploadToCloudinary} = require('../config/cloudinaryConfig')
 const User = require('../models/signUp'); 
@@ -238,7 +237,7 @@ const likePost = async (req, res) => {
     if (existingLikeIndex !== -1) {
       // Unlike the post
       post.likes.splice(existingLikeIndex, 1);
-      post.likeCount = Math.max(0, post.likes.length); // Update likeCount to match likes array
+      post.likeCount = Math.max(0, post.likes.length); 
       await post.save();
 
       console.log(`User ${userId} unliked the post`);
@@ -402,7 +401,7 @@ const postNotify = (req, res) => {
   };
 
   const notifyPost = (data) => {
-      sendEvent(data); // Send the event to the client
+      sendEvent(data); 
   };
 
   postEventEmitter.on("newPost", notifyPost);
@@ -415,7 +414,7 @@ const postNotify = (req, res) => {
 
 
 
-// module.exports = { postNotify };
+
 
   
 const markNotificationAsRead = async (req, res) => { 
@@ -430,8 +429,8 @@ const markNotificationAsRead = async (req, res) => {
     }
 
     const result = await Notification.updateOne(
-      { _id: notificationId }, // Match the notification by its ID
-      { $set: { read: true } } // Set 'read' to true
+      { _id: notificationId }, 
+      { $set: { read: true } } 
     );
 
     console.log("Update Result:", result);

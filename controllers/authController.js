@@ -188,8 +188,8 @@ const studentInformation = async (req, res) => {
 
 const uploadProfilePicture = async (req, res) => {
   try {
-    console.log("Request Body:", req.body);
-    console.log("Uploaded Files:", req.files);
+    // console.log("Request Body:", req.body);
+    // console.log("Uploaded Files:", req.files);
 
     const { userId, skipUpload } = req.body;
 

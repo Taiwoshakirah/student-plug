@@ -23,7 +23,6 @@ const schoolInfoSchema = new mongoose.Schema({
     required: true,
   },
   faculties: [{ type: mongoose.Schema.Types.ObjectId, ref: "Faculty" }], 
-  // students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
   students: [{ type: String }],
   collectionKey: { type: String },
   studentCount: { 

@@ -35,7 +35,7 @@ const app = express();
 const server = http.createServer(app)
 setupWebSocket(server);
 
-console.log("HTTP Server:", server);
+
 
 
 
@@ -101,7 +101,6 @@ const trendRouter = require('./routes/trendRouter')
 const studentPayRouter = require('./routes/studentPayRouter')
 const eventRouter = require('./routes/eventRouter')
 const getNotificationsRouter = require('./routes/getNotificationsRouter')
-// const fcmRouter = require('./routes/fcmRouter')
 const notFound = require("./middlewares/notFound");
 const methodNotAllowed = require("./utils/methodNotAllowed");
 
@@ -116,7 +115,6 @@ app.use('/api/getting',trendRouter)
 app.use('/api/payment',studentPayRouter)
 app.use('/api/schoolEvent',eventRouter)
 app.use('/api/plug',getNotificationsRouter)
-// app.use('/api/notify',fcmRouter)
 app.use(notFound);
 app.use(methodNotAllowed);
 

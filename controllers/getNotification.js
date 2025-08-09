@@ -1,4 +1,3 @@
-// const mongoose = require("mongoose");
 const { Notification } = require("../models/notification");
 const UserPost = require('../models/post')
 const SugPost = require('../models/sugPost')
@@ -8,14 +7,14 @@ const SugPost = require('../models/sugPost')
 const fetchNotification = async (req, res) => {
     try {
       const { userId } = req.params;
-      const { type } = req.query; // `type` can be 'like', 'comment', or 'all'
+      const { type } = req.query; 
   
       console.log("Fetching notifications for user:", userId);
       console.log("Notification type:", type);
   
       const query = { userId };
       if (type && type !== "all") {
-        query.type = type; // Filter notifications by type at the database level
+        query.type = type; 
       }
   
       const notifications = await Notification.find(query).sort({ createdAt: -1 });
@@ -85,7 +84,7 @@ const fetchNotification = async (req, res) => {
               photo: notification.likerPhoto,
               comment: notification.body,
               commentId: notification.commentId,
-              notificationId: notification._id, // Ensure notificationId is added for comments
+              notificationId: notification._id, 
             });
           }
         }
@@ -141,7 +140,7 @@ const fetchNotification = async (req, res) => {
   
           if (commentersCount > 0) {
             notificationsToReturn.push({
-              notificationId: group.comments[0].notificationId,  // Ensure comment notificationId is returned
+              notificationId: group.comments[0].notificationId,  
               postId: group.postId,
               title: "Your post has new comments",
               text: group.text,

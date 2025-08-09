@@ -1,4 +1,3 @@
-// routes/student.js
 const express = require('express')
 const StudentPayment = require("../models/studentPayment");
 const EventPayment = require("../models/eventpymt");
@@ -186,79 +185,6 @@ const getStudentPaymentDetails = async (req, res) => {
     });
   }
 };
-// const getStudentPaymentDetails = async (req, res) => {
-//   const { email } = req.query;
-
-//   try {
-//     const studentDetails = await StudentPayment.findOne({ email });
-//     console.log('Found student payment:', studentDetails ? {
-//       email: studentDetails.email,
-//       schoolInfoId: studentDetails.schoolInfoId
-//     } : 'not found');
-
-//     if (!studentDetails) {
-//       return res.status(404).json({ error: "Student not found" });
-//     }
-
-//     // Log the schoolInfoId we're trying to find
-//     console.log('Looking for schoolInfoId:', studentDetails.schoolInfoId);
-
-//     // Ensure schoolInfoId is valid before querying
-//     if (!studentDetails.schoolInfoId) {
-//       return res.status(400).json({ error: "Student payment record is missing schoolInfoId" });
-//     }
-
-//     const schoolInfo = await SchoolInfo.findById(studentDetails.schoolInfoId);
-//     console.log('Found schoolInfo:', schoolInfo ? {
-//       _id: schoolInfo._id,
-//       university: schoolInfo.university
-//     } : 'not found');
-
-//     if (!schoolInfo) {
-//       return res.status(404).json({ 
-//         error: "School information not found",
-//         searchedId: studentDetails.schoolInfoId
-//       });
-//     }
-
-//     const { accountNumber, accountName, bankName } = schoolInfo.virtualAccount;
-//     // const accountName = schoolInfo.university;
-
-//     const serviceCharge = 100;
-//     const totalFee = parseFloat(studentDetails.feeAmount) + serviceCharge;
-
-//     res.status(200).json({
-//       success: true,
-//       student: {
-//         firstName: studentDetails.firstName,
-//         lastName: studentDetails.lastName,
-//         department: studentDetails.department,
-//         regNo: studentDetails.regNo,
-//         academicLevel: studentDetails.academicLevel,
-//         email: studentDetails.email,
-//         feeType: studentDetails.feeType,
-//         senderAccountNumber:studentDetails.senderAccountNumber,
-//         virtualAccount: {
-//           accountNumber,
-//           accountName,
-//           bankName,
-//         },
-//         paymentDetails: {
-//           paymentMethod: "Bank Transfer",
-//           paymentAmount: totalFee,
-//           originalAmount: studentDetails.feeAmount,
-//           serviceCharge,
-//         },
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Error fetching student payment details:", error);
-//     res.status(500).json({ 
-//       error: "An error occurred while fetching details",
-//       details: error.message
-//     });
-//   }
-// };
 
 
 
@@ -592,12 +518,7 @@ const fidelityWebhook = async (req, res) => {
       webhookRaw: payload,
     });
 
-//     const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
-// if (event) {
-//   console.log(" Payment matched an Event virtual account.");
-//   await recordEventTransaction(event._id, senderAccountNumber, reference, amount);
-//   return;
-// }
+
 
 const event = await Event.findOne({ "virtualAccounts.fidelity.accountNumber": accountNumber });
     if (event) {
@@ -721,121 +642,6 @@ const retrieveStudentDetails = async (req, res) => {
 };
 
 
-// const schoolPaymentStatus = async (req, res) => {
-//     const { schoolInfoId } = req.params;
-//     const { page = 1, limit = 1 } = req.query; 
-
-//     try {
-//         // Retrieve school information and populate related faculties and students
-//         const schoolInfo = await SchoolInfo.findById(schoolInfoId)
-//             .populate({
-//                 path: "faculties",
-//                 select: "facultyName",
-//             })
-//             .populate({
-//                 path: "students",
-//                 select: "registrationNumber faculty transactions",
-//                 populate: [
-//                     {
-//                         path: "faculty",
-//                         select: "facultyName",
-//                     },
-//                     {
-//                         path: "transactions",
-//                         select: "status",
-//                     },
-//                 ],
-//             });
-
-//         if (!schoolInfo) {
-//             return res.status(404).json({ message: "School information not found." });
-//         }
-
-//         const totalRegistrations = schoolInfo.students.length;
-//         let totalPaid = 0;
-
-//         // Create a dictionary to hold data grouped by faculty
-//         const facultyWiseData = {};
-
-//         schoolInfo.faculties.forEach((faculty) => {
-//             facultyWiseData[faculty._id] = {
-//                 facultyName: faculty.facultyName,
-//                 totalRegistrations: 0,
-//                 students: [],
-//             };
-//         });
-
-//         // Categorize students by faculty and payment status
-//         schoolInfo.students.forEach((student) => {
-//             const hasPaid = student.transactions.some(
-//                 (transaction) => transaction.status === "successful"
-//             );
-//             const paymentStatus = hasPaid ? "Paid" : "Unpaid";
-//             const formattedRegNo = `${student.registrationNumber}`;
-
-//             if (student.faculty && facultyWiseData[student.faculty._id]) {
-//                 facultyWiseData[student.faculty._id].totalRegistrations++;
-//                 facultyWiseData[student.faculty._id].students.push({
-//                     registrationNumber: formattedRegNo,
-//                     status: paymentStatus,
-//                 });
-//             }
-
-//             if (hasPaid) {
-//                 totalPaid++;
-//             }
-//         });
-
-//         const totalUnpaid = totalRegistrations - totalPaid;
-
-//         // Implement pagination for faculties
-//         const facultyEntries = Object.values(facultyWiseData);
-//         const totalFaculties = facultyEntries.length;
-
-//         const startIndex = (page - 1) * limit; 
-//         const endIndex = startIndex + parseInt(limit, 10); 
-
-//         // Slice the faculty entries based on pagination indices
-//         const paginatedFaculties = facultyEntries.slice(
-//             Math.max(startIndex, 0), 
-//             Math.min(endIndex, totalFaculties)
-//         );
-
-//         // Handle case where no entries exist for the requested page
-//         if (paginatedFaculties.length === 0) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "No faculties found for the specified page.",
-//             });
-//         }
-
-//         // Format response
-//         const result = {
-//             totalRegistrations,
-//             totalPaid,
-//             totalUnpaid,
-//             facultyDetails: paginatedFaculties,
-//             pagination: {
-//                 currentPage: Number(page),
-//                 totalPages: Math.ceil(totalFaculties / limit),
-//                 hasNextPage: endIndex < totalFaculties,
-//                 hasPrevPage: startIndex > 0,
-//             },
-//         };
-
-//         return res.status(200).json({
-//             success: true,
-//             message: "School payment status retrieved successfully.",
-//             data: result,
-//         });
-//     } catch (error) {
-//         console.error("Error retrieving school payment status:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "An error occurred while retrieving school payment status.",
-//         });
-//     }
-// };
 
 const schoolPaymentStatus = async (req, res) => {
     const { schoolInfoId } = req.params;
@@ -854,7 +660,7 @@ const schoolPaymentStatus = async (req, res) => {
         }
 
         // Get the university name to use the correct student collection
-        const universityName = schoolInfo.university; // Assuming this field exists
+        const universityName = schoolInfo.university; 
         const StudentModel = getSchoolStudentModel(universityName);
 
         // Find students for this school and populate faculty and transactions

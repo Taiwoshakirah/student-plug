@@ -1,84 +1,12 @@
-// const FidelityNotification = require("../models/fidelityWehook")
 
-// const Transaction = require("../models/transaction");
-// const StudentPayment = require("../models/studentPayment");
-// const Student = require('../models/studentRegNo')
-
-
-// const generateReceiptDetails = async (transaction_ref) => {
-//   try {
-//     //  Find the transaction
-//     const transaction = await Transaction.findOne({ reference: transaction_ref });
-//     if (!transaction) throw new Error("Transaction not found.");
-
-//     const {
-//       email,
-//       amount,
-//       feeType,
-//       reference,
-//       createdAt,
-//       student: studentId
-//     } = transaction;
-
-//     //  Find the Student record
-//     const student = await Student.findById(studentId);
-//     if (!student) throw new Error("Student record not found.");
-
-//     //  Find the StudentPayment record using regNo
-//     const studentPayment = await StudentPayment.findOne({ regNo: student.registrationNumber });
-//     if (!studentPayment) throw new Error("StudentPayment record not found.");
-
-//     const {
-//       regNo,
-//       department,
-//       academicLevel,
-//       firstName,
-//       lastName
-//     } = studentPayment;
-
-//     const fullName = `${firstName} ${lastName}`;
-//     const date = createdAt.toLocaleDateString("en-GB", {
-//       day: "2-digit",
-//       month: "short",
-//       year: "numeric",
-//     });
-//     const time = createdAt.toLocaleTimeString("en-GB", {
-//       hour: "2-digit",
-//       minute: "2-digit",
-//     });
-
-//     return {
-//       paymentStatus: "success",
-//       amount,
-//       reference,
-//       regNo,
-//       fullName,
-//       department,
-//       academicLevel,
-//       date,
-//       time,
-//     };
-//   } catch (error) {
-//     console.error("Error generating receipt:", error.message);
-//     return null;
-//   }
-// };
-
-
-
-
-
-
-// module.exports = generateReceiptDetails;
 
 
 const FidelityNotification = require("../models/fidelityWehook");
 const Transaction = require("../models/transaction");
 const StudentPayment = require("../models/studentPayment");
-const SchoolInfo = require("../models/schoolInfo"); // Add this import
+const SchoolInfo = require("../models/schoolInfo"); 
 const mongoose = require("mongoose");
 const studentSchema = require("../models/studentRegNo").schema;
-// Remove: const Student = require('../models/studentRegNo') - No longer needed
 
 const getSchoolStudentModel = (universityName) => {
   const collectionName = `students_${universityName.toLowerCase().replace(/\s+/g, "_")}`;
@@ -97,7 +25,7 @@ const generateReceiptDetails = async (transaction_ref) => {
       reference,
       createdAt,
       student: studentId,
-      studentPayment: studentPaymentId // If you added this field to transaction schema
+      studentPayment: studentPaymentId 
     } = transaction;
 
     // Method 1: If you have studentPayment reference in transaction (recommended)
@@ -158,10 +86,10 @@ const generateReceiptDetails = async (transaction_ref) => {
       fullName,
       department,
       academicLevel,
-      schoolName: schoolInfo.university, // Add school name to receipt
+      schoolName: schoolInfo.university, 
       date,
       time,
-      feeType, // Include fee type in receipt
+      feeType, 
     };
     
   } catch (error) {
@@ -183,7 +111,7 @@ const generateReceiptDetailsWithSchool = async (transaction_ref, schoolName = nu
       reference,
       createdAt,
       student: studentId,
-      schoolName: transactionSchoolName // If you added this to transaction schema
+      schoolName: transactionSchoolName 
     } = transaction;
 
     // Use provided schoolName or get from transaction

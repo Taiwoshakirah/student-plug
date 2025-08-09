@@ -77,7 +77,7 @@ const setupWebSocket = (server) => {
         const existingClient = clients.get(userId);
         if (existingClient && existingClient !== ws) {
           console.log(`User ${userId} already connected. Updating connection.`);
-          clients.set(userId, ws); // Update to new WebSocket
+          clients.set(userId, ws);
         } else if (!existingClient) {
           clients.set(userId, ws);
         }

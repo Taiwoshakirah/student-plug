@@ -7,7 +7,7 @@ const studentSchema = require("../models/studentRegNo").schema;
 const axios = require("axios");
 require("dotenv").config();
 const Transaction = require('../models/transaction')
-const CardDetails = require('../models/cardDetails')
+
 const SchoolInfo = require('../models/schoolInfo')
 const StudentInfo = require('../models/studentInfo')
 const Faculty = require('../models/faculties')
